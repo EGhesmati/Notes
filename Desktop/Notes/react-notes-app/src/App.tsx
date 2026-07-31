@@ -6,6 +6,10 @@ function App() {
   const [notes, setNotes] = useState<string[]>([]);
 
   function addNote() {
+    if (note.trim() === "") {
+      return;
+    }
+
     setNotes([...notes, note]);
     setNote("");
   }
