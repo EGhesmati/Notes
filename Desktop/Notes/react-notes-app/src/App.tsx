@@ -31,6 +31,7 @@ function App() {
       />
 
       <button onClick={addNote}>Add Note</button>
+      <p>Characters: {note.length}</p>
 
       <hr />
 
@@ -41,6 +42,7 @@ function App() {
           <button onClick={() => deleteNote(index)}>
             Delete
           </button>
+
         </div>
       ))}
     </div>
