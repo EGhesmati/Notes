@@ -1,20 +1,28 @@
-import { useState, useMemo, useCallback, lazy, Suspense } from "react";
+import { useState, useMemo, useCallback, lazy, Suspense, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, StickyNote, Sun, Moon } from "lucide-react";
+import { Plus, Search, StickyNote, Sun, Moon, Loader2 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounce } from "@/hooks/use-debounce";
-import { NotesGridSkeleton } from "@/components/NotesGridSkeleton";
-import type { NoteItem, NotesState } from "@/types";
+import { useLocalStorage } from "@/hooks/use-local-storage";
+import { AppLoadingScreen } from "@/components/AppLoadingScreen";
+import type { NoteItem } from "@/types";
 
 const NotesGrid = lazy(() => import("@/components/NotesGrid"));
 
 function App() {
   const [text, setText] = useState("");
-  const [notes, setNotes] = useState<NotesState>([]);
+  const [notes, setNotes] = useLocalStorage<NoteItem[]>("notes", []);
   const [search, setSearch] = useState("");
+  const [hydrated, setHydrated] = useState(false);
   const { theme, toggle } = useTheme();
+
+  // Show loading screen on first mount, then reveal the app
+  useEffect(() => {
+    const id = setTimeout(() => setHydrated(true), 400);
+    return () => clearTimeout(id);
+  }, []);
 
   const debouncedSearch = useDebounce(search, 200);
 
@@ -28,11 +36,14 @@ function App() {
     };
     setNotes((prev) => [...prev, newNote]);
     setText("");
-  }, [text]);
+  }, [text, setNotes]);
 
-  const deleteNote = useCallback((id: number) => {
-    setNotes((prev) => prev.filter((n) => n.id !== id));
-  }, []);
+  const deleteNote = useCallback(
+    (id: number) => {
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+    },
+    [setNotes],
+  );
 
   const filtered = useMemo(
     () =>
@@ -43,6 +54,9 @@ function App() {
         : notes,
     [notes, debouncedSearch],
   );
+
+  // Initial loading screen
+  if (!hydrated) return <AppLoadingScreen />;
 
   return (
     <div className="relative mx-auto max-w-5xl px-6 py-12 sm:py-16">
@@ -122,7 +136,13 @@ function App() {
           No notes yet. Add your first one!
         </p>
       ) : (
-        <Suspense fallback={<NotesGridSkeleton />}>
+        <Suspense
+          fallback={
+            <div className="flex justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          }
+        >
           <NotesGrid notes={filtered} onDelete={deleteNote} />
         </Suspense>
       )}
