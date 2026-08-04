@@ -7,7 +7,11 @@ A clean, modern note-taking app built with **React 19**, **shadcn/ui**, and **Ta
 ![Vite](https://img.shields.io/badge/vite-8-646CFF?logo=vite)
 ![Tailwind](https://img.shields.io/badge/tailwind-4-06B6D4?logo=tailwindcss)
 ![shadcn/ui](https://img.shields.io/badge/shadcn%2Fui-latest-black?logo=shadcnui)
+![Lucide](https://img.shields.io/badge/icons-lucide-F56565?logo=lucide)
+![localStorage](https://img.shields.io/badge/storage-localStorage-FFA116?logo=html5)
+![Lazy Load](https://img.shields.io/badge/code%20split-lazy%20load-7C3AED)
 ![GitHub Pages](https://img.shields.io/badge/deployed-github%20pages-222222?logo=github)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -131,28 +135,33 @@ App
 
 ```
 react-notes-app/
-├── components.json              # shadcn config
-├── vite.config.ts               # Vite + Tailwind plugin + @/ alias
-├── tsconfig.app.json            # TS paths & strict options
+├── components.json                # shadcn config
+├── vite.config.ts                 # Vite + Tailwind plugin + @/ alias
+├── tsconfig.app.json              # TS paths & strict options
 ├── package.json
 │
 ├── public/
 │   └── favicon.svg
 │
 ├── src/
-│   ├── main.tsx                 # Entry point
-│   ├── index.css                # Tailwind imports + theme variables
-│   ├── App.tsx                  # Main application
+│   ├── main.tsx                   # Entry point
+│   ├── index.css                  # Tailwind imports + theme variables
+│   ├── App.tsx                    # Main application
+│   ├── types.ts                   # TypeScript interfaces
 │   ├── hooks/
-│   │   └── use-theme.ts        # Theme toggle logic
+│   │   ├── use-theme.ts          # Theme toggle + persistence
+│   │   ├── use-debounce.ts       # Debounced search input
+│   │   └── use-local-storage.ts  # Persistent state sync
 │   ├── lib/
-│   │   └── utils.ts            # cn() helper
+│   │   └── utils.ts              # cn() class helper
 │   └── components/
+│       ├── NotesGrid.tsx          # Lazy-loaded grid (code-split)
+│       ├── AppLoadingScreen.tsx   # Initial loading screen
 │       └── ui/
-│           ├── button.tsx       # shadcn Button
-│           ├── input.tsx        # shadcn Input
-│           ├── card.tsx         # shadcn Card
-│           └── badge.tsx        # shadcn Badge
+│           ├── button.tsx         # shadcn Button
+│           ├── input.tsx          # shadcn Input
+│           ├── card.tsx           # shadcn Card
+│           └── badge.tsx          # shadcn Badge
 ```
 
 ---
