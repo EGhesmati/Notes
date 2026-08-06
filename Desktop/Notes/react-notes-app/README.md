@@ -1,68 +1,73 @@
-# 📝 Notes
+# 📝 Notes App
 
-A clean, modern note-taking app built with **React 19**, **shadcn/ui**, and **Tailwind CSS v4**. Create, search, and delete notes in a responsive glassmorphism grid with full dark/light theme support.
+A full-stack productivity platform with notes, Pomodoro timer, statistics, and user authentication.
 
 ![React](https://img.shields.io/badge/react-19-61DAFB?logo=react)
 ![TypeScript](https://img.shields.io/badge/typescript-6-3178C6?logo=typescript)
 ![Vite](https://img.shields.io/badge/vite-8-646CFF?logo=vite)
 ![Tailwind](https://img.shields.io/badge/tailwind-4-06B6D4?logo=tailwindcss)
+![Express](https://img.shields.io/badge/express-4-000000?logo=express)
+![PostgreSQL](https://img.shields.io/badge/database-neon%20postgresql-00E599?logo=postgresql)
 ![shadcn/ui](https://img.shields.io/badge/shadcn%2Fui-latest-black?logo=shadcnui)
-![Lucide](https://img.shields.io/badge/icons-lucide-F56565?logo=lucide)
-![localStorage](https://img.shields.io/badge/storage-localStorage-FFA116?logo=html5)
-![Lazy Load](https://img.shields.io/badge/code%20split-lazy%20load-7C3AED)
-![GitHub Pages](https://img.shields.io/badge/deployed-github%20pages-222222?logo=github)
-![License](https://img.shields.io/badge/license-MIT-green)
+![GitHub Pages](https://img.shields.io/badge/frontend-github%20pages-222222?logo=github)
+![Render](https://img.shields.io/badge/backend-render-46E3B7?logo=render)
 
 ---
 
-## ✨ Features in detail
+## ✨ Features
 
-### Core
-| Feature | Details |
-|---------|---------|
-| **Add notes** | Type and click *Add* or press **Enter**. Empty / whitespace-only notes are rejected. |
-| **Delete notes** | Hover over any note to reveal the trash icon. Delete button uses a functional state update to avoid stale closures under rapid clicks. |
-| **Search** | Filters notes in real-time as you type. Case-insensitive. A match-count badge appears while searching. |
-| **Character counter** | Live character count below the input, updated on every keystroke. |
-| **Empty states** | Shows contextual messages: *"No notes yet."* vs *"No matching notes."* when searching. |
+### Notes
+- Create, edit, delete notes with inline editing
+- **Priority badges** — Low / Medium / High with color indicators
+- **Due dates** — Date picker + custom time input
+- **Urgency display** — Today, Tomorrow, Overdue Xd badges
+- **Pin notes** — Pinned notes sort to top
+- **Search** — Real-time filtering with match count
+- **Categories via Pomodoro linking** — Track time per note
 
-### UI
-| Feature | Details |
-|---------|---------|
-| **Dark / light mode** | Toggle via the sun/moon icon in the top-right. Preference persists in `localStorage` and falls back to the system `prefers-color-scheme` media query. |
-| **Glassmorphism** | All inputs and note cards use `backdrop-blur-xl` over semi-transparent backgrounds, giving the frosted-glass effect. |
-| **Responsive grid** | 1 column on mobile, 2 on tablet (`sm:`), 3 on desktop (`lg:`). Cards stretch to equal height within each row. |
-| **Theme-aware colors** | Every component uses shadcn CSS variables (`--background`, `--card`, `--border`, `--primary`, etc.) so the palette switches seamlessly between light and dark. |
+### Pomodoro Timer
+- Auto-cycling focus / short break / long break
+- **25 / 60 / 90 min** focus, **5 / 10 / 15 min** short break
+- **30 min** long break every 4th cycle
+- 🔗 **Link to notes** — track which note you're working on
+- 🔊 Sound effects + browser notifications
+- 💾 Persists on page reload
 
-### Dev
-| Feature | Details |
-|---------|---------|
-| **State safety** | Both `addNote` and `deleteNote` use React functional state updates (`setNotes(prev => ...)`) to prevent stale-closure bugs. |
-| **TypeScript** | Full type safety with TS 6, strict linting (`noUnusedLocals`, `noUnusedParameters`, `erasableSyntaxOnly`). |
-| **shadcn components** | `Button`, `Input`, `Card` (+ `CardContent`), and `Badge` — all tree-shakeable and imported individually. |
-| **Lucide icons** | `Plus`, `Search`, `Trash2`, `StickyNote`, `Sun`, `Moon` — lightweight SVG icons. |
-| **GitHub Pages** | Deployed via `gh-pages` with `base: '/Notes/'` configured in Vite for correct asset paths. |
+### Statistics Dashboard
+- Today / This Week / This Month summary
+- **Last 7 Days** bar chart
+- 🔥 **Streaks** — current + longest
+- 📊 **Completion rate** — finished vs abandoned sessions
+- 📝 **Per-note breakdown** — focus time per linked note
+- 🎯 **Daily focus goal** — progress bar with targets (2/4/6/8)
 
----
-
-## 🛠 Tech stack
-
-| Layer | Library | Version |
-|-------|---------|---------|
-| Framework | React | 19 |
-| Language | TypeScript | 6 |
-| Build tool | Vite | 8 |
-| UI primitives | shadcn/ui | latest |
-| Styling | Tailwind CSS | 4 |
-| Animations | tw-animate-css | 1 |
-| Icons | Lucide React | 1 |
-| Class merging | clsx + tailwind-merge | 2 / 3 |
-| Font | Geist Variable | — |
-| Deployment | gh-pages | — |
+### Auth & Backend
+- **Passcode-based login/register** — no email required
+- **Per-user data isolation** — each user has their own notes
+- **Admin panel** — view users, change passcodes, delete accounts
+- **JWT authentication** — 30-day tokens
+- **postgresql** — persistent storage
+- **Full offline fallback** — works without backend via localStorage
 
 ---
 
-## 🚀 Getting started
+## 🛠 Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 19, TypeScript 6, Vite 8 |
+| Styling | Tailwind CSS 4, shadcn/ui |
+| Icons | Lucide React |
+| Backend | Express.js 4, TypeScript |
+| Database | Neon PostgreSQL (serverless) |
+| Auth | JWT (jsonwebtoken) |
+| Hosting | GitHub Pages (frontend) + Render (backend) |
+
+---
+
+## 🚀 Getting Started
+
+### Frontend
 
 ```bash
 git clone https://github.com/EGhesmati/Notes.git
@@ -72,97 +77,79 @@ npm install
 npm run dev        # → http://localhost:5173
 ```
 
-| Command | What it does |
-|---------|-------------|
-| `npm run dev` | Start Vite dev server with HMR |
-| `npm run build` | Type-check with `tsc` then bundle with Vite |
-| `npm run preview` | Serve the production build locally |
-| `npm run lint` | Run ESLint |
-| `npm run deploy` | Build + push `dist/` to the `gh-pages` branch |
+### Backend
 
----
-
-## 🌐 Live demo
-
-👉 **[eghesmati.github.io/Notes](https://EGhesmati.github.io/Notes)**
-
----
-
-## 🧱 How it works
-
-### Theme system
-
-```
-useTheme() hook
-  ├── Reads localStorage for saved preference
-  ├── Falls back to prefers-color-scheme media query
-  ├── Toggles .dark class on <html> element
-  └── Listens for system preference changes
-
-index.css
-  ├── :root { ... }          → light palette
-  ├── .dark { ... }          → dark palette
-  └── @theme inline { ... }  → maps CSS vars to Tailwind utilities
+```bash
+cd server
+npm install
+npm run seed       # creates default admin user
+npm run dev        # → http://localhost:3001
 ```
 
-### Data flow
+### Environment Variables
 
 ```
-[note state] ──→ Input (controlled)
-[notes state] ──→ Grid → Card → deleteNote(index)
-[search state] ──→ filter() → filtered array → Grid
-```
-
-### Component tree
-
-```
-App
-├── Theme toggle (Sun / Moon icon)
-├── Header (title + subtitle)
-├── Input + Add button
-├── Character counter
-├── Search input
-├── Stats badges (note count, match count)
-└── Grid
-    └── Card (× n)
-        ├── Note text
-        └── Delete button (reveals on hover)
+VITE_API_URL=http://localhost:3001    # frontend (.env.local)
+DATABASE_URL=postgres://...            # backend (server env)
+JWT_SECRET=your-secret                # backend
+ADMIN_TOKEN=admin-secret-token        # backend
+ADMIN_NAME=admin                      # backend (seed)
+ADMIN_PASSCODE=changeme               # backend (seed)
 ```
 
 ---
 
-## 📁 Project structure
+## 🌐 Live Demo
+
+👉 **[eghesmati.github.io/Notes](https://eghesmati.github.io/Notes)**
+
+---
+
+## 📁 Project Structure
 
 ```
 react-notes-app/
-├── components.json                # shadcn config
-├── vite.config.ts                 # Vite + Tailwind plugin + @/ alias
-├── tsconfig.app.json              # TS paths & strict options
-├── package.json
-│
-├── public/
-│   └── favicon.svg
-│
+├── server/
+│   ├── server.ts              # Express API (auth, notes, sessions, admin)
+│   ├── seed.ts                # Database seeder
+│   └── package.json
 ├── src/
-│   ├── main.tsx                   # Entry point
-│   ├── index.css                  # Tailwind imports + theme variables
-│   ├── App.tsx                    # Main application
-│   ├── types.ts                   # TypeScript interfaces
-│   ├── hooks/
-│   │   ├── use-theme.ts          # Theme toggle + persistence
-│   │   ├── use-debounce.ts       # Debounced search input
-│   │   └── use-local-storage.ts  # Persistent state sync
+│   ├── main.tsx               # Entry point
+│   ├── App.tsx                # Main app with auth gate
+│   ├── types.ts               # TypeScript types
 │   ├── lib/
-│   │   └── utils.ts              # cn() class helper
-│   └── components/
-│       ├── NotesGrid.tsx          # Lazy-loaded grid (code-split)
-│       ├── AppLoadingScreen.tsx   # Initial loading screen
-│       └── ui/
-│           ├── button.tsx         # shadcn Button
-│           ├── input.tsx          # shadcn Input
-│           ├── card.tsx           # shadcn Card
-│           └── badge.tsx          # shadcn Badge
+│   │   ├── api.ts             # API client (fetch wrapper)
+│   │   └── auth-context.tsx   # Auth context provider
+│   ├── hooks/
+│   │   ├── use-user-notes.ts      # Notes CRUD (API + localStorage)
+│   │   ├── use-pomodoro-stats.ts  # Pomodoro stats engine
+│   │   ├── use-theme.ts           # Dark/light mode
+│   │   ├── use-debounce.ts        # Search debouncing
+│   │   └── use-local-storage.ts   # localStorage sync
+│   ├── components/
+│   │   ├── NotesGrid.tsx          # Note cards with edit/pin/delete/urgency
+│   │   ├── PomodoroTimer.tsx      # Auto-cycling timer + note linking
+│   │   ├── PomodoroStats.tsx      # Statistics dashboard
+│   │   ├── DailyGoal.tsx          # Daily focus goal progress bar
+│   │   ├── TimeChips.tsx          # Custom time input (HH:MM)
+│   │   ├── AppLoadingScreen.tsx   # Loading state
+│   │   └── ui/                    # shadcn components
+│   └── pages/
+│       └── LoginPage.tsx          # Passcode login/register
+└── public/
+    ├── favicon.svg
+    └── 404.html                   # GitHub Pages SPA redirect
 ```
+
+---
+
+## 🔧 Deployment
+
+| Part | Platform | Command |
+|------|----------|---------|
+| Frontend | GitHub Pages | `npm run deploy` |
+| Backend | Render | Auto-deploys from `main` branch |
+| Database | Neon | Serverless PostgreSQL |
 
 ---
 
