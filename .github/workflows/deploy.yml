@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -17,7 +18,7 @@ jobs:
           node-version: 22
 
       - name: Install & Build
-        working-directory: react-notes-app
+        working-directory: Desktop/Notes/react-notes-app
         env:
           VITE_API_URL: https://notes-api-nt3p.onrender.com
         run: |
@@ -28,4 +29,4 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: react-notes-app/dist
+          publish_dir: Desktop/Notes/react-notes-app/dist
