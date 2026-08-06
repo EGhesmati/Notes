@@ -18,7 +18,7 @@ const pool = new pg.Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthor
 await pool.query(`
   CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     passcode TEXT NOT NULL UNIQUE
   );
   CREATE TABLE IF NOT EXISTS notes (
