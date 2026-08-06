@@ -83,8 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(err.error || "Registration failed");
     }
     const data = await res.json();
-    setToken(data.token);
-    setUser(data.user);
+    // Don't set token/user here — let the user see the passcode first,
+    // then sign in explicitly via signIn().
     return data.passcode as string;
   }, []);
 

@@ -38,6 +38,15 @@ export function LoginPage() {
     setCopied(true);
   };
 
+  const handleSignInWithCode = async () => {
+    setError("");
+    try {
+      await signIn(name, generatedCode);
+    } catch {
+      setError("Sign in failed. Please try again.");
+    }
+  };
+
   if (mode === "show-passcode") {
     return (
       <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-4">
@@ -55,9 +64,12 @@ export function LoginPage() {
               {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
             </Button>
           </div>
+          {error && (
+            <p className="mt-2 text-xs text-rose-500">{error}</p>
+          )}
           <Button
             className="mt-4 w-full"
-            onClick={() => signIn(name, generatedCode)}
+            onClick={handleSignInWithCode}
           >
             Sign in with this passcode
           </Button>
