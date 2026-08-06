@@ -124,6 +124,30 @@ app.post("/api/sessions", authMiddleware, (req, res) => {
   res.json({ ok: true });
 });
 
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "admin-secret-token";
+
+app.get("/api/admin/users", (req, res) => {
+  if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
+  const users = db.prepare("SELECT id, name, passcode FROM users ORDER BY id").all();
+  res.json(users);
+});
+
+app.put("/api/admin/users/:id/passcode", (req, res) => {
+  if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
+  const { passcode } = req.body;
+  if (!passcode) return res.status(400).json({ error: "passcode required" });
+  db.prepare("UPDATE users SET passcode = ? WHERE id = ?").run(passcode, req.params.id);
+  res.json({ ok: true });
+});
+
+app.delete("/api/admin/users/:id", (req, res) => {
+  if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
+  db.prepare("DELETE FROM notes WHERE user_id = ?").run(req.params.id);
+  db.prepare("DELETE FROM sessions WHERE user_id = ?").run(req.params.id);
+  db.prepare("DELETE FROM users WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
