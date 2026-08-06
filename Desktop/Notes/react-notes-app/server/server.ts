@@ -126,6 +126,41 @@ app.post("/api/sessions", authMiddleware, (req, res) => {
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "admin-secret-token";
 
+app.get("/admin", (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html><head><title>Admin - Notes App</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font-family:system-ui;max-width:600px;margin:40px auto;padding:0 16px;background:#0f0f0f;color:#e0e0e0}
+table{width:100%;border-collapse:collapse;margin-top:16px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #222}
+th{color:#888;font-size:11px;text-transform:uppercase}
+input,button{padding:6px 10px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#e0e0e0;font-size:13px}
+button{background:#7c3aed;border:none;color:white;cursor:pointer;margin-left:6px}
+.delete-btn{background:#dc2626;font-size:11px;padding:4px 8px}
+h1{font-size:18px;margin-bottom:4px}h1 span{color:#7c3aed}p{color:#666;font-size:13px;margin:0}</style></head>
+<body>
+<h1>Notes App <span>Admin</span></h1>
+<p>Users registered on this server</p>
+<div><input id="token" placeholder="Admin token" type="password" style="width:200px"><button onclick="load()">Load</button></div>
+<table id="table"></table>
+<script>
+async function load(){
+  const t=document.getElementById('token').value;
+  const r=await fetch('/api/admin/users',{headers:{'x-admin-token':t}});
+  const users=await r.json();
+  document.getElementById('table').innerHTML=
+    '<tr><th>ID</th><th>Name</th><th>Passcode</th><th></th></tr>'+
+    users.map(u=>'<tr><td>'+u.id+'</td><td>'+u.name+'</td><td><code>'+u.passcode+'</code></td><td><button class="delete-btn" onclick="del('+u.id+')">Delete</button></td></tr>').join('');
+  window._token=t;
+}
+async function del(id){
+  if(!confirm('Delete user '+id+' and all their data?'))return;
+  await fetch('/api/admin/users/'+id,{method:'DELETE',headers:{'x-admin-token':window._token}});
+  load();
+}
+</script></body></html>`);
+});
+
 app.get("/api/admin/users", (req, res) => {
   if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
   const users = db.prepare("SELECT id, name, passcode FROM users ORDER BY id").all();
