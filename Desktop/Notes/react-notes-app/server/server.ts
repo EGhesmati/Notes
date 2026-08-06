@@ -1,37 +1,43 @@
-import Database from "better-sqlite3";
+import pg from "pg";
 import express from "express";
 import cors from "cors";
-import crypto from "crypto";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
+const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
 const PORT = parseInt(process.env.PORT || "3001", 10);
+const DATABASE_URL = process.env.DATABASE_URL;
 
-const db = new Database("notes.db");
-db.pragma("journal_mode = WAL");
-db.exec(`
+if (!DATABASE_URL) {
+  console.error("DATABASE_URL is required");
+  process.exit(1);
+}
+
+const pool = new pg.Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
+// init tables
+await pool.query(`
   CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     passcode TEXT NOT NULL UNIQUE
   );
   CREATE TABLE IF NOT EXISTS notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
     text TEXT NOT NULL,
     color TEXT NOT NULL DEFAULT 'border-l-sky-400',
     priority TEXT,
     due_date TEXT,
     pinned INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
   CREATE TABLE IF NOT EXISTS sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
     duration INTEGER NOT NULL,
     note_id INTEGER,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
 `);
 
@@ -53,23 +59,25 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
   }
 }
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const { name, passcode } = req.body;
   if (!name || !passcode) return res.status(400).json({ error: "name and passcode required" });
-  const user = db.prepare("SELECT id, name FROM users WHERE name = ? AND passcode = ?").get(name, passcode) as any;
-  if (!user) return res.status(401).json({ error: "invalid credentials" });
+  const { rows } = await pool.query("SELECT id, name FROM users WHERE name = $1 AND passcode = $2", [name, passcode]);
+  if (rows.length === 0) return res.status(401).json({ error: "invalid credentials" });
+  const user = rows[0];
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
   res.json({ token, user: { id: user.id, name: user.name } });
 });
 
-app.post("/api/auth/register", (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: "name required" });
-  const passcode = crypto.randomBytes(4).toString("hex");
+  const passcode = Array.from({ length: 8 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]).join("");
   try {
-    const result = db.prepare("INSERT INTO users (name, passcode) VALUES (?, ?)").run(name, passcode);
-    const token = jwt.sign({ userId: result.lastInsertRowid }, JWT_SECRET, { expiresIn: "30d" });
-    res.json({ token, passcode, user: { id: result.lastInsertRowid, name } });
+    const { rows } = await pool.query("INSERT INTO users (name, passcode) VALUES ($1, $2) RETURNING id, name", [name, passcode]);
+    const user = rows[0];
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
+    res.json({ token, passcode, user: { id: user.id, name: user.name } });
   } catch {
     res.status(409).json({ error: "name already taken" });
   }
@@ -77,52 +85,61 @@ app.post("/api/auth/register", (req, res) => {
 
 // ---- Notes ----
 
-app.get("/api/notes", authMiddleware, (req, res) => {
-  const notes = db.prepare("SELECT * FROM notes WHERE user_id = ? ORDER BY pinned DESC, created_at DESC").all((req as any).userId);
-  res.json(notes.map((n: any) => ({
+app.get("/api/notes", authMiddleware, async (req, res) => {
+  const { rows } = await pool.query(
+    "SELECT * FROM notes WHERE user_id = $1 ORDER BY pinned DESC, created_at DESC",
+    [(req as any).userId],
+  );
+  res.json(rows.map((n: any) => ({
     ...n,
     dueDate: n.due_date || undefined,
     pinned: !!n.pinned,
   })));
 });
 
-app.post("/api/notes", authMiddleware, (req, res) => {
+app.post("/api/notes", authMiddleware, async (req, res) => {
   const { text, color, priority, dueDate, pinned } = req.body;
-  const result = db.prepare(
-    "INSERT INTO notes (user_id, text, color, priority, due_date, pinned) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run((req as any).userId, text, color, priority || null, dueDate || null, pinned ? 1 : 0);
-  const note = db.prepare("SELECT * FROM notes WHERE id = ?").get(result.lastInsertRowid) as any;
+  const { rows } = await pool.query(
+    "INSERT INTO notes (user_id, text, color, priority, due_date, pinned) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+    [(req as any).userId, text, color, priority || null, dueDate || null, pinned ? 1 : 0],
+  );
+  const note = rows[0];
   res.json({ ...note, dueDate: note.due_date || undefined, pinned: !!note.pinned });
 });
 
-app.put("/api/notes/:id", authMiddleware, (req, res) => {
+app.put("/api/notes/:id", authMiddleware, async (req, res) => {
   const { text, color, priority, dueDate, pinned } = req.body;
-  db.prepare(
-    "UPDATE notes SET text = ?, color = ?, priority = ?, due_date = ?, pinned = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?"
-  ).run(text, color, priority || null, dueDate || null, pinned ? 1 : 0, req.params.id, (req as any).userId);
+  await pool.query(
+    "UPDATE notes SET text = COALESCE($1, text), priority = $2, due_date = $3, pinned = COALESCE($4, pinned), updated_at = NOW() WHERE id = $5 AND user_id = $6",
+    [text, priority || null, dueDate || null, pinned != null ? (pinned ? 1 : 0) : null, req.params.id, (req as any).userId],
+  );
   res.json({ ok: true });
 });
 
-app.delete("/api/notes/:id", authMiddleware, (req, res) => {
-  db.prepare("DELETE FROM notes WHERE id = ? AND user_id = ?").run(req.params.id, (req as any).userId);
+app.delete("/api/notes/:id", authMiddleware, async (req, res) => {
+  await pool.query("DELETE FROM notes WHERE id = $1 AND user_id = $2", [req.params.id, (req as any).userId]);
   res.json({ ok: true });
 });
 
 // ---- Sessions ----
 
-app.get("/api/sessions", authMiddleware, (req, res) => {
-  const sessions = db.prepare(
-    "SELECT * FROM sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 500"
-  ).all((req as any).userId);
-  res.json(sessions);
+app.get("/api/sessions", authMiddleware, async (req, res) => {
+  const { rows } = await pool.query(
+    "SELECT * FROM sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 500",
+    [(req as any).userId],
+  );
+  res.json(rows);
 });
 
-app.post("/api/sessions", authMiddleware, (req, res) => {
+app.post("/api/sessions", authMiddleware, async (req, res) => {
   const { duration, noteId } = req.body;
-  db.prepare("INSERT INTO sessions (user_id, duration, note_id) VALUES (?, ?, ?)")
-    .run((req as any).userId, duration, noteId || null);
+  await pool.query("INSERT INTO sessions (user_id, duration, note_id) VALUES ($1, $2, $3)", [
+    (req as any).userId, duration, noteId || null,
+  ]);
   res.json({ ok: true });
 });
+
+// ---- Admin ----
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "admin-secret-token";
 
@@ -161,28 +178,28 @@ async function del(id){
 </script></body></html>`);
 });
 
-app.get("/api/admin/users", (req, res) => {
+app.get("/api/admin/users", async (req, res) => {
   if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
-  const users = db.prepare("SELECT id, name, passcode FROM users ORDER BY id").all();
-  res.json(users);
+  const { rows } = await pool.query("SELECT id, name, passcode FROM users ORDER BY id");
+  res.json(rows);
 });
 
-app.put("/api/admin/users/:id/passcode", (req, res) => {
+app.put("/api/admin/users/:id/passcode", async (req, res) => {
   if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
   const { passcode } = req.body;
   if (!passcode) return res.status(400).json({ error: "passcode required" });
-  db.prepare("UPDATE users SET passcode = ? WHERE id = ?").run(passcode, req.params.id);
+  await pool.query("UPDATE users SET passcode = $1 WHERE id = $2", [passcode, req.params.id]);
   res.json({ ok: true });
 });
 
-app.delete("/api/admin/users/:id", (req, res) => {
+app.delete("/api/admin/users/:id", async (req, res) => {
   if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
-  db.prepare("DELETE FROM notes WHERE user_id = ?").run(req.params.id);
-  db.prepare("DELETE FROM sessions WHERE user_id = ?").run(req.params.id);
-  db.prepare("DELETE FROM users WHERE id = ?").run(req.params.id);
+  await pool.query("DELETE FROM notes WHERE user_id = $1", [req.params.id]);
+  await pool.query("DELETE FROM sessions WHERE user_id = $1", [req.params.id]);
+  await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]);
   res.json({ ok: true });
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
