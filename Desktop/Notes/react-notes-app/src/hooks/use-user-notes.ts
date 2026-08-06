@@ -2,6 +2,16 @@ import { useState, useEffect, useCallback } from "react";
 import { fetchNotes, createNote as apiCreate, updateNote as apiUpdate, deleteNoteApi } from "@/lib/api";
 import type { NoteItem } from "@/types";
 
+interface RawNote {
+  id: number;
+  text: string;
+  created_at: string;
+  color: string;
+  priority: string | null;
+  due_date: string | null;
+  pinned: number;
+}
+
 const LS_KEY = "notes";
 
 function loadLocal(): NoteItem[] {
@@ -22,8 +32,8 @@ export function useUserNotes() {
 
   useEffect(() => {
     fetchNotes()
-      .then((data) => {
-        const mapped = data.map((n) => ({
+      .then((data: RawNote[]) => {
+        const mapped = data.map((n: RawNote) => ({
           id: n.id,
           text: n.text,
           createdAt: n.created_at,

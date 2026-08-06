@@ -1,0 +1,111 @@
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+interface User {
+  id: number;
+  name: string;
+}
+
+interface AuthContextValue {
+  isLoggedIn: boolean;
+  user: User | null;
+  signIn: (name: string, passcode: string) => Promise<void>;
+  signUp: (name: string) => Promise<string>;
+  signOut: () => void;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+function getToken(): string | null {
+  return localStorage.getItem("token");
+}
+
+function getUser(): User | null {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [token, setToken] = useState<string | null>(getToken);
+  const [user, setUser] = useState<User | null>(getUser);
+
+  useEffect(() => {
+    if (token) {
+      localStorage.setItem("token", token);
+    } else {
+      localStorage.removeItem("token");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem("user", JSON.stringify(user));
+    } else {
+      localStorage.removeItem("user");
+    }
+  }, [user]);
+
+  const signIn = useCallback(async (name: string, passcode: string) => {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, passcode }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Invalid credentials");
+    }
+    const data = await res.json();
+    setToken(data.token);
+    setUser(data.user);
+  }, []);
+
+  const signUp = useCallback(async (name: string) => {
+    const res = await fetch(`${API_URL}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Registration failed");
+    }
+    const data = await res.json();
+    setToken(data.token);
+    setUser(data.user);
+    return data.passcode as string;
+  }, []);
+
+  const signOut = useCallback(() => {
+    setToken(null);
+    setUser(null);
+  }, []);
+
+  return (
+    <AuthContext.Provider
+      value={{ isLoggedIn: !!token, user, signIn, signUp, signOut }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return ctx;
+}

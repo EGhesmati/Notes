@@ -1,0 +1,5 @@
+# macOS
+.DS_Store
+
+# gh-pages cache (prevents stale deploy state)
+react-notes-app/node_modules/.cache/
