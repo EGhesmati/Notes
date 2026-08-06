@@ -37,6 +37,7 @@ await pool.query(`
     user_id INTEGER NOT NULL REFERENCES users(id),
     duration INTEGER NOT NULL,
     note_id INTEGER,
+    note_title TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
 `);
@@ -132,9 +133,9 @@ app.get("/api/sessions", authMiddleware, async (req, res) => {
 });
 
 app.post("/api/sessions", authMiddleware, async (req, res) => {
-  const { duration, noteId } = req.body;
-  await pool.query("INSERT INTO sessions (user_id, duration, note_id) VALUES ($1, $2, $3)", [
-    (req as any).userId, duration, noteId || null,
+  const { duration, noteId, noteTitle } = req.body;
+  await pool.query("INSERT INTO sessions (user_id, duration, note_id, note_title) VALUES ($1, $2, $3, $4)", [
+    (req as any).userId, duration, noteId || null, noteTitle || null,
   ]);
   res.json({ ok: true });
 });
