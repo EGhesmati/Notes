@@ -13,9 +13,14 @@ db.exec(`
 
 // Seed a default user if table is empty
 const count = db.prepare("SELECT COUNT(*) as c FROM users").get() as any;
+// Seed default user. Credentials from env vars — never commit real ones.
+// Set ADMIN_NAME + ADMIN_PASSCODE in Render environment variables.
+const adminName = process.env.ADMIN_NAME || "admin";
+const adminPass = process.env.ADMIN_PASSCODE || "change-me";
+
 if (count.c === 0) {
-  db.prepare("INSERT INTO users (name, passcode) VALUES (?, ?)").run("erfan", "abc123");
-  console.log("✅ Seeded user: erfan / abc123");
+  db.prepare("INSERT INTO users (name, passcode) VALUES (?, ?)").run(adminName, adminPass);
+  console.log(`✅ Seeded user: ${adminName} / ${adminPass}`);
 } else {
   console.log(`ℹ️  Users already exist (${count.c} total)`);
 }
