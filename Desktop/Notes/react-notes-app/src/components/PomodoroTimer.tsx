@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, RotateCcw, Timer, X, Volume2, VolumeX } from "lucide-react";
 import { logSession } from "@/hooks/use-pomodoro-stats";
+import type { NoteItem } from "@/types";
 
 type Phase = "focus" | "short-break" | "long-break";
 
@@ -57,10 +58,23 @@ const PHASE_COLOR: Record<Phase, string> = {
   "long-break": "text-sky-500",
 };
 
-// simple beep using Web Audio API
-function playBeep() {
+// shared audio context — created lazily, resumed on user gesture
+let _audioCtx: AudioContext | null = null;
+
+function getAudioCtx(): AudioContext | null {
   try {
-    const ctx = new AudioContext();
+    if (!_audioCtx) _audioCtx = new AudioContext();
+    if (_audioCtx.state === "suspended") _audioCtx.resume();
+    return _audioCtx;
+  } catch {
+    return null;
+  }
+}
+
+function playBeep() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
@@ -72,14 +86,15 @@ function playBeep() {
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.4);
   } catch {
-    // audio not supported
+    // ignore
   }
 }
 
 function playChime() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
   try {
-    const ctx = new AudioContext();
-    const notes = [523, 659, 784]; // C5, E5, G5
+    const notes = [523, 659, 784];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -94,11 +109,14 @@ function playChime() {
       osc.stop(t + 0.3);
     });
   } catch {
-    // audio not supported
+    // ignore
   }
 }
 
 export function PomodoroTimer() {
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const endAtRef = useRef<number | null>(null);
+
   const restored = loadState();
 
   const [open, setOpen] = useState(false);
@@ -115,18 +133,19 @@ export function PomodoroTimer() {
     }
     return restored?.secondsLeft ?? 25 * 60;
   });
-  const [running, setRunning] = useState(false);
+  const [running, setRunning] = useState(restored?.running ?? false);
   const [pomoCount, setPomoCount] = useState(restored?.pomoCount ?? 0);
   const [notified, setNotified] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const endAtRef = useRef<number | null>(null);
+  const [linkedNoteId, setLinkedNoteId] = useState<number | null>(null);
+  const [linkedNoteTitle, setLinkedNoteTitle] = useState("");
 
-  // auto-resume if was running
-  useEffect(() => {
-    if (restored?.running) {
-      setRunning(true);
+  const notes = useMemo<NoteItem[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("notes") || "[]");
+    } catch {
+      return [];
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open]); // refresh when panel opens
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current) {
@@ -174,6 +193,7 @@ export function PomodoroTimer() {
   );
 
   const start = useCallback(() => {
+    getAudioCtx(); // resume audio context on user gesture
     setNotified(false);
     setRunning(true);
     const endAt = Date.now() + secondsLeft * 1000;
@@ -263,7 +283,7 @@ export function PomodoroTimer() {
 
   const advance = useCallback(() => {
     if (phase === "focus") {
-      logSession(focusMin, true);
+      logSession(focusMin, true, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
       const newCount = pomoCount + 1;
       startPhase(nextPhase(phase), newCount);
     } else {
@@ -429,6 +449,42 @@ export function PomodoroTimer() {
           <p className="mt-1.5 text-[10px] text-muted-foreground">
             Long break: {LONG_BREAK_MIN}m (every 4th)
           </p>
+
+          {/* Link to note */}
+          {notes.length > 0 && (
+            <div className="mt-3 border-t border-border pt-3">
+              <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+                {linkedNoteId ? "Tracking" : "Track for note"}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {notes.slice(0, 5).map((n) => {
+                  const active = n.id === linkedNoteId;
+                  return (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => {
+                        if (active) {
+                          setLinkedNoteId(null);
+                          setLinkedNoteTitle("");
+                        } else {
+                          setLinkedNoteId(n.id);
+                          setLinkedNoteTitle(n.text.slice(0, 40));
+                        }
+                      }}
+                      className={`max-w-[130px] truncate rounded-md px-2 py-1 text-[10px] font-medium transition-all ${
+                        active
+                          ? "bg-primary/20 text-primary ring-1 ring-primary/30"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                      }`}
+                    >
+                      {n.text.slice(0, 20)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,7 +1,11 @@
+import { fetchSessions, logSessionApi } from "@/lib/api";
+
 interface PomodoroSession {
-  date: string;   // ISO string
-  duration: number; // minutes
+  date: string;
+  duration: number;
   completed: boolean;
+  noteId?: number;
+  noteTitle?: string;
 }
 
 const STORAGE_KEY = "pomodoro_sessions";
@@ -16,18 +20,30 @@ function loadSessions(): PomodoroSession[] {
 }
 
 function saveSessions(sessions: PomodoroSession[]) {
-  // keep last 90 days
   const cutoff = Date.now() - 90 * 86400000;
   const filtered = sessions.filter((s) => new Date(s.date).getTime() > cutoff);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
 }
 
-export function logSession(durationMin: number, completed: boolean) {
+export async function logSession(
+  durationMin: number,
+  completed: boolean,
+  noteId?: number,
+  noteTitle?: string,
+) {
+  try {
+    await logSessionApi(durationMin, noteId, noteTitle);
+  } catch {
+    // ignore API errors
+  }
+  // always save locally too
   const sessions = loadSessions();
   sessions.push({
     date: new Date().toISOString(),
     duration: durationMin,
     completed,
+    noteId,
+    noteTitle,
   });
   saveSessions(sessions);
 }
@@ -42,6 +58,13 @@ function startOfWeek(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), diff);
 }
 
+export interface NoteBreakdown {
+  noteId: number;
+  noteTitle: string;
+  focusMin: number;
+  sessions: number;
+}
+
 export interface PomodoroStats {
   today: { sessions: number; focusMin: number };
   week: { sessions: number; focusMin: number; streak: number };
@@ -50,28 +73,42 @@ export interface PomodoroStats {
   currentStreak: number;
   longestStreak: number;
   completionRate: number;
+  noteBreakdown: NoteBreakdown[];
 }
 
-export function getStats(): PomodoroStats {
-  const sessions = loadSessions();
+export async function getStats(): Promise<PomodoroStats> {
+  // Try API first
+  let sessions = loadSessions();
+  try {
+    const apiSessions = await fetchSessions();
+    if (apiSessions.length > 0) {
+      // Replace local with API data (more reliable)
+      sessions = apiSessions.map((s: any) => ({
+        date: s.created_at,
+        duration: s.duration,
+        completed: true,
+        noteId: s.note_id ?? undefined,
+        noteTitle: s.note_title ?? undefined,
+      }));
+      saveSessions(sessions); // sync local
+    }
+  } catch {
+    // API unavailable, use localStorage
+  }
   const now = new Date();
   const todayKey = getDayKey(now);
   const weekStart = startOfWeek(now);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // today
   const todaySessions = sessions.filter((s) => getDayKey(new Date(s.date)) === todayKey);
   const todayFocus = todaySessions.reduce((sum, s) => sum + s.duration, 0);
 
-  // week
   const weekSessions = sessions.filter((s) => new Date(s.date) >= weekStart);
   const weekFocus = weekSessions.reduce((sum, s) => sum + s.duration, 0);
 
-  // month
   const monthSessions = sessions.filter((s) => new Date(s.date) >= monthStart);
   const monthFocus = monthSessions.reduce((sum, s) => sum + s.duration, 0);
 
-  // best day (this month)
   const byDay = new Map<string, number>();
   monthSessions.forEach((s) => {
     const key = getDayKey(new Date(s.date));
@@ -85,7 +122,6 @@ export function getStats(): PomodoroStats {
     }
   });
 
-  // daily chart (last 7 days)
   const dailyChart: PomodoroStats["dailyChart"] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
@@ -99,7 +135,6 @@ export function getStats(): PomodoroStats {
     });
   }
 
-  // streaks
   const completedDays = new Set<string>();
   sessions.filter((s) => s.completed).forEach((s) => completedDays.add(getDayKey(new Date(s.date))));
 
@@ -118,12 +153,8 @@ export function getStats(): PomodoroStats {
     const curr = new Date(dateStr + "T00:00:00");
     if (prev) {
       const diff = (curr.getTime() - prev.getTime()) / 86400000;
-      if (diff === 1) {
-        run++;
-      } else {
-        longestStreak = Math.max(longestStreak, run);
-        run = 1;
-      }
+      if (diff === 1) run++;
+      else { longestStreak = Math.max(longestStreak, run); run = 1; }
     } else {
       run = 1;
     }
@@ -131,10 +162,29 @@ export function getStats(): PomodoroStats {
   }
   longestStreak = Math.max(longestStreak, run);
 
-  // completion rate
   const total = sessions.length;
   const completed = sessions.filter((s) => s.completed).length;
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 100;
+
+  const noteMap = new Map<number, NoteBreakdown>();
+  sessions.forEach((s) => {
+    if (!s.noteId || !s.noteTitle) return;
+    const existing = noteMap.get(s.noteId);
+    if (existing) {
+      existing.focusMin += s.duration;
+      existing.sessions += 1;
+    } else {
+      noteMap.set(s.noteId, {
+        noteId: s.noteId,
+        noteTitle: s.noteTitle,
+        focusMin: s.duration,
+        sessions: 1,
+      });
+    }
+  });
+  const noteBreakdown = [...noteMap.values()]
+    .sort((a, b) => b.focusMin - a.focusMin)
+    .slice(0, 10);
 
   return {
     today: { sessions: todaySessions.length, focusMin: todayFocus },
@@ -144,5 +194,6 @@ export function getStats(): PomodoroStats {
     currentStreak,
     longestStreak,
     completionRate,
+    noteBreakdown,
   };
 }

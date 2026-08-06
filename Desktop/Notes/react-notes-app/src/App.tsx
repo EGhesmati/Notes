@@ -10,6 +10,7 @@ import {
   Moon,
   Loader2,
   Heart,
+  LogOut,
 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -17,7 +18,10 @@ import { useUserNotes } from "@/hooks/use-user-notes";
 import { AppLoadingScreen } from "@/components/AppLoadingScreen";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { PomodoroStatsPanel } from "@/components/PomodoroStats";
+import { DailyGoal } from "@/components/DailyGoal";
 import { TimeChips } from "@/components/TimeChips";
+import { useAuth } from "@/lib/auth-context";
+import { LoginPage } from "@/pages/LoginPage";
 import { NOTE_COLORS, PRIORITY_BADGE } from "@/types";
 import type { Priority } from "@/types";
 
@@ -30,11 +34,22 @@ function toISO(date: string | undefined, time: string | undefined): string | und
 }
 
 export default function App() {
+  const { isLoggedIn, signOut } = useAuth();
+
+  if (!isLoggedIn) {
+    return <LoginPage />;
+  }
+
+  return <AppShell signOut={signOut} />;
+}
+
+function AppShell({ signOut }: { signOut: () => void }) {
+  const { user } = useAuth();
   const [text, setText] = useState("");
   const [priority, setPriority] = useState<Priority | undefined>();
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
-  const [notes, setNotes] = useUserNotes();
+  const { notes, setNotes: addNoteApi, editNote: editNoteApi, deleteNote: deleteNoteApi } = useUserNotes();
   const [search, setSearch] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const { theme, toggle } = useTheme();
@@ -51,50 +66,57 @@ export default function App() {
     if (!trimmed) return;
     const color =
       NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)];
-    setNotes((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        text: trimmed,
-        createdAt: new Date().toISOString(),
-        color,
-        priority,
-        dueDate: toISO(dueDate, dueTime),
-      },
-    ]);
+    addNoteApi({
+      text: trimmed,
+      color,
+      priority,
+      dueDate: toISO(dueDate, dueTime),
+    });
     setText("");
     setPriority(undefined);
     setDueDate("");
     setDueTime("");
-  }, [text, priority, dueDate, dueTime, setNotes]);
+  }, [text, priority, dueDate, dueTime, addNoteApi]);
 
   const editNote = useCallback(
     (id: number, newText: string, newPriority?: Priority, newDueDate?: string, newDueTime?: string) => {
-      setNotes((prev) =>
-        prev.map((n) =>
-          n.id === id
-            ? { ...n, text: newText, priority: newPriority, dueDate: toISO(newDueDate, newDueTime) }
-            : n,
-        ),
-      );
+      editNoteApi(id, {
+        text: newText,
+        priority: newPriority || null,
+        dueDate: toISO(newDueDate, newDueTime) || null,
+      });
     },
-    [setNotes],
+    [editNoteApi],
   );
 
   const deleteNote = useCallback(
-    (id: number) => setNotes((prev) => prev.filter((n) => n.id !== id)),
-    [setNotes],
+    (id: number) => deleteNoteApi(id),
+    [deleteNoteApi],
   );
 
-  const filtered = useMemo(
-    () =>
-      debouncedSearch
-        ? notes.filter((n) =>
-            n.text.toLowerCase().includes(debouncedSearch.toLowerCase()),
-          )
-        : notes,
-    [notes, debouncedSearch],
+  const togglePin = useCallback(
+    (id: number) => {
+      const note = notes.find((n) => n.id === id);
+      if (note) {
+        editNoteApi(id, { pinned: !note.pinned });
+      }
+    },
+    [notes, editNoteApi],
   );
+
+  const filtered = useMemo(() => {
+    const matches = debouncedSearch
+      ? notes.filter((n) =>
+          n.text.toLowerCase().includes(debouncedSearch.toLowerCase()),
+        )
+      : notes;
+    // pinned first, then by date newest first
+    return [...matches].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [notes, debouncedSearch]);
 
   if (!hydrated) return <AppLoadingScreen />;
 
@@ -106,12 +128,22 @@ export default function App() {
           <div className="flex items-center gap-2">
             <StickyNote className="h-5 w-5 text-primary" />
             <span className="text-sm font-semibold tracking-tight text-foreground">
-              Notes
+              Hello, {user?.name ?? "there"}
             </span>
           </div>
           <div className="flex items-center gap-1">
+            <DailyGoal />
             <PomodoroStatsPanel />
             <PomodoroTimer />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={signOut}
+              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"
+              title="Sign out"
+            >
+              <LogOut className="h-[16px] w-[16px]" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -232,6 +264,7 @@ export default function App() {
               notes={filtered}
               onDelete={deleteNote}
               onEdit={editNote}
+              onTogglePin={togglePin}
             />
           </Suspense>
         )}

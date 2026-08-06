@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { BarChart3, X, Flame, Timer, Target, Trophy } from "lucide-react";
+import { BarChart3, X, Flame, Timer, Target, Trophy, StickyNote } from "lucide-react";
 import { getStats, type PomodoroStats } from "@/hooks/use-pomodoro-stats";
 
 function formatHours(min: number) {
@@ -17,13 +17,10 @@ export function PomodoroStatsPanel() {
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState<PomodoroStats | null>(null);
 
-  const refresh = useCallback(() => {
-    setStats(getStats());
-  }, []);
-
   useEffect(() => {
-    if (open) refresh();
-  }, [open, refresh]);
+    if (!open) return;
+    getStats().then(setStats);
+  }, [open]);
 
   return (
     <div className="relative">
@@ -133,6 +130,24 @@ export function PomodoroStatsPanel() {
                     <Trophy className="h-3 w-3" /> Best: {stats.longestStreak}d
                   </span>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Note breakdown */}
+          {stats.noteBreakdown.length > 0 && (
+            <div className="mb-3 rounded-lg bg-muted/50 p-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">By Note</p>
+              <div className="space-y-1.5">
+                {stats.noteBreakdown.map((n) => (
+                  <div key={n.noteId} className="flex items-center gap-2 text-[10px]">
+                    <StickyNote className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <span className="flex-1 truncate text-foreground">{n.noteTitle}</span>
+                    <span className="shrink-0 font-mono text-muted-foreground">
+                      {formatHours(n.focusMin)}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

@@ -1,8 +1,8 @@
-import { memo, useState, useCallback } from "react";
+import { memo, useState, useCallback, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Pencil, Check, X, Calendar } from "lucide-react";
+import { Trash2, Pencil, Check, X, Calendar, Pin, Timer } from "lucide-react";
 import { PRIORITY_BADGE } from "@/types";
 import type { NotesState, Priority } from "@/types";
 import { TimeChips } from "@/components/TimeChips";
@@ -17,6 +17,7 @@ interface NotesGridProps {
     dueDate?: string,
     dueTime?: string,
   ) => void;
+  readonly onTogglePin: (id: number) => void;
 }
 
 const PRIORITY_OPTIONS: Priority[] = ["low", "medium", "high"];
@@ -57,11 +58,46 @@ function fromISO(iso?: string) {
   };
 }
 
+function formatHours(min: number) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function getNoteFocusTimes(): Map<number, number> {
+  try {
+    const raw = localStorage.getItem("pomodoro_sessions");
+    if (!raw) return new Map();
+    const sessions: { noteId?: number; duration: number }[] = JSON.parse(raw);
+    const map = new Map<number, number>();
+    sessions.forEach((s) => {
+      if (s.noteId) {
+        map.set(s.noteId, (map.get(s.noteId) || 0) + s.duration);
+      }
+    });
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
 const NotesGrid = memo(function NotesGrid({
   notes,
   onDelete,
   onEdit,
+  onTogglePin,
 }: NotesGridProps) {
+  const [focusTimes, setFocusTimes] = useState(getNoteFocusTimes);
+
+  // refresh focus times when window regains focus (pomodoro may have finished)
+  useEffect(() => {
+    const onFocus = () => setFocusTimes(getNoteFocusTimes());
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
   if (notes.length === 0) {
     return (
       <p className="py-16 text-center text-sm italic text-muted-foreground">
@@ -76,8 +112,10 @@ const NotesGrid = memo(function NotesGrid({
         <NoteCard
           key={item.id}
           item={item}
+          focusMin={focusTimes.get(item.id) ?? 0}
           onDelete={onDelete}
           onEdit={onEdit}
+          onTogglePin={onTogglePin}
         />
       ))}
     </div>
@@ -86,10 +124,13 @@ const NotesGrid = memo(function NotesGrid({
 
 const NoteCard = memo(function NoteCard({
   item,
+  focusMin,
   onDelete,
   onEdit,
+  onTogglePin,
 }: {
   readonly item: NotesState[number];
+  readonly focusMin: number;
   readonly onDelete: (id: number) => void;
   readonly onEdit: (
     id: number,
@@ -98,6 +139,7 @@ const NoteCard = memo(function NoteCard({
     dueDate?: string,
     dueTime?: string,
   ) => void;
+  readonly onTogglePin: (id: number) => void;
 }) {
   const defaultDates = fromISO(item.dueDate);
   const [editing, setEditing] = useState(false);
@@ -137,8 +179,11 @@ const NoteCard = memo(function NoteCard({
 
   return (
     <Card
-      className={`group flex flex-col border-l-4 ${item.color} bg-card shadow-sm backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}
+      className={`group relative flex flex-col border-l-4 ${item.color} bg-card shadow-sm backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}
     >
+      {item.pinned && (
+        <Pin className="absolute right-2 top-2 h-3.5 w-3.5 rotate-45 fill-primary/30 text-primary" />
+      )}
       <CardContent className="flex flex-1 flex-col justify-between gap-3 p-4">
         {editing ? (
           <div className="flex flex-col gap-3">
@@ -216,9 +261,18 @@ const NoteCard = memo(function NoteCard({
                     </span>
                   </>
                 )}
+                {focusMin > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+                    <Timer className="h-3 w-3" />
+                    {formatHours(focusMin)}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all">
+              <Button variant="ghost" size="icon" onClick={() => onTogglePin(item.id)} className={`h-9 w-9 md:h-8 md:w-8 ${item.pinned ? "text-primary" : "text-muted-foreground"} hover:text-foreground`} title={item.pinned ? "Unpin" : "Pin"}>
+                <Pin className={`h-4 w-4 ${item.pinned ? "fill-primary/20" : ""}`} />
+              </Button>
               <Button variant="ghost" size="icon" onClick={startEdit} className="h-9 w-9 md:h-8 md:w-8 text-muted-foreground hover:text-foreground" title="Edit">
                 <Pencil className="h-4 w-4" />
               </Button>
