@@ -1,4 +1,4 @@
-import pg from "pg";
+import { Pool } from "@neondatabase/serverless";
 import express from "express";
 import cors from "cors";
 import jwt from "jsonwebtoken";
@@ -12,7 +12,7 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
-const pool = new pg.Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const pool = new Pool({ connectionString: DATABASE_URL });
 
 // init tables
 await pool.query(`

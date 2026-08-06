@@ -1,4 +1,4 @@
-import pg from "pg";
+import { Pool } from "@neondatabase/serverless";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -6,7 +6,7 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
-const pool = new pg.Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const pool = new Pool({ connectionString: DATABASE_URL });
 
 await pool.query(`
   CREATE TABLE IF NOT EXISTS users (

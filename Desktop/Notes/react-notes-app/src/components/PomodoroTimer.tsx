@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Play, Pause, RotateCcw, Timer, X, Volume2, VolumeX } from "lucide-react";
 import { logSession } from "@/hooks/use-pomodoro-stats";
+import { useAuth } from "@/lib/auth-context";
 import type { NoteItem } from "@/types";
 
 type Phase = "focus" | "short-break" | "long-break";
@@ -138,14 +140,21 @@ export function PomodoroTimer() {
   const [notified, setNotified] = useState(false);
   const [linkedNoteId, setLinkedNoteId] = useState<number | null>(null);
   const [linkedNoteTitle, setLinkedNoteTitle] = useState("");
+  const [customFocusOpen, setCustomFocusOpen] = useState(false);
+  const [customFocusVal, setCustomFocusVal] = useState("");
+  const [customBreakOpen, setCustomBreakOpen] = useState(false);
+  const [customBreakVal, setCustomBreakVal] = useState("");
+
+  const { user } = useAuth();
 
   const notes = useMemo<NoteItem[]>(() => {
+    if (!user) return [];
     try {
-      return JSON.parse(localStorage.getItem("notes") || "[]");
+      return JSON.parse(localStorage.getItem(`notes-${user.id}`) || "[]");
     } catch {
       return [];
     }
-  }, [open]); // refresh when panel opens
+  }, [open, user]); // refresh when panel opens
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current) {
@@ -425,9 +434,12 @@ export function PomodoroTimer() {
             {FOCUS_OPTIONS.map((m) => (
               <button
                 key={m}
-                onClick={() => changeFocus(m)}
+                onClick={() => {
+                  changeFocus(m);
+                  setCustomFocusOpen(false);
+                }}
                 className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
-                  focusMin === m
+                  focusMin === m && !customFocusOpen
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
@@ -435,6 +447,52 @@ export function PomodoroTimer() {
                 {m}m
               </button>
             ))}
+            {customFocusOpen ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const val = parseInt(customFocusVal, 10);
+                  if (val > 0 && val <= 180) {
+                    if (running && phase === "focus") {
+                      logSession(focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
+                    }
+                    clearTimer();
+                    setFocusMin(val);
+                    setRunning(false);
+                    setPhase("focus");
+                    setPomoCount(0);
+                    setSecondsLeft(val * 60);
+                    setNotified(false);
+                    clearState();
+                  }
+                  setCustomFocusOpen(false);
+                  setCustomFocusVal("");
+                }}
+                className="flex-1"
+              >
+                <Input
+                  type="number"
+                  min={1}
+                  max={180}
+                  placeholder="min"
+                  value={customFocusVal}
+                  onChange={(e) => setCustomFocusVal(e.target.value)}
+                  className="h-7 w-full rounded-lg px-2 py-1 text-xs"
+                  autoFocus
+                  onBlur={() => {
+                    setCustomFocusOpen(false);
+                    setCustomFocusVal("");
+                  }}
+                />
+              </form>
+            ) : (
+              <button
+                onClick={() => setCustomFocusOpen(true)}
+                className="flex-1 rounded-lg px-2 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-all"
+              >
+                Custom
+              </button>
+            )}
           </div>
 
           <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">Short break</p>
@@ -442,9 +500,12 @@ export function PomodoroTimer() {
             {BREAK_OPTIONS.map((m) => (
               <button
                 key={m}
-                onClick={() => changeBreak(m)}
+                onClick={() => {
+                  changeBreak(m);
+                  setCustomBreakOpen(false);
+                }}
                 className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
-                  breakMin === m
+                  breakMin === m && !customBreakOpen
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
@@ -452,6 +513,44 @@ export function PomodoroTimer() {
                 {m}m
               </button>
             ))}
+            {customBreakOpen ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const val = parseInt(customBreakVal, 10);
+                  if (val > 0 && val <= 60) {
+                    clearTimer();
+                    setBreakMin(val);
+                    clearState();
+                  }
+                  setCustomBreakOpen(false);
+                  setCustomBreakVal("");
+                }}
+                className="flex-1"
+              >
+                <Input
+                  type="number"
+                  min={1}
+                  max={60}
+                  placeholder="min"
+                  value={customBreakVal}
+                  onChange={(e) => setCustomBreakVal(e.target.value)}
+                  className="h-7 w-full rounded-lg px-2 py-1 text-xs"
+                  autoFocus
+                  onBlur={() => {
+                    setCustomBreakOpen(false);
+                    setCustomBreakVal("");
+                  }}
+                />
+              </form>
+            ) : (
+              <button
+                onClick={() => setCustomBreakOpen(true)}
+                className="flex-1 rounded-lg px-2 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-all"
+              >
+                Custom
+              </button>
+            )}
           </div>
           <p className="mt-1.5 text-[10px] text-muted-foreground">
             Long break: {LONG_BREAK_MIN}m (every 4th)

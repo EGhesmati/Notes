@@ -89,9 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(() => {
+    // clear user-scoped notes cache
+    if (user) {
+      localStorage.removeItem(`notes-${user.id}`);
+    }
     setToken(null);
     setUser(null);
-  }, []);
+  }, [user]);
 
   return (
     <AuthContext.Provider

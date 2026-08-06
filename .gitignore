@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+
+.DS_Store
+.vtcode/
+vtcode.toml
+
+node_modules
+dist
+*.log
