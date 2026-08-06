@@ -216,6 +216,10 @@ export function PomodoroTimer() {
   }, [clearTimer]);
 
   const reset = useCallback(() => {
+    if (running && phase === "focus") {
+      // log abandoned session
+      logSession(focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
+    }
     clearTimer();
     setRunning(false);
     setNotified(false);
@@ -225,6 +229,9 @@ export function PomodoroTimer() {
 
   const changeFocus = useCallback(
     (m: number) => {
+      if (running && phase === "focus") {
+        logSession(focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
+      }
       clearTimer();
       setFocusMin(m);
       setRunning(false);
