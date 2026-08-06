@@ -61,7 +61,8 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
 }
 
 app.post("/api/auth/login", async (req, res) => {
-  const { name, passcode } = req.body;
+  const name = (req.body.name || "").trim();
+  const passcode = req.body.passcode;
   if (!name || !passcode) return res.status(400).json({ error: "name and passcode required" });
   const { rows } = await pool.query("SELECT id, name FROM users WHERE name = $1 AND passcode = $2", [name, passcode]);
   if (rows.length === 0) return res.status(401).json({ error: "invalid credentials" });
@@ -71,7 +72,7 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 app.post("/api/auth/register", async (req, res) => {
-  const { name } = req.body;
+  const name = (req.body.name || "").trim();
   if (!name) return res.status(400).json({ error: "name required" });
   const passcode = Array.from({ length: 8 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]).join("");
   try {
@@ -190,6 +191,14 @@ app.put("/api/admin/users/:id/passcode", async (req, res) => {
   const { passcode } = req.body;
   if (!passcode) return res.status(400).json({ error: "passcode required" });
   await pool.query("UPDATE users SET passcode = $1 WHERE id = $2", [passcode, req.params.id]);
+  res.json({ ok: true });
+});
+
+app.put("/api/admin/users/:id/name", async (req, res) => {
+  if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: "name required" });
+  await pool.query("UPDATE users SET name = $1 WHERE id = $2", [name.trim(), req.params.id]);
   res.json({ ok: true });
 });
 
