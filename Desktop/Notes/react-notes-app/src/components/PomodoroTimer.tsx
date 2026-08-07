@@ -234,7 +234,7 @@ export function PomodoroTimer() {
     setNotified(false);
     clearState();
     startPhase("focus", 0);
-  }, [clearTimer, startPhase]);
+  }, [clearTimer, startPhase, running, phase, focusMin, linkedNoteId, linkedNoteTitle]);
 
   const changeFocus = useCallback(
     (m: number) => {
@@ -250,7 +250,7 @@ export function PomodoroTimer() {
       setNotified(false);
       clearState();
     },
-    [clearTimer],
+    [clearTimer, running, phase, focusMin, linkedNoteId, linkedNoteTitle],
   );
 
   const changeBreak = useCallback(
@@ -319,7 +319,7 @@ export function PomodoroTimer() {
       running: true,
       startedAt: Date.now(),
     });
-  }, [phase, pomoCount, focusMin, breakMin, nextPhase, startPhase]);
+  }, [phase, pomoCount, focusMin, breakMin, nextPhase, startPhase, linkedNoteId, linkedNoteTitle]);
 
   // close on Escape
   useEffect(() => {

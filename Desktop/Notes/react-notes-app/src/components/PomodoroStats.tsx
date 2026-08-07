@@ -20,6 +20,10 @@ export function PomodoroStatsPanel() {
   useEffect(() => {
     if (!open) return;
     getStats().then(setStats);
+    // refresh stats live when a session is logged
+    const handler = () => { getStats().then(setStats); };
+    window.addEventListener("pomodoro-updated", handler);
+    return () => window.removeEventListener("pomodoro-updated", handler);
   }, [open]);
 
   return (
