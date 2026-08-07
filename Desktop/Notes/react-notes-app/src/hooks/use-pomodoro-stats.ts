@@ -62,11 +62,19 @@ export function getTodaySessionCountLocal(userId: number): number {
 }
 
 // Fetch today's completed-session count from the server (authenticated) or
-// localStorage (guest / offline fallback). Server data is cached to localStorage
-// so sibling components (e.g. NotesGrid) can read it on their next focus/poll.
-// NOTE: We intentionally do NOT dispatch "pomodoro-updated" here — that event
-// is reserved for logSession() (local session completion) to avoid a feedback
-// loop with this function's own polling/listener in DailyGoal.
+// localStorage (guest / offline fallback).
+//
+// This function is intentionally READ-ONLY with respect to localStorage.
+// It must NOT call saveSessions() because: when logSession() fails to reach
+// the server, it saves the session to localStorage and sets a "dirty" flag so
+// that getStats() can retry the upload later. If this function overwrote
+// localStorage with server data (which may not yet include the dirty session),
+// the dirty session would be permanently lost before getStats() gets a chance
+// to sync it — causing statistics to reset to zero.
+//
+// Local storage caching of server data is handled exclusively by getStats(),
+// which runs the dirty-sync step BEFORE the server fetch, preserving any
+// pending local sessions.
 export async function getTodaySessionCount(userId: number): Promise<number> {
   if (!userId) {
     return getTodaySessionCountLocal(0);
@@ -75,9 +83,6 @@ export async function getTodaySessionCount(userId: number): Promise<number> {
     const apiSessions = await fetchSessions();
     const now = new Date();
     const todayKey = getDayKey(now);
-    // Cache server data locally so sibling components that read from
-    // localStorage (e.g. NotesGrid) pick up cross-device changes on focus.
-    saveSessions(userId, apiSessions.map(mapApiSession));
     return apiSessions.filter(
       (s: RawSession) => getDayKey(new Date(s.created_at)) === todayKey,
     ).length;
@@ -233,8 +238,18 @@ export async function getStats(userId: number): Promise<PomodoroStats> {
     // --- 3. Fetch authoritative data from the server ---
     try {
       const apiSessions = await fetchSessions();
-      sessions = apiSessions.map(mapApiSession);
-      // Cache server data locally for offline use
+      const serverSessions: PomodoroSession[] = apiSessions.map(mapApiSession);
+      // If the dirty sync above failed, local sessions still contain data
+      // not yet on the server. Merge to avoid data loss — keep all server
+      // sessions plus any local ones that aren't duplicates (by date).
+      if (localStorage.getItem(dirtyFlagKey(userId)) === "true") {
+        const local = loadSessions(userId);
+        const serverDates = new Set(serverSessions.map((s) => s.date));
+        sessions = [...serverSessions, ...local.filter((s) => !serverDates.has(s.date))];
+      } else {
+        sessions = serverSessions;
+      }
+      // Cache to localStorage for offline use and sibling components
       saveSessions(userId, sessions);
     } catch {
       // Network or server unavailable — fall back to local cache
