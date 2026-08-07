@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { BarChart3, X, Flame, Timer, Target, Trophy, StickyNote } from "lucide-react";
 import { getStats, type PomodoroStats } from "@/hooks/use-pomodoro-stats";
+import { useAuth } from "@/lib/auth-context";
 
 function formatHours(min: number) {
   const h = Math.floor(min / 60);
@@ -14,17 +15,19 @@ function formatHours(min: number) {
 const maxBar = 10;
 
 export function PomodoroStatsPanel() {
+  const { user } = useAuth();
+  const userId = user?.id ?? 0;
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState<PomodoroStats | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    getStats().then(setStats);
+    getStats(userId).then(setStats);
     // refresh stats live when a session is logged
-    const handler = () => { getStats().then(setStats); };
+    const handler = () => { getStats(userId).then(setStats); };
     window.addEventListener("pomodoro-updated", handler);
     return () => window.removeEventListener("pomodoro-updated", handler);
-  }, [open]);
+  }, [open, userId]);
 
   return (
     <div className="relative">

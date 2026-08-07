@@ -12,7 +12,9 @@ const FOCUS_OPTIONS = [25, 60, 90];
 const BREAK_OPTIONS = [5, 10, 15];
 const LONG_BREAK_MIN = 30;
 
-const STORAGE_KEY = "pomodoro_state";
+function stateKey(userId: number) {
+  return `pomodoro_state_${userId}`;
+}
 
 interface TimerState {
   focusMin: number;
@@ -24,9 +26,9 @@ interface TimerState {
   startedAt: number | null; // timestamp when started
 }
 
-function loadState(): TimerState | null {
+function loadState(userId: number): TimerState | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(stateKey(userId));
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
@@ -34,12 +36,12 @@ function loadState(): TimerState | null {
   }
 }
 
-function saveState(state: TimerState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function saveState(userId: number, state: TimerState) {
+  localStorage.setItem(stateKey(userId), JSON.stringify(state));
 }
 
-function clearState() {
-  localStorage.removeItem(STORAGE_KEY);
+function clearState(userId: number) {
+  localStorage.removeItem(stateKey(userId));
 }
 
 function formatTime(seconds: number) {
@@ -116,10 +118,13 @@ function playChime() {
 }
 
 export function PomodoroTimer() {
+  const { user } = useAuth();
+  const userId = user?.id ?? 0;
+
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const endAtRef = useRef<number | null>(null);
 
-  const restored = loadState();
+  const restored = loadState(userId);
 
   const [open, setOpen] = useState(false);
   const [sound, setSound] = useState(true);
@@ -144,8 +149,6 @@ export function PomodoroTimer() {
   const [customFocusVal, setCustomFocusVal] = useState("");
   const [customBreakOpen, setCustomBreakOpen] = useState(false);
   const [customBreakVal, setCustomBreakVal] = useState("");
-
-  const { user } = useAuth();
 
   const notes = useMemo<NoteItem[]>(() => {
     if (!user) return [];
@@ -207,7 +210,7 @@ export function PomodoroTimer() {
     setRunning(true);
     const endAt = Date.now() + secondsLeft * 1000;
     endAtRef.current = endAt;
-    saveState({
+    saveState(userId,{
       focusMin,
       breakMin,
       phase,
@@ -216,30 +219,30 @@ export function PomodoroTimer() {
       running: true,
       startedAt: Date.now(),
     });
-  }, [focusMin, breakMin, phase, secondsLeft, pomoCount]);
+  }, [focusMin, breakMin, phase, secondsLeft, pomoCount, userId]);
 
   const pause = useCallback(() => {
     clearTimer();
     setRunning(false);
-    clearState();
-  }, [clearTimer]);
+    clearState(userId);
+  }, [clearTimer, userId]);
 
   const reset = useCallback(() => {
     if (running && phase === "focus") {
       // log abandoned session
-      logSession(focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
+      logSession(user?.id ?? 0, focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
     }
     clearTimer();
     setRunning(false);
     setNotified(false);
-    clearState();
+    clearState(userId);
     startPhase("focus", 0);
-  }, [clearTimer, startPhase, running, phase, focusMin, linkedNoteId, linkedNoteTitle]);
+  }, [clearTimer, startPhase, running, phase, focusMin, linkedNoteId, linkedNoteTitle, user, userId]);
 
   const changeFocus = useCallback(
     (m: number) => {
       if (running && phase === "focus") {
-        logSession(focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
+        logSession(user?.id ?? 0, focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
       }
       clearTimer();
       setFocusMin(m);
@@ -248,18 +251,18 @@ export function PomodoroTimer() {
       setPomoCount(0);
       setSecondsLeft(m * 60);
       setNotified(false);
-      clearState();
+      clearState(userId);
     },
-    [clearTimer, running, phase, focusMin, linkedNoteId, linkedNoteTitle],
+    [clearTimer, running, phase, focusMin, linkedNoteId, linkedNoteTitle, user, userId],
   );
 
   const changeBreak = useCallback(
     (m: number) => {
       clearTimer();
       setBreakMin(m);
-      clearState();
+      clearState(userId);
     },
-    [clearTimer],
+    [clearTimer, userId],
   );
 
   // tick — uses wall-clock time so background tabs don't lag
@@ -270,13 +273,13 @@ export function PomodoroTimer() {
       setSecondsLeft(remaining);
       if (remaining <= 0) {
         setRunning(false);
-        clearState();
+        clearState(userId);
         const label = PHASE_LABEL[phase];
         setTimeout(() => notify(label), 50);
       }
     }, 250); // faster tick for smooth display
     return clearTimer;
-  }, [running, phase, notify, clearTimer]);
+  }, [running, phase, notify, clearTimer, userId]);
 
   // update tab title
   useEffect(() => {
@@ -299,7 +302,7 @@ export function PomodoroTimer() {
 
   const advance = useCallback(() => {
     if (phase === "focus") {
-      logSession(focusMin, true, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
+      logSession(user?.id ?? 0, focusMin, true, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
       const newCount = pomoCount + 1;
       startPhase(nextPhase(phase), newCount);
     } else {
@@ -310,7 +313,7 @@ export function PomodoroTimer() {
       ? (nextPhase(phase) === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60)
       : focusMin * 60;
     endAtRef.current = Date.now() + dur * 1000;
-    saveState({
+    saveState(userId, {
       focusMin,
       breakMin,
       phase: phase === "focus" ? nextPhase(phase) : "focus",
@@ -319,7 +322,7 @@ export function PomodoroTimer() {
       running: true,
       startedAt: Date.now(),
     });
-  }, [phase, pomoCount, focusMin, breakMin, nextPhase, startPhase, linkedNoteId, linkedNoteTitle]);
+  }, [phase, pomoCount, focusMin, breakMin, nextPhase, startPhase, linkedNoteId, linkedNoteTitle, user, userId]);
 
   // close on Escape
   useEffect(() => {
@@ -454,7 +457,7 @@ export function PomodoroTimer() {
                   const val = parseInt(customFocusVal, 10);
                   if (val > 0 && val <= 180) {
                     if (running && phase === "focus") {
-                      logSession(focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
+                      logSession(user?.id ?? 0, focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
                     }
                     clearTimer();
                     setFocusMin(val);
@@ -463,7 +466,7 @@ export function PomodoroTimer() {
                     setPomoCount(0);
                     setSecondsLeft(val * 60);
                     setNotified(false);
-                    clearState();
+                    clearState(userId);
                   }
                   setCustomFocusOpen(false);
                   setCustomFocusVal("");
@@ -521,7 +524,7 @@ export function PomodoroTimer() {
                   if (val > 0 && val <= 60) {
                     clearTimer();
                     setBreakMin(val);
-                    clearState();
+                    clearState(userId);
                   }
                   setCustomBreakOpen(false);
                   setCustomBreakVal("");

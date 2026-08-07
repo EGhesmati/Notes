@@ -1,12 +1,20 @@
 import { useState, useEffect } from "react";
 import { Target } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
-const GOAL_KEY = "daily_focus_goal";
 const DEFAULT_GOAL = 4;
 
-function getTodaySessions(): number {
+function goalKey(userId: number) {
+  return `daily_focus_goal_${userId}`;
+}
+
+function sessionsKey(userId: number) {
+  return `pomodoro_sessions_${userId}`;
+}
+
+function getTodaySessions(userId: number): number {
   try {
-    const raw = localStorage.getItem("pomodoro_sessions");
+    const raw = localStorage.getItem(sessionsKey(userId));
     if (!raw) return 0;
     const sessions: { date: string }[] = JSON.parse(raw);
     const today = new Date();
@@ -20,9 +28,9 @@ function getTodaySessions(): number {
   }
 }
 
-function getGoal(): number {
+function getGoal(userId: number): number {
   try {
-    const stored = localStorage.getItem(GOAL_KEY);
+    const stored = localStorage.getItem(goalKey(userId));
     return stored ? parseInt(stored, 10) || DEFAULT_GOAL : DEFAULT_GOAL;
   } catch {
     return DEFAULT_GOAL;
@@ -30,22 +38,24 @@ function getGoal(): number {
 }
 
 export function DailyGoal() {
-  const [goal, setGoal] = useState(getGoal);
-  const [completed, setCompleted] = useState(getTodaySessions);
+  const { user } = useAuth();
+  const userId = user?.id ?? 0;
+  const [goal, setGoal] = useState(() => getGoal(userId));
+  const [completed, setCompleted] = useState(() => getTodaySessions(userId));
 
   // listen for pomodoro session updates
   useEffect(() => {
-    const handler = () => setCompleted(getTodaySessions());
+    const handler = () => setCompleted(getTodaySessions(userId));
     window.addEventListener("pomodoro-updated", handler);
     return () => window.removeEventListener("pomodoro-updated", handler);
-  }, []);
+  }, [userId]);
 
   const percent = Math.min(100, Math.round((completed / goal) * 100));
   const done = completed >= goal;
 
   const setNewGoal = (g: number) => {
     setGoal(g);
-    localStorage.setItem(GOAL_KEY, String(g));
+    localStorage.setItem(goalKey(userId), String(g));
   };
 
   return (

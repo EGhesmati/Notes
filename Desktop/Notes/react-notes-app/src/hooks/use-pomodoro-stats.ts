@@ -8,24 +8,27 @@ interface PomodoroSession {
   noteTitle?: string;
 }
 
-const STORAGE_KEY = "pomodoro_sessions";
+function sessionsKey(userId: number) {
+  return `pomodoro_sessions_${userId}`;
+}
 
-function loadSessions(): PomodoroSession[] {
+function loadSessions(userId: number): PomodoroSession[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(sessionsKey(userId));
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-function saveSessions(sessions: PomodoroSession[]) {
+function saveSessions(userId: number, sessions: PomodoroSession[]) {
   const cutoff = Date.now() - 90 * 86400000;
   const filtered = sessions.filter((s) => new Date(s.date).getTime() > cutoff);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  localStorage.setItem(sessionsKey(userId), JSON.stringify(filtered));
 }
 
 export async function logSession(
+  userId: number,
   durationMin: number,
   completed: boolean,
   noteId?: number,
@@ -37,7 +40,7 @@ export async function logSession(
     // ignore API errors
   }
   // always save locally too
-  const sessions = loadSessions();
+  const sessions = loadSessions(userId);
   sessions.push({
     date: new Date().toISOString(),
     duration: durationMin,
@@ -45,7 +48,7 @@ export async function logSession(
     noteId,
     noteTitle,
   });
-  saveSessions(sessions);
+  saveSessions(userId, sessions);
   // notify other components (e.g. DailyGoal) to refresh
   window.dispatchEvent(new CustomEvent("pomodoro-updated"));
 }
@@ -78,9 +81,9 @@ export interface PomodoroStats {
   noteBreakdown: NoteBreakdown[];
 }
 
-export async function getStats(): Promise<PomodoroStats> {
+export async function getStats(userId: number): Promise<PomodoroStats> {
   // Try API first
-  let sessions = loadSessions();
+  let sessions = loadSessions(userId);
   try {
     const apiSessions = await fetchSessions();
     if (apiSessions.length > 0) {
@@ -92,7 +95,7 @@ export async function getStats(): Promise<PomodoroStats> {
         noteId: s.note_id ?? undefined,
         noteTitle: s.note_title ?? undefined,
       }));
-      saveSessions(sessions); // sync local
+      saveSessions(userId, sessions); // sync local
     }
   } catch {
     // API unavailable, use localStorage
