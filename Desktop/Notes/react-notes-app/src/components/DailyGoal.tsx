@@ -1,7 +1,8 @@
 import { useState, useEffect, useReducer } from "react";
 import { Target } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { getTodaySessionCount, getTodaySessionCountLocal } from "@/hooks/use-pomodoro-stats";
+import { getStats, loadSessions } from "@/hooks/use-pomodoro-stats";
+import type { PomodoroStats } from "@/hooks/use-pomodoro-stats";
 
 const DEFAULT_GOAL = 4;
 
@@ -18,6 +19,14 @@ function getGoal(userId: number): number {
   }
 }
 
+function getTodayLocalCount(userId: number): number {
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  return loadSessions(userId).filter((s) =>
+    `${s.date.slice(0, 4)}-${s.date.slice(5, 7)}-${s.date.slice(8, 10)}` === todayKey
+  ).length;
+}
+
 export function DailyGoal() {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
@@ -25,22 +34,18 @@ export function DailyGoal() {
   // with the stored value when the user changes (sign-in / sign-out).
   const goal = getGoal(userId);
   const [, forceRender] = useReducer((c: number) => c + 1, 0);
-  const [completed, setCompleted] = useState(() => getTodaySessionCountLocal(userId));
+  const [completed, setCompleted] = useState(() => getTodayLocalCount(userId));
 
   // Fetch today's session count from the server (authenticated) or localStorage
   // (guest / offline), then poll for cross-device sync.
   useEffect(() => {
     let cancelled = false;
     const handler = async () => {
-      if (!userId) {
-        if (!cancelled) setCompleted(getTodaySessionCountLocal(userId));
-        return;
-      }
       try {
-        const count = await getTodaySessionCount(userId);
-        if (!cancelled) setCompleted(count);
+        const stats: PomodoroStats = await getStats(userId);
+        if (!cancelled) setCompleted(stats.today.sessions);
       } catch {
-        if (!cancelled) setCompleted(getTodaySessionCountLocal(userId));
+        if (!cancelled) setCompleted(getTodayLocalCount(userId));
       }
     };
     handler();

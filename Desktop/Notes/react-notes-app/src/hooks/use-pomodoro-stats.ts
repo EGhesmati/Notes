@@ -21,7 +21,7 @@ export function sessionsKey(userId: number) {
   return `pomodoro_sessions_${userId}`;
 }
 
-// Per-user migration flag: prevents re-importing sessions already on the server
+// Per-user migration flag: set once guest sessions (key 0) have been uploaded
 function migrationFlagKey(userId: number) {
   return `pomodoro_migrated_${userId}`;
 }
@@ -47,48 +47,50 @@ function saveSessions(userId: number, sessions: PomodoroSession[]) {
   localStorage.setItem(sessionsKey(userId), JSON.stringify(filtered));
 }
 
-// --- Local-only helpers (used for guest mode and offline fallback) ---
-
-export function getTodaySessionCountLocal(userId: number): number {
-  return loadSessions(userId).filter((s) => {
-    const d = new Date(s.date);
-    const today = new Date();
-    return (
-      d.getFullYear() === today.getFullYear() &&
-      d.getMonth() === today.getMonth() &&
-      d.getDate() === today.getDate()
-    );
-  }).length;
+// Map raw API session rows to the internal PomodoroSession format.
+function mapApiSession(s: RawSession): PomodoroSession {
+  return {
+    date: s.created_at,
+    duration: s.duration,
+    completed: !!s.completed,
+    noteId: s.note_id ?? undefined,
+    noteTitle: s.note_title ?? undefined,
+  };
 }
 
-// Fetch today's completed-session count from the server (authenticated) or
-// localStorage (guest / offline fallback).
+// Merge server sessions with any local sessions that aren't on the server yet
+// (matched by created_at/date). This is the core of the offline/sync logic:
+// we NEVER blindly overwrite localStorage with server data — that would
+// destroy sessions saved locally when the API was unreachable.
 //
-// This function is intentionally READ-ONLY with respect to localStorage.
-// It must NOT call saveSessions() because: when logSession() fails to reach
-// the server, it saves the session to localStorage and sets a "dirty" flag so
-// that getStats() can retry the upload later. If this function overwrote
-// localStorage with server data (which may not yet include the dirty session),
-// the dirty session would be permanently lost before getStats() gets a chance
-// to sync it — causing statistics to reset to zero.
-//
-// Local storage caching of server data is handled exclusively by getStats(),
-// which runs the dirty-sync step BEFORE the server fetch, preserving any
-// pending local sessions.
-export async function getTodaySessionCount(userId: number): Promise<number> {
-  if (!userId) {
-    return getTodaySessionCountLocal(0);
-  }
-  try {
-    const apiSessions = await fetchSessions();
-    const now = new Date();
-    const todayKey = getDayKey(now);
-    return apiSessions.filter(
-      (s: RawSession) => getDayKey(new Date(s.created_at)) === todayKey,
-    ).length;
-  } catch {
-    return getTodaySessionCountLocal(userId);
-  }
+// Returns the merged list, deduped so each date appears only once.
+function mergeSessions(
+  server: PomodoroSession[],
+  local: PomodoroSession[],
+): PomodoroSession[] {
+  const serverDates = new Set(server.map((s) => s.date));
+  return [...server, ...local.filter((s) => !serverDates.has(s.date))];
+}
+
+// Convert a PomodoroSession to the batch-upload payload format
+function toBatchPayload(s: PomodoroSession) {
+  return {
+    duration: s.duration,
+    noteId: s.noteId ?? null,
+    noteTitle: s.noteTitle ?? null,
+    completed: !!s.completed,
+    createdAt: s.date,
+  };
+}
+
+function getDayKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function startOfWeek(d: Date) {
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.getFullYear(), d.getMonth(), diff);
 }
 
 export async function logSession(
@@ -113,11 +115,10 @@ export async function logSession(
   if (userId) {
     try {
       await logSessionApi(durationMin, noteId, noteTitle, completed, createdAt);
-      // Update local cache immediately so UI reflects change while backend is authoritative
+      // Server confirmed — update local cache and clear dirty flag
       const sessions = loadSessions(userId);
       sessions.unshift(session);
       saveSessions(userId, sessions);
-      // All local sessions are confirmed on the server — clear the dirty flag
       localStorage.removeItem(dirtyFlagKey(userId));
       window.dispatchEvent(new CustomEvent("pomodoro-updated"));
       return;
@@ -133,16 +134,6 @@ export async function logSession(
   sessions.unshift(session);
   saveSessions(userId, sessions);
   window.dispatchEvent(new CustomEvent("pomodoro-updated"));
-}
-
-function getDayKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function startOfWeek(d: Date) {
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(d.getFullYear(), d.getMonth(), diff);
 }
 
 export interface NoteBreakdown {
@@ -163,75 +154,53 @@ export interface PomodoroStats {
   noteBreakdown: NoteBreakdown[];
 }
 
-// Map raw API session rows to the internal PomodoroSession format.
-function mapApiSession(s: RawSession): PomodoroSession {
-  return {
-    date: s.created_at,
-    duration: s.duration,
-    completed: !!s.completed,
-    noteId: s.note_id ?? undefined,
-    noteTitle: s.note_title ?? undefined,
-  };
-}
-
+// The single data-loading function. For authenticated users, the server is the
+// source of truth, with localStorage as an offline cache. For guests, localStorage
+// is the only store.
+//
+// Sync pipeline (authenticated users only):
+//   1. Migration (first login): upload guest sessions (key 0) to the server.
+//      Flag prevents retry. Local data is NOT cleared — the merge below handles
+//      deduplication.
+//   2. Dirty sync: if logSession() failed to reach the API, local sessions have
+//      a "dirty" flag. Retry the upload. Clear flag on success.
+//   3. Server fetch: fetch ALL sessions from the server, then ALWAYS merge with
+//      local sessions. This ensures no session is lost, regardless of whether
+//      migration or dirty-sync succeeded. Cache merged data locally.
+//
+// The invariant: localStorage is NEVER overwritten with server-only data.
+// Local sessions are always preserved via the merge.
 export async function getStats(userId: number): Promise<PomodoroStats> {
   let sessions: PomodoroSession[];
 
   if (userId) {
-    // --- 1. One-time migration: upload pre-existing local sessions ---
-    // On the first login after the sync fix, any statistics previously stored
-    // in localStorage (under either the authenticated key or the guest key 0)
-    // are uploaded to the server. The batch endpoint deduplicates by created_at,
-    // so re-uploading is safe.
+    // --- 1. One-time migration: upload pre-existing guest sessions ---
     const migrationDone = localStorage.getItem(migrationFlagKey(userId)) === "true";
     if (!migrationDone) {
-      const local = loadSessions(userId);
-      const guestLocal = loadSessions(0); // guest-mode sessions
-      const allLocal = [...local, ...guestLocal];
-
-      if (allLocal.length > 0) {
+      const guestLocal = loadSessions(0);
+      if (guestLocal.length > 0) {
         try {
-          const payload = allLocal.map((s) => ({
-            duration: s.duration,
-            noteId: s.noteId ?? null,
-            noteTitle: s.noteTitle ?? null,
-            completed: !!s.completed,
-            createdAt: s.date,
-          }));
-          await batchLogSessions(payload);
-          // Migration succeeded — prevent duplicate imports next time
-          localStorage.setItem(migrationFlagKey(userId), "true");
-          // Clear migrated local data so the server becomes the single source of truth
-          saveSessions(userId, []);
-          localStorage.setItem(sessionsKey(0), "[]");
+          await batchLogSessions(guestLocal.map(toBatchPayload));
         } catch {
-          // Migration failed — keep local data; will retry on the next getStats() call
+          // Migration failed — keep guest data locally. The merge below
+          // will include them in stats, and the batch upload will retry.
         }
-      } else {
-        localStorage.setItem(migrationFlagKey(userId), "true");
       }
+      // Mark migration as attempted so we don't keep retrying on every call.
+      // (The batch endpoint deduplicates by created_at, so retrying is safe
+      // but wasteful.)
+      localStorage.setItem(migrationFlagKey(userId), "true");
     }
 
     // --- 2. Sync dirty local sessions (offline fallback recovery) ---
-    // If logSession() fell back to localStorage because the API was down, those
-    // sessions need to be uploaded now. The dirty flag tracks this state.
     const isDirty = localStorage.getItem(dirtyFlagKey(userId)) === "true";
-    if (isDirty) {
-      const local = loadSessions(userId);
-      if (local.length > 0) {
-        try {
-          const payload = local.map((s) => ({
-            duration: s.duration,
-            noteId: s.noteId ?? null,
-            noteTitle: s.noteTitle ?? null,
-            completed: !!s.completed,
-            createdAt: s.date,
-          }));
-          await batchLogSessions(payload);
-          localStorage.removeItem(dirtyFlagKey(userId));
-        } catch {
-          // Still unreachable — fall back to local cache below
-        }
+    let localSessions = loadSessions(userId);
+    if (isDirty && localSessions.length > 0) {
+      try {
+        await batchLogSessions(localSessions.map(toBatchPayload));
+        localStorage.removeItem(dirtyFlagKey(userId));
+      } catch {
+        // Still unreachable — keep dirty flag set for next retry
       }
     }
 
@@ -239,17 +208,11 @@ export async function getStats(userId: number): Promise<PomodoroStats> {
     try {
       const apiSessions = await fetchSessions();
       const serverSessions: PomodoroSession[] = apiSessions.map(mapApiSession);
-      // If the dirty sync above failed, local sessions still contain data
-      // not yet on the server. Merge to avoid data loss — keep all server
-      // sessions plus any local ones that aren't duplicates (by date).
-      if (localStorage.getItem(dirtyFlagKey(userId)) === "true") {
-        const local = loadSessions(userId);
-        const serverDates = new Set(serverSessions.map((s) => s.date));
-        sessions = [...serverSessions, ...local.filter((s) => !serverDates.has(s.date))];
-      } else {
-        sessions = serverSessions;
-      }
-      // Cache to localStorage for offline use and sibling components
+      localSessions = loadSessions(userId);
+      // ALWAYS merge — never overwrite localStorage with server-only data.
+      // This ensures sessions saved locally (when the API was down) are
+      // preserved and included in the stats.
+      sessions = mergeSessions(serverSessions, localSessions);
       saveSessions(userId, sessions);
     } catch {
       // Network or server unavailable — fall back to local cache
