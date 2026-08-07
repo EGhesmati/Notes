@@ -46,6 +46,8 @@ export async function logSession(
     noteTitle,
   });
   saveSessions(sessions);
+  // notify other components (e.g. DailyGoal) to refresh
+  window.dispatchEvent(new CustomEvent("pomodoro-updated"));
 }
 
 function getDayKey(date: Date) {

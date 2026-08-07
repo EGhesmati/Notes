@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Target } from "lucide-react";
 
 const GOAL_KEY = "daily_focus_goal";
@@ -31,7 +31,14 @@ function getGoal(): number {
 
 export function DailyGoal() {
   const [goal, setGoal] = useState(getGoal);
-  const completed = useMemo(getTodaySessions, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [completed, setCompleted] = useState(getTodaySessions);
+
+  // listen for pomodoro session updates
+  useEffect(() => {
+    const handler = () => setCompleted(getTodaySessions());
+    window.addEventListener("pomodoro-updated", handler);
+    return () => window.removeEventListener("pomodoro-updated", handler);
+  }, []);
 
   const percent = Math.min(100, Math.round((completed / goal) * 100));
   const done = completed >= goal;
