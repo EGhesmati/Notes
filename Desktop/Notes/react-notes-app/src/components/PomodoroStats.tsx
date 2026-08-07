@@ -23,10 +23,18 @@ export function PomodoroStatsPanel() {
   useEffect(() => {
     if (!open) return;
     getStats(userId).then(setStats);
-    // refresh stats live when a session is logged
+    // refresh stats live when a session is logged in this browser
     const handler = () => { getStats(userId).then(setStats); };
     window.addEventListener("pomodoro-updated", handler);
-    return () => window.removeEventListener("pomodoro-updated", handler);
+    // Poll for cross-device sync (other browsers/devices won't fire the
+    // local pomodoro-updated event) and refresh when the window regains focus.
+    const interval = setInterval(() => getStats(userId).then(setStats), 30000);
+    window.addEventListener("focus", handler);
+    return () => {
+      window.removeEventListener("pomodoro-updated", handler);
+      window.removeEventListener("focus", handler);
+      clearInterval(interval);
+    };
   }, [open, userId]);
 
   return (

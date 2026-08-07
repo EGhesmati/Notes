@@ -19,8 +19,11 @@ await pool.query(`
   CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    passcode TEXT NOT NULL UNIQUE
+    passcode TEXT NOT NULL UNIQUE,
+    pomodoro_goal INTEGER NOT NULL DEFAULT 4
   );
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS pomodoro_goal INTEGER NOT NULL DEFAULT 4;
+
   CREATE TABLE IF NOT EXISTS notes (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -36,10 +39,12 @@ await pool.query(`
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
     duration INTEGER NOT NULL,
+    completed INTEGER NOT NULL DEFAULT 1,
     note_id INTEGER,
     note_title TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
+  ALTER TABLE sessions ADD COLUMN IF NOT EXISTS completed INTEGER NOT NULL DEFAULT 1;
 `);
 
 const app = express();
@@ -133,11 +138,43 @@ app.get("/api/sessions", authMiddleware, async (req, res) => {
   res.json(rows);
 });
 
+app.post("/api/sessions/batch", authMiddleware, async (req, res) => {
+  const sessions = req.body.sessions || [];
+  if (!Array.isArray(sessions)) return res.status(400).json({ error: "sessions must be an array" });
+  const userId = (req as any).userId;
+  try {
+    for (const s of sessions) {
+      const createdAt = s.createdAt ? new Date(s.createdAt).toISOString() : new Date().toISOString();
+      // insert only if no session with same user_id and created_at exists
+      await pool.query(
+        `INSERT INTO sessions (user_id, duration, note_id, note_title, completed, created_at)
+         SELECT $1, $2, $3, $4, $5, $6
+         WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE user_id = $1 AND created_at = $6)`,
+        [userId, s.duration || 0, s.noteId || null, s.noteTitle || null, s.completed ? 1 : 0, createdAt],
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "failed to batch insert" });
+  }
+});
+
 app.post("/api/sessions", authMiddleware, async (req, res) => {
-  const { duration, noteId, noteTitle } = req.body;
-  await pool.query("INSERT INTO sessions (user_id, duration, note_id, note_title) VALUES ($1, $2, $3, $4)", [
-    (req as any).userId, duration, noteId || null, noteTitle || null,
-  ]);
+  const { duration, noteId, noteTitle, completed, createdAt } = req.body;
+  const userId = (req as any).userId;
+  // Allow the client to supply a precise created_at so the deduplication
+  // check (same as the batch endpoint) can detect near-simultaneous inserts
+  // from multiple devices/tabs for the same logical session.
+  const ts = createdAt ? new Date(createdAt).toISOString() : new Date().toISOString();
+  // Insert only if no session with the same user_id + created_at already exists,
+  // preventing duplicate sessions from race conditions across devices.
+  await pool.query(
+    `INSERT INTO sessions (user_id, duration, note_id, note_title, completed, created_at)
+     SELECT $1, $2, $3, $4, $5, $6
+     WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE user_id = $1 AND created_at = $6)`,
+    [userId, duration || 0, noteId || null, noteTitle || null, completed ? 1 : 0, ts],
+  );
   res.json({ ok: true });
 });
 

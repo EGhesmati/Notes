@@ -1,31 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useReducer } from "react";
 import { Target } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { getTodaySessionCount, getTodaySessionCountLocal } from "@/hooks/use-pomodoro-stats";
 
 const DEFAULT_GOAL = 4;
 
 function goalKey(userId: number) {
   return `daily_focus_goal_${userId}`;
-}
-
-function sessionsKey(userId: number) {
-  return `pomodoro_sessions_${userId}`;
-}
-
-function getTodaySessions(userId: number): number {
-  try {
-    const raw = localStorage.getItem(sessionsKey(userId));
-    if (!raw) return 0;
-    const sessions: { date: string }[] = JSON.parse(raw);
-    const today = new Date();
-    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    return sessions.filter((s) => {
-      const d = new Date(s.date);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` === todayKey;
-    }).length;
-  } catch {
-    return 0;
-  }
 }
 
 function getGoal(userId: number): number {
@@ -40,22 +21,48 @@ function getGoal(userId: number): number {
 export function DailyGoal() {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
-  const [goal, setGoal] = useState(() => getGoal(userId));
-  const [completed, setCompleted] = useState(() => getTodaySessions(userId));
+  // Goal is derived from localStorage on every render so it stays in sync
+  // with the stored value when the user changes (sign-in / sign-out).
+  const goal = getGoal(userId);
+  const [, forceRender] = useReducer((c: number) => c + 1, 0);
+  const [completed, setCompleted] = useState(() => getTodaySessionCountLocal(userId));
 
-  // listen for pomodoro session updates
+  // Fetch today's session count from the server (authenticated) or localStorage
+  // (guest / offline), then poll for cross-device sync.
   useEffect(() => {
-    const handler = () => setCompleted(getTodaySessions(userId));
+    let cancelled = false;
+    const handler = async () => {
+      if (!userId) {
+        if (!cancelled) setCompleted(getTodaySessionCountLocal(userId));
+        return;
+      }
+      try {
+        const count = await getTodaySessionCount(userId);
+        if (!cancelled) setCompleted(count);
+      } catch {
+        if (!cancelled) setCompleted(getTodaySessionCountLocal(userId));
+      }
+    };
+    handler();
+    // Poll every 30s so another device's completed Pomodoro shows up
+    const interval = setInterval(handler, 30000);
+    // Refresh on local events and when the window regains focus
     window.addEventListener("pomodoro-updated", handler);
-    return () => window.removeEventListener("pomodoro-updated", handler);
+    window.addEventListener("focus", handler);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener("pomodoro-updated", handler);
+      window.removeEventListener("focus", handler);
+    };
   }, [userId]);
 
   const percent = Math.min(100, Math.round((completed / goal) * 100));
   const done = completed >= goal;
 
   const setNewGoal = (g: number) => {
-    setGoal(g);
     localStorage.setItem(goalKey(userId), String(g));
+    forceRender();
   };
 
   return (

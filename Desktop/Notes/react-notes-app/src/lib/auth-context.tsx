@@ -89,9 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(() => {
-    // clear user-scoped notes cache
+    // clear user-scoped caches so a fresh login re-fetches from the backend
     if (user) {
       localStorage.removeItem(`notes-${user.id}`);
+      localStorage.removeItem(`pomodoro_sessions_${user.id}`);
+      localStorage.removeItem(`pomodoro_state_${user.id}`);
+      localStorage.removeItem(`pomodoro_migrated_${user.id}`);
+      localStorage.removeItem(`pomodoro_dirty_${user.id}`);
     }
     setToken(null);
     setUser(null);
