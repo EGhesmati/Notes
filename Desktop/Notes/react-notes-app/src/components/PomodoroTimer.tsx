@@ -1,10 +1,8 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Play, Pause, RotateCcw, Timer, X, Volume2, VolumeX } from "lucide-react";
-import { logSession } from "@/hooks/use-pomodoro-stats";
 import { useAuth } from "@/lib/auth-context";
-import type { NoteItem } from "@/types";
 
 type Phase = "focus" | "short-break" | "long-break";
 
@@ -143,21 +141,10 @@ export function PomodoroTimer() {
   const [running, setRunning] = useState(restored?.running ?? false);
   const [pomoCount, setPomoCount] = useState(restored?.pomoCount ?? 0);
   const [notified, setNotified] = useState(false);
-  const [linkedNoteId, setLinkedNoteId] = useState<number | null>(null);
-  const [linkedNoteTitle, setLinkedNoteTitle] = useState("");
   const [customFocusOpen, setCustomFocusOpen] = useState(false);
   const [customFocusVal, setCustomFocusVal] = useState("");
   const [customBreakOpen, setCustomBreakOpen] = useState(false);
   const [customBreakVal, setCustomBreakVal] = useState("");
-
-  const notes = useMemo<NoteItem[]>(() => {
-    if (!user) return [];
-    try {
-      return JSON.parse(localStorage.getItem(`notes-${user.id}`) || "[]");
-    } catch {
-      return [];
-    }
-  }, [open, user]); // refresh when panel opens
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current) {
@@ -228,22 +215,15 @@ export function PomodoroTimer() {
   }, [clearTimer, userId]);
 
   const reset = useCallback(() => {
-    if (running && phase === "focus") {
-      // log abandoned session
-      logSession(user?.id ?? 0, focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
-    }
     clearTimer();
     setRunning(false);
     setNotified(false);
     clearState(userId);
     startPhase("focus", 0);
-  }, [clearTimer, startPhase, running, phase, focusMin, linkedNoteId, linkedNoteTitle, user, userId]);
+  }, [clearTimer, startPhase, userId]);
 
   const changeFocus = useCallback(
     (m: number) => {
-      if (running && phase === "focus") {
-        logSession(user?.id ?? 0, focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
-      }
       clearTimer();
       setFocusMin(m);
       setRunning(false);
@@ -253,7 +233,7 @@ export function PomodoroTimer() {
       setNotified(false);
       clearState(userId);
     },
-    [clearTimer, running, phase, focusMin, linkedNoteId, linkedNoteTitle, user, userId],
+    [clearTimer, userId],
   );
 
   const changeBreak = useCallback(
@@ -302,7 +282,6 @@ export function PomodoroTimer() {
 
   const advance = useCallback(() => {
     if (phase === "focus") {
-      logSession(user?.id ?? 0, focusMin, true, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
       const newCount = pomoCount + 1;
       startPhase(nextPhase(phase), newCount);
     } else {
@@ -322,7 +301,7 @@ export function PomodoroTimer() {
       running: true,
       startedAt: Date.now(),
     });
-  }, [phase, pomoCount, focusMin, breakMin, nextPhase, startPhase, linkedNoteId, linkedNoteTitle, user, userId]);
+  }, [phase, pomoCount, focusMin, breakMin, nextPhase, startPhase, userId]);
 
   // close on Escape
   useEffect(() => {
@@ -456,9 +435,6 @@ export function PomodoroTimer() {
                   e.preventDefault();
                   const val = parseInt(customFocusVal, 10);
                   if (val > 0 && val <= 180) {
-                    if (running && phase === "focus") {
-                      logSession(user?.id ?? 0, focusMin, false, linkedNoteId ?? undefined, linkedNoteTitle || undefined);
-                    }
                     clearTimer();
                     setFocusMin(val);
                     setRunning(false);
@@ -558,42 +534,6 @@ export function PomodoroTimer() {
           <p className="mt-1.5 text-[10px] text-muted-foreground">
             Long break: {LONG_BREAK_MIN}m (every 4th)
           </p>
-
-          {/* Link to note */}
-          {notes.length > 0 && (
-            <div className="mt-3 border-t border-border pt-3">
-              <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
-                {linkedNoteId ? "Tracking" : "Track for note"}
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {notes.slice(0, 5).map((n) => {
-                  const active = n.id === linkedNoteId;
-                  return (
-                    <button
-                      key={n.id}
-                      type="button"
-                      onClick={() => {
-                        if (active) {
-                          setLinkedNoteId(null);
-                          setLinkedNoteTitle("");
-                        } else {
-                          setLinkedNoteId(n.id);
-                          setLinkedNoteTitle(n.text.slice(0, 40));
-                        }
-                      }}
-                      className={`max-w-[130px] truncate rounded-md px-2 py-1 text-[10px] font-medium transition-all ${
-                        active
-                          ? "bg-primary/20 text-primary ring-1 ring-primary/30"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                      }`}
-                    >
-                      {n.text.slice(0, 20)}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

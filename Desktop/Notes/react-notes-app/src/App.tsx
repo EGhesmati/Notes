@@ -17,8 +17,6 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useUserNotes } from "@/hooks/use-user-notes";
 import { AppLoadingScreen } from "@/components/AppLoadingScreen";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
-import { PomodoroStatsPanel } from "@/components/PomodoroStats";
-import { DailyGoal } from "@/components/DailyGoal";
 import { TimeChips } from "@/components/TimeChips";
 import { useAuth } from "@/lib/auth-context";
 import { LoginPage } from "@/pages/LoginPage";
@@ -132,8 +130,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <DailyGoal />
-            <PomodoroStatsPanel />
             <PomodoroTimer />
             <Button
               variant="ghost"

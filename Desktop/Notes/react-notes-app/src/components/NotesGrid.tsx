@@ -1,13 +1,11 @@
-import { memo, useState, useCallback, useEffect } from "react";
+import { memo, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Pencil, Check, X, Calendar, Pin, Timer } from "lucide-react";
+import { Trash2, Pencil, Check, X, Calendar, Pin } from "lucide-react";
 import { PRIORITY_BADGE } from "@/types";
 import type { NotesState, Priority } from "@/types";
 import { TimeChips } from "@/components/TimeChips";
-import { sessionsKey } from "@/hooks/use-pomodoro-stats";
-import { useAuth } from "@/lib/auth-context";
 
 interface NotesGridProps {
   readonly notes: NotesState;
@@ -60,54 +58,12 @@ function fromISO(iso?: string) {
   };
 }
 
-function formatHours(min: number) {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  if (h === 0) return `${m}m`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
-}
-
-function getNoteFocusTimes(userId: number): Map<number, number> {
-  try {
-    const raw = localStorage.getItem(sessionsKey(userId));
-    if (!raw) return new Map();
-    const sessions: { noteId?: number; duration: number }[] = JSON.parse(raw);
-    const map = new Map<number, number>();
-    sessions.forEach((s) => {
-      if (s.noteId) {
-        map.set(s.noteId, (map.get(s.noteId) || 0) + s.duration);
-      }
-    });
-    return map;
-  } catch {
-    return new Map();
-  }
-}
-
 const NotesGrid = memo(function NotesGrid({
   notes,
   onDelete,
   onEdit,
   onTogglePin,
 }: NotesGridProps) {
-  const { user } = useAuth();
-  const userId = user?.id ?? 0;
-  const [focusTimes, setFocusTimes] = useState(() => getNoteFocusTimes(userId));
-
-  // refresh focus times when window regains focus (pomodoro may have finished)
-  // or when a local pomodoro session is logged
-  useEffect(() => {
-    const onFocus = () => setFocusTimes(getNoteFocusTimes(userId));
-    window.addEventListener("focus", onFocus);
-    const handler = () => setFocusTimes(getNoteFocusTimes(userId));
-    window.addEventListener("pomodoro-updated", handler);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("pomodoro-updated", handler);
-    };
-  }, [userId]);
-
   if (notes.length === 0) {
     return (
       <p className="py-16 text-center text-sm italic text-muted-foreground">
@@ -122,7 +78,6 @@ const NotesGrid = memo(function NotesGrid({
         <NoteCard
           key={item.id}
           item={item}
-          focusMin={focusTimes.get(item.id) ?? 0}
           onDelete={onDelete}
           onEdit={onEdit}
           onTogglePin={onTogglePin}
@@ -134,13 +89,11 @@ const NotesGrid = memo(function NotesGrid({
 
 const NoteCard = memo(function NoteCard({
   item,
-  focusMin,
   onDelete,
   onEdit,
   onTogglePin,
 }: {
   readonly item: NotesState[number];
-  readonly focusMin: number;
   readonly onDelete: (id: number) => void;
   readonly onEdit: (
     id: number,
@@ -270,12 +223,6 @@ const NoteCard = memo(function NoteCard({
                       {due.dateLabel}
                     </span>
                   </>
-                )}
-                {focusMin > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary">
-                    <Timer className="h-3 w-3" />
-                    {formatHours(focusMin)}
-                  </span>
                 )}
               </div>
             </div>
