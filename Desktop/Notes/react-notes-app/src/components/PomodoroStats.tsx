@@ -12,6 +12,7 @@ interface PomoStat {
   ts: number;
   duration: number; // seconds
   phase: Phase;
+  noteId?: number | null;
 }
 
 function statsKey(userId: number) {
@@ -83,7 +84,7 @@ export default function PomodoroStats() {
           const r = await fetch(`${API_URL}/api/pomodoros`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ ts: item.ts, duration: item.duration, phase: item.phase }),
+            body: JSON.stringify({ ts: item.ts, duration: item.duration, phase: item.phase, noteId: item.noteId ?? null }),
           });
           if (!r.ok) remaining.push(item);
         } catch {

@@ -3,12 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Play, Pause, RotateCcw, Timer, X, Volume2, VolumeX } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import type { NoteItem } from "@/types";
 
 type Phase = "focus" | "short-break" | "long-break";
 
 const FOCUS_OPTIONS = [25, 60, 90];
 const BREAK_OPTIONS = [5, 10, 15];
 const LONG_BREAK_MIN = 30;
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 function stateKey(userId: number) {
   return `pomodoro_state_${userId}`;
@@ -21,7 +23,7 @@ interface TimerState {
   secondsLeft: number;
   pomoCount: number;
   running: boolean;
-  startedAt: number | null; // timestamp when started
+  startedAt: number | null;
 }
 
 function loadState(userId: number): TimerState | null {
@@ -42,15 +44,15 @@ function clearState(userId: number) {
   localStorage.removeItem(stateKey(userId));
 }
 
-// --- Pomodoro statistics storage helpers ---
 function statsKey(userId: number) {
   return `pomodoro_stats_${userId}`;
 }
 
 interface PomoStat {
   ts: number;
-  duration: number; // seconds
+  duration: number;
   phase: Phase;
+  noteId?: number | null;
 }
 
 function loadStats(userId: number): PomoStat[] {
@@ -66,25 +68,18 @@ function loadStats(userId: number): PomoStat[] {
 function saveStats(userId: number, stats: PomoStat[]) {
   try {
     localStorage.setItem(statsKey(userId), JSON.stringify(stats));
-    // also emit a storage event across same-tab consumers
     try {
       window.dispatchEvent(new StorageEvent("storage", { key: statsKey(userId), newValue: JSON.stringify(stats) }));
-    } catch {
-      // ignore environments that don't support constructing StorageEvent
-    }
-  } catch {
-    // ignore
-  }
+    } catch {}
+  } catch {}
 }
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 async function syncStats(userId: number) {
   const token = localStorage.getItem("token");
-  if (!token) return; // no auth, can't sync
+  if (!token) return;
   const queued = loadStats(userId);
   if (queued.length === 0) return;
-  const remaining: typeof queued = [];
+  const remaining: PomoStat[] = [];
   for (const item of queued) {
     try {
       const res = await fetch(`${API_URL}/api/pomodoros`, {
@@ -93,26 +88,26 @@ async function syncStats(userId: number) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ ts: item.ts, duration: item.duration, phase: item.phase }),
+        body: JSON.stringify({
+          ts: item.ts,
+          duration: item.duration,
+          phase: item.phase,
+          noteId: item.noteId ?? null,
+        }),
       });
-      if (!res.ok) {
-        remaining.push(item);
-      }
+      if (!res.ok) remaining.push(item);
     } catch {
       remaining.push(item);
     }
   }
-  // save any remaining items back to local storage
   saveStats(userId, remaining);
 }
 
-function recordCompletion(userId: number, phase: Phase, duration: number) {
+function recordCompletion(userId: number, phase: Phase, duration: number, noteId?: number | null) {
   if (phase !== "focus") return;
   const stats = loadStats(userId);
-  const item = { ts: Date.now(), duration, phase } as PomoStat;
-  stats.push(item);
+  stats.push({ ts: Date.now(), duration, phase, noteId: noteId ?? null });
   saveStats(userId, stats);
-  // try to sync in background (don't await)
   // eslint-disable-next-line @typescript-eslint/no-floating-promises
   syncStats(userId);
 }
@@ -135,7 +130,6 @@ const PHASE_COLOR: Record<Phase, string> = {
   "long-break": "text-sky-400/70",
 };
 
-// shared audio context — created lazily, resumed on user gesture
 let _audioCtx: AudioContext | null = null;
 
 function getAudioCtx(): AudioContext | null {
@@ -162,17 +156,14 @@ function playBeep() {
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.4);
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 function playChime() {
   const ctx = getAudioCtx();
   if (!ctx) return;
   try {
-    const notes = [523, 659, 784];
-    notes.forEach((freq, i) => {
+    [523, 659, 784].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
@@ -185,18 +176,14 @@ function playChime() {
       osc.start(t);
       osc.stop(t + 0.3);
     });
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 export function PomodoroTimer() {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
-
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const endAtRef = useRef<number | null>(null);
-
   const restored = loadState(userId);
 
   const [open, setOpen] = useState(false);
@@ -220,6 +207,10 @@ export function PomodoroTimer() {
   const [customFocusVal, setCustomFocusVal] = useState("");
   const [customBreakOpen, setCustomBreakOpen] = useState(false);
   const [customBreakVal, setCustomBreakVal] = useState("");
+  const [notePickerOpen, setNotePickerOpen] = useState(false);
+  const [pendingCompletion, setPendingCompletion] = useState<{ phase: Phase; duration: number } | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<number | "none">("none");
+  const [noteOptions, setNoteOptions] = useState<NoteItem[]>([]);
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current) {
@@ -229,50 +220,34 @@ export function PomodoroTimer() {
   }, []);
 
   const nextPhase = useCallback(
-    (current: Phase): Phase => {
-      if (current === "focus") {
-        const next = pomoCount + 1;
-        return next % 4 === 0 ? "long-break" : "short-break";
-      }
-      return "focus";
-    },
+    (current: Phase): Phase => (current === "focus" ? (pomoCount + 1) % 4 === 0 ? "long-break" : "short-break" : "focus"),
     [pomoCount],
   );
 
-  const startPhase = useCallback(
-    (p: Phase, count: number) => {
-      setPhase(p);
-      setPomoCount(count);
-      const dur = p === "focus" ? focusMin * 60 : p === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
-      setSecondsLeft(dur);
-      setNotified(false);
-    },
-    [focusMin, breakMin],
-  );
+  const startPhase = useCallback((p: Phase, count: number) => {
+    setPhase(p);
+    setPomoCount(count);
+    const dur = p === "focus" ? focusMin * 60 : p === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
+    setSecondsLeft(dur);
+    setNotified(false);
+  }, [focusMin, breakMin]);
 
-  const notify = useCallback(
-    (phaseLabel: string) => {
-      if (sound) {
-        phaseLabel === "Focus" ? playChime() : playBeep();
-      }
-      if (Notification.permission === "granted") {
-        new Notification("Pomodoro", {
-          body: `${phaseLabel} finished!`,
-          icon: "/Notes/favicon.svg",
-        });
-      }
-      setNotified(true);
-    },
-    [sound],
-  );
+  const notify = useCallback((phaseLabel: string) => {
+    if (sound) {
+      phaseLabel === "Focus" ? playChime() : playBeep();
+    }
+    if (Notification.permission === "granted") {
+      new Notification("Pomodoro", { body: `${phaseLabel} finished!`, icon: "/Notes/favicon.svg" });
+    }
+    setNotified(true);
+  }, [sound]);
 
   const start = useCallback(() => {
-    getAudioCtx(); // resume audio context on user gesture
+    getAudioCtx();
     setNotified(false);
     setRunning(true);
-    const endAt = Date.now() + secondsLeft * 1000;
-    endAtRef.current = endAt;
-    saveState(userId,{
+    endAtRef.current = Date.now() + secondsLeft * 1000;
+    saveState(userId, {
       focusMin,
       breakMin,
       phase,
@@ -297,30 +272,36 @@ export function PomodoroTimer() {
     startPhase("focus", 0);
   }, [clearTimer, startPhase, userId]);
 
-  const changeFocus = useCallback(
-    (m: number) => {
-      clearTimer();
-      setFocusMin(m);
-      setRunning(false);
-      setPhase("focus");
-      setPomoCount(0);
-      setSecondsLeft(m * 60);
-      setNotified(false);
-      clearState(userId);
-    },
-    [clearTimer, userId],
-  );
+  const changeFocus = useCallback((m: number) => {
+    clearTimer();
+    setFocusMin(m);
+    setRunning(false);
+    setPhase("focus");
+    setPomoCount(0);
+    setSecondsLeft(m * 60);
+    setNotified(false);
+    clearState(userId);
+  }, [clearTimer, userId]);
 
-  const changeBreak = useCallback(
-    (m: number) => {
-      clearTimer();
-      setBreakMin(m);
-      clearState(userId);
-    },
-    [clearTimer, userId],
-  );
+  const changeBreak = useCallback((m: number) => {
+    clearTimer();
+    setBreakMin(m);
+    clearState(userId);
+  }, [clearTimer, userId]);
 
-  // tick — uses wall-clock time so background tabs don't lag
+  useEffect(() => {
+    const onNotes = () => {
+      try {
+        setNoteOptions(JSON.parse(localStorage.getItem(`notes-${userId}`) || "[]") as NoteItem[]);
+      } catch {
+        setNoteOptions([]);
+      }
+    };
+    onNotes();
+    window.addEventListener("storage", onNotes);
+    return () => window.removeEventListener("storage", onNotes);
+  }, [userId]);
+
   useEffect(() => {
     if (!running) return;
     intervalRef.current = setInterval(() => {
@@ -329,32 +310,25 @@ export function PomodoroTimer() {
       if (remaining <= 0) {
         setRunning(false);
         clearState(userId);
-        // record completion for stats (only focus sessions counted)
-        try {
-          recordCompletion(userId, phase, phase === "focus" ? focusMin * 60 : (phase === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60));
-        } catch {
-          // ignore
+        if (phase === "focus") {
+          setPendingCompletion({ phase, duration: focusMin * 60 });
+          setSelectedNoteId("none");
+          setNotePickerOpen(true);
         }
         const label = PHASE_LABEL[phase];
         setTimeout(() => notify(label), 50);
       }
-    }, 250); // faster tick for smooth display
+    }, 250);
     return clearTimer;
-  }, [running, phase, notify, clearTimer, userId]);
+  }, [running, phase, notify, clearTimer, userId, focusMin]);
 
-  // update tab title
   useEffect(() => {
-    if (running) {
-      document.title = `${formatTime(secondsLeft)} · NoteApp`;
-    } else {
-      document.title = "NoteApp";
-    }
+    document.title = running ? `${formatTime(secondsLeft)} · NoteApp` : "NoteApp";
     return () => {
       document.title = "NoteApp";
     };
   }, [running, secondsLeft]);
 
-  // request notification permission on first start
   const requestNotification = useCallback(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
@@ -384,7 +358,6 @@ export function PomodoroTimer() {
     });
   }, [phase, pomoCount, focusMin, breakMin, nextPhase, startPhase, userId]);
 
-  // close on Escape
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -403,15 +376,11 @@ export function PomodoroTimer() {
           setOpen((o) => !o);
           requestNotification();
         }}
-        className={`h-8 w-8 rounded-full relative ${
-          running ? "text-primary" : "text-muted-foreground"
-        } hover:text-foreground`}
+        className={`relative h-8 w-8 rounded-full ${running ? "text-primary" : "text-muted-foreground"} hover:text-foreground`}
         title="Pomodoro"
       >
         <Timer className="h-[18px] w-[18px]" />
-        {running && (
-          <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
-        )}
+        {running && <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />}
       </Button>
 
       {open && (
@@ -419,40 +388,23 @@ export function PomodoroTimer() {
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">Pomodoro</span>
-              <button
-                onClick={() => setSound((s) => !s)}
-                className="text-muted-foreground hover:text-foreground"
-                title={sound ? "Mute" : "Unmute"}
-              >
+              <button onClick={() => setSound((s) => !s)} className="text-muted-foreground hover:text-foreground" title={sound ? "Mute" : "Unmute"}>
                 {sound ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
               </button>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setOpen(false)}
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
-            >
+            <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="h-6 w-6 text-muted-foreground hover:text-foreground">
               <X className="h-3.5 w-3.5" />
             </Button>
           </div>
 
-          {/* Phase label */}
           <p className={`mb-1 text-center text-xs font-semibold uppercase tracking-wider ${PHASE_COLOR[phase]}`}>
             {PHASE_LABEL[phase]}
             {pomoCount > 0 && phase === "focus" && ` #${pomoCount + 1}`}
           </p>
-
-          {/* Timer */}
-          <div
-            className={`mb-3 text-center text-4xl font-mono font-bold tabular-nums tracking-wider ${
-              notified ? "animate-pulse" : "text-foreground"
-            }`}
-          >
+          <div className={`mb-3 text-center text-4xl font-mono font-bold tabular-nums tracking-wider ${notified ? "animate-pulse" : "text-foreground"}`}>
             {formatTime(secondsLeft)}
           </div>
 
-          {/* Controls */}
           <div className="mb-4 flex items-center justify-center gap-2">
             {notified ? (
               <Button size="sm" onClick={advance} className="h-8 gap-1.5">
@@ -475,23 +427,17 @@ export function PomodoroTimer() {
             </Button>
           </div>
 
-          {/* Pomo dots */}
           <div className="mb-3 flex items-center justify-center gap-1">
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
                 className={`h-2 w-2 rounded-full transition-all ${
-                  i < pomoCount % 4
-                    ? "bg-primary"
-                    : pomoCount >= 4 && i === 0
-                      ? "bg-primary/40"
-                      : "bg-muted"
+                  i < pomoCount % 4 ? "bg-primary" : pomoCount >= 4 && i === 0 ? "bg-primary/40" : "bg-muted"
                 }`}
               />
             ))}
           </div>
 
-          {/* Settings */}
           <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">Focus</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
             {FOCUS_OPTIONS.map((m) => (
@@ -502,9 +448,7 @@ export function PomodoroTimer() {
                   setCustomFocusOpen(false);
                 }}
                 className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
-                  focusMin === m && !customFocusOpen
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  focusMin === m && !customFocusOpen ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
                 {m}m
@@ -548,7 +492,7 @@ export function PomodoroTimer() {
             ) : (
               <button
                 onClick={() => setCustomFocusOpen(true)}
-                className="flex-1 rounded-lg px-2 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-all"
+                className="flex-1 rounded-lg bg-muted px-2 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:bg-muted/80"
               >
                 Custom
               </button>
@@ -565,9 +509,7 @@ export function PomodoroTimer() {
                   setCustomBreakOpen(false);
                 }}
                 className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
-                  breakMin === m && !customBreakOpen
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  breakMin === m && !customBreakOpen ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
                 {m}m
@@ -606,15 +548,69 @@ export function PomodoroTimer() {
             ) : (
               <button
                 onClick={() => setCustomBreakOpen(true)}
-                className="flex-1 rounded-lg px-2 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-all"
+                className="flex-1 rounded-lg bg-muted px-2 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:bg-muted/80"
               >
                 Custom
               </button>
             )}
           </div>
-          <p className="mt-1.5 text-[10px] text-muted-foreground">
-            Long break: {LONG_BREAK_MIN}m (every 4th)
-          </p>
+          <p className="mt-1.5 text-[10px] text-muted-foreground">Long break: {LONG_BREAK_MIN}m (every 4th)</p>
+        </div>
+      )}
+
+      {notePickerOpen && pendingCompletion && (
+        <div className="fixed inset-0 z-[60] bg-black/50 px-4 backdrop-blur-sm">
+          <div className="mx-auto mt-24 w-full max-w-md rounded-2xl border border-border bg-card p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold">Track this session</p>
+                <p className="text-xs text-muted-foreground">Choose the note you worked on, or skip it.</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setNotePickerOpen(false)} className="h-7 w-7">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-2">
+              <select
+                value={selectedNoteId}
+                onChange={(e) => setSelectedNoteId(e.target.value === "none" ? "none" : Number(e.target.value))}
+                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm"
+              >
+                <option value="none">No note</option>
+                {noteOptions.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.text}
+                  </option>
+                ))}
+              </select>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    recordCompletion(userId, pendingCompletion.phase, pendingCompletion.duration, null);
+                    setPendingCompletion(null);
+                    setNotePickerOpen(false);
+                  }}
+                >
+                  Skip
+                </Button>
+                <Button
+                  onClick={() => {
+                    recordCompletion(
+                      userId,
+                      pendingCompletion.phase,
+                      pendingCompletion.duration,
+                      selectedNoteId === "none" ? null : selectedNoteId,
+                    );
+                    setPendingCompletion(null);
+                    setNotePickerOpen(false);
+                  }}
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
