@@ -415,7 +415,7 @@ export function PomodoroTimer() {
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-border bg-card/95 p-4 shadow-xl backdrop-blur-xl">
+        <div className="absolute right-0 top-full mt-2 w-[min(18rem,calc(100vw-1rem))] rounded-xl border border-border bg-card/95 p-4 shadow-xl backdrop-blur-xl sm:w-72">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">Pomodoro</span>
@@ -493,7 +493,7 @@ export function PomodoroTimer() {
 
           {/* Settings */}
           <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">Focus</p>
-          <div className="mb-3 flex gap-1.5">
+          <div className="mb-3 flex flex-wrap gap-1.5">
             {FOCUS_OPTIONS.map((m) => (
               <button
                 key={m}
@@ -501,7 +501,7 @@ export function PomodoroTimer() {
                   changeFocus(m);
                   setCustomFocusOpen(false);
                 }}
-                className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
+                className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
                   focusMin === m && !customFocusOpen
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -528,7 +528,7 @@ export function PomodoroTimer() {
                   setCustomFocusOpen(false);
                   setCustomFocusVal("");
                 }}
-                className="flex-1"
+                className="min-w-0 flex-1"
               >
                 <Input
                   type="number"
@@ -556,7 +556,7 @@ export function PomodoroTimer() {
           </div>
 
           <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">Short break</p>
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {BREAK_OPTIONS.map((m) => (
               <button
                 key={m}
@@ -564,7 +564,7 @@ export function PomodoroTimer() {
                   changeBreak(m);
                   setCustomBreakOpen(false);
                 }}
-                className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
+                className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
                   breakMin === m && !customBreakOpen
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -586,7 +586,7 @@ export function PomodoroTimer() {
                   setCustomBreakOpen(false);
                   setCustomBreakVal("");
                 }}
-                className="flex-1"
+                className="min-w-0 flex-1"
               >
                 <Input
                   type="number"

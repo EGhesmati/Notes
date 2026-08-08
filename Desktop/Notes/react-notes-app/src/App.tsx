@@ -141,7 +141,11 @@ function AppShell({ signOut }: { signOut: () => void }) {
             <Button
               variant="ghost"
               size="icon"
-              onClick={signOut}
+              onClick={() => {
+                if (window.confirm("Did you really want to sign out?")) {
+                  signOut();
+                }
+              }}
               className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"
               title="Sign out"
             >

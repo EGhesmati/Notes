@@ -174,7 +174,7 @@ export default function PomodoroStats() {
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-96 rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl">
+        <div className="absolute right-0 top-full z-50 mt-2 w-[min(24rem,calc(100vw-1rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-96">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="rounded-lg bg-primary/10 p-1.5 text-primary">
@@ -195,7 +195,7 @@ export default function PomodoroStats() {
             </Button>
           </div>
 
-          <div className="mb-4 grid grid-cols-3 gap-2">
+          <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <div className="rounded-xl border border-border/60 bg-background/70 p-2 text-center">
               <p className="text-[10px] text-muted-foreground">Today</p>
               <p className="text-base font-semibold">{totals.todayCompleted}</p>
@@ -239,7 +239,7 @@ export default function PomodoroStats() {
             })}
           </div>
 
-          <div className="mt-3 flex items-center justify-between rounded-xl border border-border/60 bg-background/70 px-2.5 py-2 text-[11px]">
+          <div className="mt-3 flex flex-col gap-1 rounded-xl border border-border/60 bg-background/70 px-2.5 py-2 text-[11px] sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <TrendingUp className="h-3.5 w-3.5" />
               <span>Total progress</span>
