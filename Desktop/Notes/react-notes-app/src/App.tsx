@@ -10,6 +10,8 @@ import {
   Loader2,
   Heart,
   LogOut,
+  Shield,
+  X,
 } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
 import { useTheme } from "@/hooks/use-theme";
@@ -21,19 +23,10 @@ import PomodoroStats from "@/components/PomodoroStats";
 import { TimeChips } from "@/components/TimeChips";
 import { useAuth } from "@/lib/auth-context";
 import { LoginPage } from "@/pages/LoginPage";
-import AdminPage from "@/pages/AdminPage";
 import { NOTE_COLORS, PRIORITY_BADGE } from "@/types";
 import type { Priority } from "@/types";
 
 const NotesGrid = lazy(() => import("@/components/NotesGrid"));
-
-function getAppPath() {
-  const base = import.meta.env.BASE_URL || "/";
-  const pathname = window.location.pathname;
-  if (!pathname.startsWith(base)) return pathname;
-  const path = pathname.slice(base.length - 1);
-  return path.startsWith("/") ? path : `/${path}`;
-}
 
 function toISO(date: string | undefined, time: string | undefined): string | undefined {
   if (!date) return undefined;
@@ -43,11 +36,6 @@ function toISO(date: string | undefined, time: string | undefined): string | und
 
 export default function App() {
   const { isLoggedIn, signOut } = useAuth();
-  const path = getAppPath();
-
-  if (path === "/admin" && isLoggedIn) {
-    return <AdminPage />;
-  }
   if (!isLoggedIn) {
     return <LoginPage />;
   }
@@ -64,6 +52,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
   const { notes, setNotes: addNoteApi, editNote: editNoteApi, deleteNote: deleteNoteApi } = useUserNotes();
   const [search, setSearch] = useState("");
   const [hydrated, setHydrated] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const { theme, toggle } = useTheme();
 
   useEffect(() => {
@@ -144,9 +133,11 @@ function AppShell({ signOut }: { signOut: () => void }) {
           <div className="flex items-center gap-1">
             <PomodoroTimer />
             <PomodoroStats />
-            <Button variant="ghost" size="icon" onClick={() => (window.location.href = `${import.meta.env.BASE_URL}admin`)} className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" title="Admin">
-              A
-            </Button>
+            {user?.isAdmin && (
+              <Button variant="ghost" size="icon" onClick={() => setShowAdmin(true)} className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" title="Admin">
+                <Shield className="h-[16px] w-[16px]" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -258,6 +249,8 @@ function AppShell({ signOut }: { signOut: () => void }) {
         )}
       </main>
 
+      {showAdmin && user?.isAdmin && <AdminModal onClose={() => setShowAdmin(false)} />}
+
       <footer className="border-t border-border/50 bg-background/70 backdrop-blur-xl">
         <div className="mx-auto max-w-5xl px-6 py-4 text-center">
           <p className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
@@ -267,6 +260,92 @@ function AppShell({ signOut }: { signOut: () => void }) {
           </p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function AdminModal({ onClose }: { onClose: () => void }) {
+  const [users, setUsers] = useState<Array<{ id: number; name: string; isAdmin: boolean; createdAt: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/admin/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || "forbidden");
+        }
+        const data = await res.json();
+        if (mounted) setUsers(data);
+      } catch (err) {
+        if (mounted) setError(err instanceof Error ? err.message : "forbidden");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
+      <div className="mx-auto mt-10 w-[min(100%-2rem,56rem)] rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex items-center gap-3">
+            <AppIcon className="h-8 w-8" />
+            <div>
+              <h2 className="text-lg font-semibold">Admin</h2>
+              <p className="text-sm text-muted-foreground">Users registered on this server</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="max-h-[70vh] overflow-auto p-5">
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading users...</p>
+          ) : error ? (
+            <p className="text-sm text-rose-500">{error}</p>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-border bg-background">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-border bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3">ID</th>
+                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Role</th>
+                    <th className="px-4 py-3">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id} className="border-b border-border/60 last:border-b-0">
+                      <td className="px-4 py-3">{u.id}</td>
+                      <td className="px-4 py-3 font-medium">{u.name}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={u.isAdmin ? "default" : "secondary"} className="text-[10px]">
+                          {u.isAdmin ? "Admin" : "User"}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{new Date(u.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
