@@ -57,9 +57,9 @@ const PHASE_LABEL: Record<Phase, string> = {
 };
 
 const PHASE_COLOR: Record<Phase, string> = {
-  focus: "text-rose-500",
-  "short-break": "text-emerald-500",
-  "long-break": "text-sky-500",
+  focus: "text-rose-400/70",
+  "short-break": "text-emerald-400/70",
+  "long-break": "text-sky-400/70",
 };
 
 // shared audio context — created lazily, resumed on user gesture

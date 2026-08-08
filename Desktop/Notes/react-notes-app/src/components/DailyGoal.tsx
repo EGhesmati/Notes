@@ -71,15 +71,17 @@ export function DailyGoal() {
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <Target className={`h-3.5 w-3.5 ${done ? "text-emerald-500" : "text-muted-foreground"}`} />
-      <div className="h-2 w-16 overflow-hidden rounded-full bg-muted">
+    <div className="flex items-center gap-2.5">
+      <Target className={`h-3.5 w-3.5 ${done ? "text-emerald-400/70" : "text-muted-foreground/50"}`} />
+      <div className="relative h-2 w-14 overflow-hidden rounded-full bg-muted/60">
         <div
-          className={`h-full rounded-full transition-all duration-500 ${done ? "bg-emerald-500" : "bg-primary"}`}
-          style={{ width: `${Math.max(4, percent)}%` }}
+          className={`h-full rounded-full transition-all duration-500 ${
+            done ? "bg-emerald-400/70" : "bg-primary/60"
+          }`}
+          style={{ width: `${Math.max(6, percent)}%` }}
         />
       </div>
-      <span className="text-[10px] font-mono tabular-nums text-muted-foreground">
+      <span className="text-[9px] font-mono tabular-nums text-muted-foreground/50">
         {completed}/{goal}
       </span>
       {/* goal presets */}
@@ -88,10 +90,10 @@ export function DailyGoal() {
           <button
             key={g}
             onClick={() => setNewGoal(g)}
-            className={`rounded px-1 text-[9px] font-medium transition-all ${
+            className={`rounded px-1.5 py-0.5 text-[9px] font-medium transition-all ${
               goal === g
-                ? "bg-primary/20 text-primary"
-                : "text-muted-foreground/50 hover:text-muted-foreground"
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground/40 hover:text-muted-foreground/70"
             }`}
           >
             {g}
