@@ -19,8 +19,7 @@ await pool.query(`
   CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    passcode TEXT NOT NULL UNIQUE,
-    is_admin BOOLEAN NOT NULL DEFAULT FALSE
+    passcode TEXT NOT NULL UNIQUE
   );
 
   CREATE TABLE IF NOT EXISTS notes (
@@ -68,11 +67,11 @@ app.post("/api/auth/login", async (req, res) => {
   const name = (req.body.name || "").trim();
   const passcode = req.body.passcode;
   if (!name || !passcode) return res.status(400).json({ error: "name and passcode required" });
-  const { rows } = await pool.query("SELECT id, name, is_admin FROM users WHERE name = $1 AND passcode = $2", [name, passcode]);
+  const { rows } = await pool.query("SELECT id, name FROM users WHERE name = $1 AND passcode = $2", [name, passcode]);
   if (rows.length === 0) return res.status(401).json({ error: "invalid credentials" });
   const user = rows[0];
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
-  res.json({ token, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
+  res.json({ token, user: { id: user.id, name: user.name } });
 });
 
 app.post("/api/auth/register", async (req, res) => {
@@ -80,16 +79,10 @@ app.post("/api/auth/register", async (req, res) => {
   if (!name) return res.status(400).json({ error: "name required" });
   const passcode = Array.from({ length: 8 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]).join("");
   try {
-    const { rows: adminRows } = await pool.query("SELECT COUNT(*)::int AS count FROM users WHERE is_admin = TRUE");
-    const isAdmin = adminRows[0]?.count === 0;
-    const { rows } = await pool.query("INSERT INTO users (name, passcode) VALUES ($1, $2) RETURNING id, name, is_admin", [name, passcode]);
+    const { rows } = await pool.query("INSERT INTO users (name, passcode) VALUES ($1, $2) RETURNING id, name", [name, passcode]);
     const user = rows[0];
-    if (isAdmin) {
-      await pool.query("UPDATE users SET is_admin = TRUE WHERE id = $1", [user.id]);
-      user.is_admin = true;
-    }
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
-    res.json({ token, passcode, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
+    res.json({ token, passcode, user: { id: user.id, name: user.name } });
   } catch {
     res.status(409).json({ error: "name already taken" });
   }
@@ -166,43 +159,6 @@ app.get("/api/pomodoros", authMiddleware, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "failed to fetch" });
   }
-});
-
-// ---- Admin ----
-
-function adminMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "unauthorized" });
-  try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { userId: number };
-    (req as any).userId = payload.userId;
-  } catch {
-    return res.status(401).json({ error: "invalid token" });
-  }
-  next();
-}
-
-async function loadCurrentUser(userId: number) {
-  const { rows } = await pool.query("SELECT id, name, is_admin FROM users WHERE id = $1", [userId]);
-  return rows[0] ?? null;
-}
-
-app.get("/api/admin/me", adminMiddleware, async (req, res) => {
-  const user = await loadCurrentUser((req as any).userId);
-  if (!user?.is_admin) return res.status(403).json({ error: "forbidden" });
-  res.json({ isAdmin: true });
-});
-
-app.get("/api/admin/users", adminMiddleware, async (req, res) => {
-  const user = await loadCurrentUser((req as any).userId);
-  if (!user?.is_admin) return res.status(403).json({ error: "forbidden" });
-  const { rows } = await pool.query("SELECT id, name, is_admin, created_at FROM users ORDER BY id");
-  res.json(rows.map((u: any) => ({
-    id: u.id,
-    name: u.name,
-    isAdmin: !!u.is_admin,
-    createdAt: u.created_at,
-  })));
 });
 
 app.listen(PORT, () => {
