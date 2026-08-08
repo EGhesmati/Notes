@@ -113,7 +113,6 @@ export default function PomodoroStats() {
     const dayMs = 24 * 60 * 60 * 1000;
     const weekMs = 7 * dayMs;
     const yearMs = 365 * dayMs;
-    const all = [...serverStats, ...queued];
     const totalCompleted = all.filter((s) => s.phase === "focus").length;
     const totalMinutes = Math.round(all.reduce((acc, s) => acc + s.duration, 0) / 60);
     const today = new Date();
@@ -132,7 +131,7 @@ export default function PomodoroStats() {
       all.filter((s) => s.phase === "focus" && s.ts >= now - yearMs).reduce((acc, s) => acc + s.duration, 0) / 60,
     );
     return { totalCompleted, totalMinutes, todayCompleted, weekCompleted, yearCompleted, dayMinutes, weekMinutes, yearMinutes };
-  }, [allStats, serverStats, queued]);
+  }, [allStats]);
 
   return (
     <div className="relative">
