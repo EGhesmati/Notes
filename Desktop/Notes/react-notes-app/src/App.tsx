@@ -132,6 +132,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
           </div>
           <div className="flex items-center gap-1">
             <PomodoroTimer />
+            <PomodoroStats />
             <Button
               variant="ghost"
               size="icon"
@@ -242,9 +243,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
               {filtered.length} match{filtered.length !== 1 && "es"}
             </Badge>
           )}
-
-          {/* Pomodoro statistics */}
-          <PomodoroStats />
         </div>
 
         {/* Notes grid */}
