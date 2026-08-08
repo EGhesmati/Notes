@@ -43,13 +43,13 @@ function toISO(date: string | undefined, time: string | undefined): string | und
 
 export default function App() {
   const { isLoggedIn, signOut } = useAuth();
+  const path = getAppPath();
 
+  if (path === "/admin" && isLoggedIn) {
+    return <AdminPage />;
+  }
   if (!isLoggedIn) {
     return <LoginPage />;
-  }
-
-  if (getAppPath() === "/admin") {
-    return <AdminPage />;
   }
 
   return <AppShell signOut={signOut} />;
