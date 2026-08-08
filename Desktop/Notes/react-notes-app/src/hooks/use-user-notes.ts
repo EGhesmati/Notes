@@ -10,7 +10,8 @@ interface RawNote {
   color: string;
   priority: string | null;
   due_date: string | null;
-  pinned: number;
+  // server returns pinned as a boolean (true/false); coerce with !! when reading
+  pinned: boolean | number | null;
 }
 
 function lsKey(userId: number) {
@@ -63,7 +64,7 @@ export function useUserNotes() {
           color: n.color,
           priority: (n.priority as NoteItem["priority"]) || undefined,
           dueDate: n.due_date || undefined,
-          pinned: n.pinned === 1,
+          pinned: !!n.pinned,
         }));
         setNotes(mapped);
         saveLocal(userId, mapped);
