@@ -19,7 +19,8 @@ await pool.query(`
   CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    passcode TEXT NOT NULL UNIQUE
+    passcode TEXT NOT NULL UNIQUE,
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE
   );
 
   CREATE TABLE IF NOT EXISTS notes (
@@ -67,11 +68,11 @@ app.post("/api/auth/login", async (req, res) => {
   const name = (req.body.name || "").trim();
   const passcode = req.body.passcode;
   if (!name || !passcode) return res.status(400).json({ error: "name and passcode required" });
-  const { rows } = await pool.query("SELECT id, name FROM users WHERE name = $1 AND passcode = $2", [name, passcode]);
+  const { rows } = await pool.query("SELECT id, name, is_admin FROM users WHERE name = $1 AND passcode = $2", [name, passcode]);
   if (rows.length === 0) return res.status(401).json({ error: "invalid credentials" });
   const user = rows[0];
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
-  res.json({ token, user: { id: user.id, name: user.name } });
+  res.json({ token, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
 });
 
 app.post("/api/auth/register", async (req, res) => {
@@ -79,10 +80,10 @@ app.post("/api/auth/register", async (req, res) => {
   if (!name) return res.status(400).json({ error: "name required" });
   const passcode = Array.from({ length: 8 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]).join("");
   try {
-    const { rows } = await pool.query("INSERT INTO users (name, passcode) VALUES ($1, $2) RETURNING id, name", [name, passcode]);
+    const { rows } = await pool.query("INSERT INTO users (name, passcode) VALUES ($1, $2) RETURNING id, name, is_admin", [name, passcode]);
     const user = rows[0];
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
-    res.json({ token, passcode, user: { id: user.id, name: user.name } });
+    res.json({ token, passcode, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
   } catch {
     res.status(409).json({ error: "name already taken" });
   }
@@ -124,6 +125,32 @@ app.put("/api/notes/:id", authMiddleware, async (req, res) => {
 app.delete("/api/notes/:id", authMiddleware, async (req, res) => {
   await pool.query("DELETE FROM notes WHERE id = $1 AND user_id = $2", [req.params.id, (req as any).userId]);
   res.json({ ok: true });
+});
+
+// ---- Safe admin user summary ----
+
+function adminMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "unauthorized" });
+  try {
+    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { userId: number };
+    (req as any).userId = payload.userId;
+    next();
+  } catch {
+    res.status(401).json({ error: "invalid token" });
+  }
+}
+
+app.get("/api/admin/users", adminMiddleware, async (req, res) => {
+  const { rows: currentRows } = await pool.query("SELECT is_admin FROM users WHERE id = $1", [(req as any).userId]);
+  if (!currentRows[0]?.is_admin) return res.status(403).json({ error: "forbidden" });
+  const { rows } = await pool.query("SELECT id, name, created_at, is_admin FROM users ORDER BY id");
+  res.json(rows.map((u: any) => ({
+    id: u.id,
+    name: u.name,
+    createdAt: u.created_at,
+    isAdmin: !!u.is_admin,
+  })));
 });
 
 // ---- Pomodoro endpoints ----
