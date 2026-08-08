@@ -21,6 +21,7 @@ import PomodoroStats from "@/components/PomodoroStats";
 import { TimeChips } from "@/components/TimeChips";
 import { useAuth } from "@/lib/auth-context";
 import { LoginPage } from "@/pages/LoginPage";
+import AdminPage from "@/pages/AdminPage";
 import { NOTE_COLORS, PRIORITY_BADGE } from "@/types";
 import type { Priority } from "@/types";
 
@@ -37,6 +38,10 @@ export default function App() {
 
   if (!isLoggedIn) {
     return <LoginPage />;
+  }
+
+  if (window.location.pathname === "/admin") {
+    return <AdminPage />;
   }
 
   return <AppShell signOut={signOut} />;
@@ -109,7 +114,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
           n.text.toLowerCase().includes(debouncedSearch.toLowerCase()),
         )
       : notes;
-    // pinned first, then by date newest first
     return [...matches].sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
@@ -121,7 +125,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
-      {/* Navbar — sticky, glassy */}
       <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2">
@@ -133,6 +136,9 @@ function AppShell({ signOut }: { signOut: () => void }) {
           <div className="flex items-center gap-1">
             <PomodoroTimer />
             <PomodoroStats />
+            <Button variant="ghost" size="icon" onClick={() => (window.location.pathname = "/admin")} className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" title="Admin">
+              A
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -158,19 +164,15 @@ function AppShell({ signOut }: { signOut: () => void }) {
         </div>
       </nav>
 
-      {/* Main */}
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
             <AppIcon className="mr-2 inline-block h-8 w-8 align-middle" />
             Notes
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            write it down, keep it safe
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">write it down, keep it safe</p>
         </div>
 
-        {/* Add note */}
         <div className="mb-2 flex gap-3">
           <Input
             placeholder="Write a note..."
@@ -179,11 +181,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
             onKeyDown={(e) => e.key === "Enter" && addNote()}
             className="h-12 border-border bg-card/80 backdrop-blur-xl placeholder:text-muted-foreground/60 focus-visible:ring-ring"
           />
-          <Button
-            onClick={addNote}
-            size="lg"
-            className="h-12 px-5 shadow-lg shadow-foreground/10 transition-all hover:shadow-xl hover:shadow-foreground/15 active:scale-95"
-          >
+          <Button onClick={addNote} size="lg" className="h-12 px-5 shadow-lg shadow-foreground/10 transition-all hover:shadow-xl hover:shadow-foreground/15 active:scale-95">
             <Plus className="h-5 w-5" />
             Add
           </Button>
@@ -199,9 +197,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
                 type="button"
                 onClick={() => setPriority((prev) => (prev === p ? undefined : p))}
                 className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all ${
-                  sel
-                    ? `${b.className} ring-2 ring-offset-1 ring-offset-background`
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  sel ? `${b.className} ring-2 ring-offset-1 ring-offset-background` : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
                 {b.label}
@@ -222,7 +218,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
           {text.length} character{text.length !== 1 && "s"}
         </p>
 
-        {/* Search */}
         <div className="relative mb-5">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
           <Input
@@ -233,7 +228,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
           />
         </div>
 
-        {/* Stats */}
         <div className="mb-6 flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
             {notes.length} note{notes.length !== 1 && "s"}
@@ -245,30 +239,17 @@ function AppShell({ signOut }: { signOut: () => void }) {
           )}
         </div>
 
-        {/* Notes grid */}
         {notes.length === 0 && !debouncedSearch ? (
           <p className="py-16 text-center text-sm italic text-muted-foreground">
             No notes yet. Add your first one!
           </p>
         ) : (
-          <Suspense
-            fallback={
-              <div className="flex justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            }
-          >
-            <NotesGrid
-              notes={filtered}
-              onDelete={deleteNote}
-              onEdit={editNote}
-              onTogglePin={togglePin}
-            />
+          <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+            <NotesGrid notes={filtered} onDelete={deleteNote} onEdit={editNote} onTogglePin={togglePin} />
           </Suspense>
         )}
       </main>
 
-      {/* Footer — glassy */}
       <footer className="border-t border-border/50 bg-background/70 backdrop-blur-xl">
         <div className="mx-auto max-w-5xl px-6 py-4 text-center">
           <p className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">

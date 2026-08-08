@@ -19,7 +19,8 @@ await pool.query(`
   CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    passcode TEXT NOT NULL UNIQUE
+    passcode TEXT NOT NULL UNIQUE,
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE
   );
 
   CREATE TABLE IF NOT EXISTS notes (
@@ -67,11 +68,11 @@ app.post("/api/auth/login", async (req, res) => {
   const name = (req.body.name || "").trim();
   const passcode = req.body.passcode;
   if (!name || !passcode) return res.status(400).json({ error: "name and passcode required" });
-  const { rows } = await pool.query("SELECT id, name FROM users WHERE name = $1 AND passcode = $2", [name, passcode]);
+  const { rows } = await pool.query("SELECT id, name, is_admin FROM users WHERE name = $1 AND passcode = $2", [name, passcode]);
   if (rows.length === 0) return res.status(401).json({ error: "invalid credentials" });
   const user = rows[0];
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
-  res.json({ token, user: { id: user.id, name: user.name } });
+  res.json({ token, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
 });
 
 app.post("/api/auth/register", async (req, res) => {
@@ -79,10 +80,16 @@ app.post("/api/auth/register", async (req, res) => {
   if (!name) return res.status(400).json({ error: "name required" });
   const passcode = Array.from({ length: 8 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]).join("");
   try {
-    const { rows } = await pool.query("INSERT INTO users (name, passcode) VALUES ($1, $2) RETURNING id, name", [name, passcode]);
+    const { rows: adminRows } = await pool.query("SELECT COUNT(*)::int AS count FROM users WHERE is_admin = TRUE");
+    const isAdmin = adminRows[0]?.count === 0;
+    const { rows } = await pool.query("INSERT INTO users (name, passcode) VALUES ($1, $2) RETURNING id, name, is_admin", [name, passcode]);
     const user = rows[0];
+    if (isAdmin) {
+      await pool.query("UPDATE users SET is_admin = TRUE WHERE id = $1", [user.id]);
+      user.is_admin = true;
+    }
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
-    res.json({ token, passcode, user: { id: user.id, name: user.name } });
+    res.json({ token, passcode, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
   } catch {
     res.status(409).json({ error: "name already taken" });
   }
@@ -163,71 +170,39 @@ app.get("/api/pomodoros", authMiddleware, async (req, res) => {
 
 // ---- Admin ----
 
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "admin-secret-token";
-
-app.get("/admin", (req, res) => {
-  res.send(`<!DOCTYPE html>
-<html><head><title>Admin - Notes App</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font-family:system-ui;max-width:600px;margin:40px auto;padding:0 16px;background:#0f0f0f;color:#e0e0e0}
-table{width:100%;border-collapse:collapse;margin-top:16px}
-th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #222}
-th{color:#888;font-size:11px;text-transform:uppercase}
-input,button{padding:6px 10px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#e0e0e0;font-size:13px}
-button{background:#7c3aed;border:none;color:white;cursor:pointer;margin-left:6px}
-.delete-btn{background:#dc2626;font-size:11px;padding:4px 8px}
-h1{font-size:18px;margin-bottom:4px}h1 span{color:#7c3aed}p{color:#666;font-size:13px;margin:0}</style></head>
-<body>
-<h1>Notes App <span>Admin</span></h1>
-<p>Users registered on this server</p>
-<div><input id="token" placeholder="Admin token" type="password" style="width:200px"><button onclick="load()">Load</button></div>
-<table id="table"></table>
-<script>
-async function load(){
-  const t=document.getElementById('token').value;
-  const r=await fetch('/api/admin/users',{headers:{'x-admin-token':t}});
-  const users=await r.json();
-  document.getElementById('table').innerHTML=
-    '<tr><th>ID</th><th>Name</th><th>Passcode</th><th></th></tr>'+
-    users.map(u=>'<tr><td>'+u.id+'</td><td>'+u.name+'</td><td><code>'+u.passcode+'</code></td><td><button class="delete-btn" onclick="del('+u.id+')">Delete</button></td></tr>').join('');
-  window._token=t;
+function adminMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "unauthorized" });
+  try {
+    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { userId: number };
+    (req as any).userId = payload.userId;
+  } catch {
+    return res.status(401).json({ error: "invalid token" });
+  }
+  next();
 }
-async function del(id){
-  if(!confirm('Delete user '+id+' and all their data?'))return;
-  await fetch('/api/admin/users/'+id,{method:'DELETE',headers:{'x-admin-token':window._token}});
-  load();
+
+async function loadCurrentUser(userId: number) {
+  const { rows } = await pool.query("SELECT id, name, is_admin FROM users WHERE id = $1", [userId]);
+  return rows[0] ?? null;
 }
-</script></body></html>`);
+
+app.get("/api/admin/me", adminMiddleware, async (req, res) => {
+  const user = await loadCurrentUser((req as any).userId);
+  if (!user?.is_admin) return res.status(403).json({ error: "forbidden" });
+  res.json({ isAdmin: true });
 });
 
-app.get("/api/admin/users", async (req, res) => {
-  if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
-  const { rows } = await pool.query("SELECT id, name, passcode FROM users ORDER BY id");
-  res.json(rows);
-});
-
-app.put("/api/admin/users/:id/passcode", async (req, res) => {
-  if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
-  const { passcode } = req.body;
-  if (!passcode) return res.status(400).json({ error: "passcode required" });
-  await pool.query("UPDATE users SET passcode = $1 WHERE id = $2", [passcode, req.params.id]);
-  res.json({ ok: true });
-});
-
-app.put("/api/admin/users/:id/name", async (req, res) => {
-  if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
-  const { name } = req.body;
-  if (!name) return res.status(400).json({ error: "name required" });
-  await pool.query("UPDATE users SET name = $1 WHERE id = $2", [name.trim(), req.params.id]);
-  res.json({ ok: true });
-});
-
-app.delete("/api/admin/users/:id", async (req, res) => {
-  if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
-  await pool.query("DELETE FROM notes WHERE user_id = $1", [req.params.id]);
-  await pool.query("DELETE FROM pomodoros WHERE user_id = $1", [req.params.id]);
-  await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]);
-  res.json({ ok: true });
+app.get("/api/admin/users", adminMiddleware, async (req, res) => {
+  const user = await loadCurrentUser((req as any).userId);
+  if (!user?.is_admin) return res.status(403).json({ error: "forbidden" });
+  const { rows } = await pool.query("SELECT id, name, is_admin, created_at FROM users ORDER BY id");
+  res.json(rows.map((u: any) => ({
+    id: u.id,
+    name: u.name,
+    isAdmin: !!u.is_admin,
+    createdAt: u.created_at,
+  })));
 });
 
 app.listen(PORT, () => {
