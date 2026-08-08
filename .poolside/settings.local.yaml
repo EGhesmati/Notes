@@ -1,0 +1,31 @@
+tools:
+    shell:
+        allow:
+            - ls *
+            - find *
+            - head *
+            - cd *
+            - git log *
+            - echo *
+            - npx tsc *
+            - npx eslint *
+            - git stash *
+            - git diff *
+            - npm run *
+            - tail *
+            - cat *
+            - grep *
+            - sort
+            - git config *
+            - git remote *
+            - git status *
+            - git ls-files *
+            - git add *
+            - git commit *
+            - git push origin *
+            - git show *
+            - curl *
+            - git rm *
+            - wc *
+            - git reset HEAD *
+            - git push

@@ -17,6 +17,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useUserNotes } from "@/hooks/use-user-notes";
 import { AppLoadingScreen } from "@/components/AppLoadingScreen";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
+import PomodoroStats from "@/components/PomodoroStats";
 import { TimeChips } from "@/components/TimeChips";
 import { useAuth } from "@/lib/auth-context";
 import { LoginPage } from "@/pages/LoginPage";
@@ -241,6 +242,9 @@ function AppShell({ signOut }: { signOut: () => void }) {
               {filtered.length} match{filtered.length !== 1 && "es"}
             </Badge>
           )}
+
+          {/* Pomodoro statistics */}
+          <PomodoroStats />
         </div>
 
         {/* Notes grid */}

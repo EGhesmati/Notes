@@ -42,6 +42,48 @@ function clearState(userId: number) {
   localStorage.removeItem(stateKey(userId));
 }
 
+// --- Pomodoro statistics storage helpers ---
+function statsKey(userId: number) {
+  return `pomodoro_stats_${userId}`;
+}
+
+interface PomoStat {
+  ts: number;
+  duration: number; // seconds
+  phase: Phase;
+}
+
+function loadStats(userId: number): PomoStat[] {
+  try {
+    const raw = localStorage.getItem(statsKey(userId));
+    if (!raw) return [];
+    return JSON.parse(raw) as PomoStat[];
+  } catch {
+    return [];
+  }
+}
+
+function saveStats(userId: number, stats: PomoStat[]) {
+  try {
+    localStorage.setItem(statsKey(userId), JSON.stringify(stats));
+    // also emit a storage event across same-tab consumers
+    try {
+      window.dispatchEvent(new StorageEvent("storage", { key: statsKey(userId), newValue: JSON.stringify(stats) }));
+    } catch {
+      // ignore environments that don't support constructing StorageEvent
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function recordCompletion(userId: number, phase: Phase, duration: number) {
+  if (phase !== "focus") return;
+  const stats = loadStats(userId);
+  stats.push({ ts: Date.now(), duration, phase });
+  saveStats(userId, stats);
+}
+
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -254,6 +296,12 @@ export function PomodoroTimer() {
       if (remaining <= 0) {
         setRunning(false);
         clearState(userId);
+        // record completion for stats (only focus sessions counted)
+        try {
+          recordCompletion(userId, phase, phase === "focus" ? focusMin * 60 : (phase === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60));
+        } catch {
+          // ignore
+        }
         const label = PHASE_LABEL[phase];
         setTimeout(() => notify(label), 50);
       }

@@ -9,3 +9,6 @@ vtcode.toml
 node_modules
 dist
 *.log
+
+# Stakpak session files
+.stakpak/session*
