@@ -1,0 +1,38 @@
+name: Deploy server to Render
+
+on:
+  workflow_dispatch:
+    inputs:
+      skipSeed:
+        description: 'Skip running the seed script on the server (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          SKIP_SEED: ${{ github.event.inputs.skipSeed || 'false' }}
+        run: |
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_ID" ]; then
+            echo "Missing RENDER_API_KEY or RENDER_SERVICE_ID secrets";
+            exit 1;
+          fi
+
+          body='{}'
+          echo "Triggering deploy for service $RENDER_SERVICE_ID"
+          resp=$(curl -sS -X POST "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$body") || true
+          echo "$resp"
+          id=$(echo "$resp" | jq -r '.id // empty')
+          if [ -z "$id" ]; then
+            echo "Failed to trigger deploy"; exit 1;
+          fi
+          echo "Deploy triggered: $id"
+          echo "You can watch the Render deploy logs at https://dashboard.render.com/web/services/$RENDER_SERVICE_ID/deploys/$id"
