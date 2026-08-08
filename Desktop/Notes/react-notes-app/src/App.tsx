@@ -53,6 +53,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
   const [search, setSearch] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
+  const [showSignOut, setShowSignOut] = useState(false);
   const { theme, toggle } = useTheme();
 
   useEffect(() => {
@@ -141,11 +142,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => {
-                if (window.confirm("Did you really want to sign out?")) {
-                  signOut();
-                }
-              }}
+              onClick={() => setShowSignOut(true)}
               className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"
               title="Sign out"
             >
@@ -254,6 +251,18 @@ function AppShell({ signOut }: { signOut: () => void }) {
       </main>
 
       {showUsers && user?.isAdmin && <UsersModal onClose={() => setShowUsers(false)} />}
+      {showSignOut && (
+        <ConfirmModal
+          title="Sign out"
+          description="Did you really want to sign out?"
+          confirmLabel="Sign out"
+          onConfirm={() => {
+            setShowSignOut(false);
+            signOut();
+          }}
+          onClose={() => setShowSignOut(false)}
+        />
+      )}
 
       <footer className="border-t border-border/50 bg-background/70 backdrop-blur-xl">
         <div className="mx-auto max-w-5xl px-6 py-4 text-center">
@@ -264,6 +273,37 @@ function AppShell({ signOut }: { signOut: () => void }) {
           </p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function ConfirmModal({
+  title,
+  description,
+  confirmLabel,
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
+      <div className="mx-auto mt-20 w-[min(100%-2rem,28rem)] rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="text-lg font-semibold">{title}</h2>
+        </div>
+        <div className="px-5 py-4">
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="destructive" onClick={onConfirm}>{confirmLabel}</Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -302,7 +342,7 @@ function UsersModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
-      <div className="mx-auto mt-10 w-[min(100%-2rem,56rem)] rounded-2xl border border-border bg-card shadow-2xl">
+      <div className="mx-auto mt-6 w-[min(100%-1rem,56rem)] rounded-2xl border border-border bg-card shadow-2xl sm:mt-10">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-3">
             <AppIcon className="h-8 w-8" />
