@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file=.env server.ts",
-    "start": "tsx --env-file=.env server.ts",
-    "seed": "tsx --env-file=.env seed.ts"
+    "dev": "tsx watch server.ts",
+    "start": "tsx server.ts",
+    "seed": "tsx seed.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
