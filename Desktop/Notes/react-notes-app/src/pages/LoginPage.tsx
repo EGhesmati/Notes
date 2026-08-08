@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { StickyNote, Copy, Check } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { AppIcon } from "@/components/AppIcon";
 
 export function LoginPage() {
   const { signIn, signUp } = useAuth();
@@ -50,7 +51,7 @@ export function LoginPage() {
   if (mode === "show-passcode") {
     return (
       <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-4">
-        <StickyNote className="h-10 w-10 text-primary" />
+      <AppIcon className="h-10 w-10" />
         <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-lg text-center">
           <h2 className="text-lg font-semibold text-foreground">Your passcode</h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -81,7 +82,7 @@ export function LoginPage() {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-4">
       <div className="flex flex-col items-center gap-2">
-        <StickyNote className="h-10 w-10 text-primary" />
+        <AppIcon className="h-10 w-10" />
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notes App</h1>
         <p className="text-sm text-muted-foreground">write it down, keep it safe</p>
       </div>

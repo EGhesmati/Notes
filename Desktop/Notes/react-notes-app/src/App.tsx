@@ -5,13 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   Search,
-  StickyNote,
   Sun,
   Moon,
   Loader2,
   Heart,
   LogOut,
 } from "lucide-react";
+import { AppIcon } from "@/components/AppIcon";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useUserNotes } from "@/hooks/use-user-notes";
@@ -125,7 +125,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
       <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2">
-            <StickyNote className="h-5 w-5 text-primary" />
+            <AppIcon className="h-5 w-5" />
             <span className="text-sm font-semibold tracking-tight text-foreground">
               Hello, {user?.name ?? "there"}
             </span>
@@ -162,7 +162,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            <StickyNote className="mr-2 inline-block h-8 w-8 text-primary align-middle" />
+            <AppIcon className="mr-2 inline-block h-8 w-8 align-middle" />
             Notes
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
