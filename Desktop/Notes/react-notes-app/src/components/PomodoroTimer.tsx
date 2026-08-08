@@ -77,11 +77,44 @@ function saveStats(userId: number, stats: PomoStat[]) {
   }
 }
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+async function syncStats(userId: number) {
+  const token = localStorage.getItem("token");
+  if (!token) return; // no auth, can't sync
+  const queued = loadStats(userId);
+  if (queued.length === 0) return;
+  const remaining: typeof queued = [];
+  for (const item of queued) {
+    try {
+      const res = await fetch(`${API_URL}/api/pomodoros`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ts: item.ts, duration: item.duration, phase: item.phase }),
+      });
+      if (!res.ok) {
+        remaining.push(item);
+      }
+    } catch {
+      remaining.push(item);
+    }
+  }
+  // save any remaining items back to local storage
+  saveStats(userId, remaining);
+}
+
 function recordCompletion(userId: number, phase: Phase, duration: number) {
   if (phase !== "focus") return;
   const stats = loadStats(userId);
-  stats.push({ ts: Date.now(), duration, phase });
+  const item = { ts: Date.now(), duration, phase } as PomoStat;
+  stats.push(item);
   saveStats(userId, stats);
+  // try to sync in background (don't await)
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  syncStats(userId);
 }
 
 function formatTime(seconds: number) {

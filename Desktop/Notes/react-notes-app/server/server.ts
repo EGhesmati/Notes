@@ -33,6 +33,16 @@ await pool.query(`
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
+
+  CREATE TABLE IF NOT EXISTS pomodoros (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    ts BIGINT NOT NULL,
+    duration INTEGER NOT NULL,
+    phase TEXT NOT NULL,
+    note_id INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
 `);
 
 const app = express();
@@ -116,6 +126,41 @@ app.delete("/api/notes/:id", authMiddleware, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- Pomodoro endpoints ----
+
+app.post("/api/pomodoros", authMiddleware, async (req, res) => {
+  const { ts, duration, phase, noteId } = req.body;
+  if (!ts || !duration || !phase) return res.status(400).json({ error: "ts, duration and phase required" });
+  try {
+    const { rows } = await pool.query(
+      "INSERT INTO pomodoros (user_id, ts, duration, phase, note_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [(req as any).userId, ts, duration, phase, noteId || null],
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "failed to save" });
+  }
+});
+
+app.get("/api/pomodoros", authMiddleware, async (req, res) => {
+  const since = req.query.since ? Number(req.query.since) : null;
+  const params: any[] = [(req as any).userId];
+  let q = "SELECT id, ts, duration, phase, note_id FROM pomodoros WHERE user_id = $1";
+  if (since) {
+    q += " AND ts >= $2";
+    params.push(since);
+  }
+  q += " ORDER BY ts DESC LIMIT 1000";
+  try {
+    const { rows } = await pool.query(q, params);
+    res.json(rows.map((r: any) => ({ ts: Number(r.ts), duration: r.duration, phase: r.phase, noteId: r.note_id })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "failed to fetch" });
+  }
+});
+
 // ---- Admin ----
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "admin-secret-token";
@@ -180,6 +225,7 @@ app.put("/api/admin/users/:id/name", async (req, res) => {
 app.delete("/api/admin/users/:id", async (req, res) => {
   if (req.headers["x-admin-token"] !== ADMIN_TOKEN) return res.status(403).json({ error: "forbidden" });
   await pool.query("DELETE FROM notes WHERE user_id = $1", [req.params.id]);
+  await pool.query("DELETE FROM pomodoros WHERE user_id = $1", [req.params.id]);
   await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]);
   res.json({ ok: true });
 });
