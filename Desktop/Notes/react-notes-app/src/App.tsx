@@ -27,6 +27,14 @@ import type { Priority } from "@/types";
 
 const NotesGrid = lazy(() => import("@/components/NotesGrid"));
 
+function getAppPath() {
+  const base = import.meta.env.BASE_URL || "/";
+  const pathname = window.location.pathname;
+  if (!pathname.startsWith(base)) return pathname;
+  const path = pathname.slice(base.length - 1);
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
 function toISO(date: string | undefined, time: string | undefined): string | undefined {
   if (!date) return undefined;
   const t = time || "23:59";
@@ -40,7 +48,7 @@ export default function App() {
     return <LoginPage />;
   }
 
-  if (window.location.pathname === "/admin") {
+  if (getAppPath() === "/admin") {
     return <AdminPage />;
   }
 
@@ -136,7 +144,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
           <div className="flex items-center gap-1">
             <PomodoroTimer />
             <PomodoroStats />
-            <Button variant="ghost" size="icon" onClick={() => (window.location.pathname = "/admin")} className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" title="Admin">
+            <Button variant="ghost" size="icon" onClick={() => (window.location.href = `${import.meta.env.BASE_URL}admin`)} className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" title="Admin">
               A
             </Button>
             <Button

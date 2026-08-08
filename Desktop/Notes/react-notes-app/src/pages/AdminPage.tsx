@@ -47,7 +47,7 @@ export default function AdminPage() {
   }, []);
 
   if (!user?.isAdmin) {
-    window.location.pathname = "/";
+    window.location.href = import.meta.env.BASE_URL;
     return null;
   }
 
@@ -97,7 +97,7 @@ export default function AdminPage() {
           </div>
         )}
         <div className="mt-4">
-          <Button variant="outline" onClick={() => (window.location.href = "/")}>Back</Button>
+          <Button variant="outline" onClick={() => (window.location.href = import.meta.env.BASE_URL)}>Back</Button>
         </div>
       </div>
     </div>
