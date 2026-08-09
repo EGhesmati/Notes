@@ -17,6 +17,7 @@ import { AppIcon } from "@/components/AppIcon";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useUserNotes } from "@/hooks/use-user-notes";
+import { usePomodoroStats, timePerNoteMap } from "@/hooks/use-pomodoro-stats";
 import { AppLoadingScreen } from "@/components/AppLoadingScreen";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import PomodoroStats from "@/components/PomodoroStats";
@@ -45,11 +46,15 @@ export default function App() {
 
 function AppShell({ signOut }: { signOut: () => void }) {
   const { user } = useAuth();
+  const userId = user?.id ?? 0;
   const [text, setText] = useState("");
   const [priority, setPriority] = useState<Priority | undefined>();
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
   const { notes, setNotes: addNoteApi, editNote: editNoteApi, deleteNote: deleteNoteApi } = useUserNotes();
+  // complete pomodoro dataset (local + server) → total focus time per note
+  const { stats: pomoStats } = usePomodoroStats(userId);
+  const timeOnNote = useMemo(() => timePerNoteMap(pomoStats), [pomoStats]);
   const [search, setSearch] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
@@ -245,7 +250,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
           </p>
         ) : (
           <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
-            <NotesGrid notes={filtered} onDelete={deleteNote} onEdit={editNote} onTogglePin={togglePin} />
+            <NotesGrid notes={filtered} onDelete={deleteNote} onEdit={editNote} onTogglePin={togglePin} timeOnNote={timeOnNote} />
           </Suspense>
         )}
       </main>

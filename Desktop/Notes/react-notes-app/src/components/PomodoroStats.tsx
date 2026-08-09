@@ -1,112 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BarChart3, CalendarDays, Sparkles, TrendingUp, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
-
-type Phase = "focus" | "short-break" | "long-break";
-
-interface PomoStat {
-  ts: number;
-  duration: number; // seconds
-  phase: Phase;
-  noteId?: number | null;
-}
-
-function statsKey(userId: number) {
-  return `pomodoro_stats_${userId}`;
-}
-
-function loadStats(userId: number): PomoStat[] {
-  try {
-    const raw = localStorage.getItem(statsKey(userId));
-    if (!raw) return [];
-    return JSON.parse(raw) as PomoStat[];
-  } catch {
-    return [];
-  }
-}
-
-function saveStats(userId: number, stats: PomoStat[]) {
-  try {
-    localStorage.setItem(statsKey(userId), JSON.stringify(stats));
-  } catch {}
-}
+import { usePomodoroStats } from "@/hooks/use-pomodoro-stats";
 
 export default function PomodoroStats() {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
-  const [serverStats, setServerStats] = useState<PomoStat[]>([]);
-  const [queued, setQueued] = useState<PomoStat[]>(() => loadStats(userId));
   const [open, setOpen] = useState(false);
 
-  // load queued local stats
-  useEffect(() => {
-    setQueued(loadStats(userId));
-  }, [userId]);
-
-  // listen for local storage changes to queued stats
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === statsKey(userId)) {
-        setQueued(loadStats(userId));
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [userId]);
-
-  // fetch server stats when logged in and try to sync queued items
-  useEffect(() => {
-    let mounted = true;
-    async function fetchAndSync() {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-      try {
-        // fetch server-side records
-        const res = await fetch(`${API_URL}/api/pomodoros`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok) {
-          const data = await res.json();
-          if (mounted) setServerStats(data as PomoStat[]);
-        }
-      } catch {
-        // ignore
-      }
-
-      // try to sync queued items
-      const q = loadStats(userId);
-      if (q.length === 0) return;
-      const remaining: PomoStat[] = [];
-      for (const item of q) {
-        try {
-          const r = await fetch(`${API_URL}/api/pomodoros`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ ts: item.ts, duration: item.duration, phase: item.phase, noteId: item.noteId ?? null }),
-          });
-          if (!r.ok) remaining.push(item);
-        } catch {
-          remaining.push(item);
-        }
-      }
-      saveStats(userId, remaining);
-      setQueued(remaining);
-      // refresh server data after sync
-      try {
-        const res2 = await fetch(`${API_URL}/api/pomodoros`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res2.ok) {
-          const data2 = await res2.json();
-          if (mounted) setServerStats(data2 as PomoStat[]);
-        }
-      } catch {}
-    }
-    fetchAndSync();
-    return () => { mounted = false; };
-  }, [userId]);
-
-  const allStats = useMemo(() => [...serverStats, ...queued], [serverStats, queued]);
+  // complete dataset (local + server-synced), kept reactive by the shared hook
+  const { stats: allStats } = usePomodoroStats(userId);
 
   const totals = useMemo(() => {
     const all = allStats;

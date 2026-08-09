@@ -4,13 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Play, Pause, RotateCcw, Timer, X, Volume2, VolumeX } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import type { NoteItem } from "@/types";
-
-type Phase = "focus" | "short-break" | "long-break";
+import { type Phase, recordCompletion } from "@/hooks/use-pomodoro-stats";
 
 const FOCUS_OPTIONS = [25, 60, 90];
 const BREAK_OPTIONS = [5, 10, 15];
 const LONG_BREAK_MIN = 30;
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 function stateKey(userId: number) {
   return `pomodoro_state_${userId}`;
@@ -42,74 +40,6 @@ function saveState(userId: number, state: TimerState) {
 
 function clearState(userId: number) {
   localStorage.removeItem(stateKey(userId));
-}
-
-function statsKey(userId: number) {
-  return `pomodoro_stats_${userId}`;
-}
-
-interface PomoStat {
-  ts: number;
-  duration: number;
-  phase: Phase;
-  noteId?: number | null;
-}
-
-function loadStats(userId: number): PomoStat[] {
-  try {
-    const raw = localStorage.getItem(statsKey(userId));
-    if (!raw) return [];
-    return JSON.parse(raw) as PomoStat[];
-  } catch {
-    return [];
-  }
-}
-
-function saveStats(userId: number, stats: PomoStat[]) {
-  try {
-    localStorage.setItem(statsKey(userId), JSON.stringify(stats));
-    try {
-      window.dispatchEvent(new StorageEvent("storage", { key: statsKey(userId), newValue: JSON.stringify(stats) }));
-    } catch {}
-  } catch {}
-}
-
-async function syncStats(userId: number) {
-  const token = localStorage.getItem("token");
-  if (!token) return;
-  const queued = loadStats(userId);
-  if (queued.length === 0) return;
-  const remaining: PomoStat[] = [];
-  for (const item of queued) {
-    try {
-      const res = await fetch(`${API_URL}/api/pomodoros`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ts: item.ts,
-          duration: item.duration,
-          phase: item.phase,
-          noteId: item.noteId ?? null,
-        }),
-      });
-      if (!res.ok) remaining.push(item);
-    } catch {
-      remaining.push(item);
-    }
-  }
-  saveStats(userId, remaining);
-}
-
-function recordCompletion(userId: number, phase: Phase, duration: number, noteId?: number | null) {
-  if (phase !== "focus") return;
-  const stats = loadStats(userId);
-  stats.push({ ts: Date.now(), duration, phase, noteId: noteId ?? null });
-  saveStats(userId, stats);
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-  syncStats(userId);
 }
 
 function formatTime(seconds: number) {
@@ -241,6 +171,18 @@ export function PomodoroTimer() {
     }
     setNotified(true);
   }, [sound]);
+
+  // Resolve the pending completion: every exit path of the note-picker modal
+  // records the session so a completed pomodoro is never silently lost.
+  const confirmCompletion = useCallback(
+    (noteId: number | null) => {
+      if (!pendingCompletion) return;
+      recordCompletion(userId, pendingCompletion.phase, pendingCompletion.duration, noteId);
+      setPendingCompletion(null);
+      setNotePickerOpen(false);
+    },
+    [userId, pendingCompletion],
+  );
 
   const start = useCallback(() => {
     getAudioCtx();
@@ -566,7 +508,7 @@ export function PomodoroTimer() {
                 <p className="text-sm font-semibold">Track this session</p>
                 <p className="text-xs text-muted-foreground">Choose the note you worked on, or skip it.</p>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setNotePickerOpen(false)} className="h-7 w-7">
+              <Button variant="ghost" size="icon" onClick={() => confirmCompletion(selectedNoteId === "none" ? null : selectedNoteId)} className="h-7 w-7">
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -586,25 +528,12 @@ export function PomodoroTimer() {
               <div className="flex justify-end gap-2 pt-1">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    recordCompletion(userId, pendingCompletion.phase, pendingCompletion.duration, null);
-                    setPendingCompletion(null);
-                    setNotePickerOpen(false);
-                  }}
+                  onClick={() => confirmCompletion(null)}
                 >
                   Skip
                 </Button>
                 <Button
-                  onClick={() => {
-                    recordCompletion(
-                      userId,
-                      pendingCompletion.phase,
-                      pendingCompletion.duration,
-                      selectedNoteId === "none" ? null : selectedNoteId,
-                    );
-                    setPendingCompletion(null);
-                    setNotePickerOpen(false);
-                  }}
+                  onClick={() => confirmCompletion(selectedNoteId === "none" ? null : selectedNoteId)}
                 >
                   Save
                 </Button>

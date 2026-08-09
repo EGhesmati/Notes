@@ -2,9 +2,10 @@ import { memo, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Pencil, Check, X, Calendar, Pin } from "lucide-react";
+import { Trash2, Pencil, Check, X, Calendar, Pin, Timer } from "lucide-react";
 import { PRIORITY_BADGE } from "@/types";
 import type { NotesState, Priority } from "@/types";
+import { formatDuration } from "@/hooks/use-pomodoro-stats";
 import { TimeChips } from "@/components/TimeChips";
 
 interface NotesGridProps {
@@ -18,6 +19,8 @@ interface NotesGridProps {
     dueTime?: string,
   ) => void;
   readonly onTogglePin: (id: number) => void;
+  /** total focus seconds worked per note id */
+  readonly timeOnNote: Map<number, number>;
 }
 
 const PRIORITY_OPTIONS: Priority[] = ["low", "medium", "high"];
@@ -63,6 +66,7 @@ const NotesGrid = memo(function NotesGrid({
   onDelete,
   onEdit,
   onTogglePin,
+  timeOnNote,
 }: NotesGridProps) {
   if (notes.length === 0) {
     return (
@@ -81,6 +85,7 @@ const NotesGrid = memo(function NotesGrid({
           onDelete={onDelete}
           onEdit={onEdit}
           onTogglePin={onTogglePin}
+          timeOnNote={timeOnNote}
         />
       ))}
     </div>
@@ -92,6 +97,7 @@ const NoteCard = memo(function NoteCard({
   onDelete,
   onEdit,
   onTogglePin,
+  timeOnNote,
 }: {
   readonly item: NotesState[number];
   readonly onDelete: (id: number) => void;
@@ -103,6 +109,7 @@ const NoteCard = memo(function NoteCard({
     dueTime?: string,
   ) => void;
   readonly onTogglePin: (id: number) => void;
+  readonly timeOnNote: Map<number, number>;
 }) {
   const defaultDates = fromISO(item.dueDate);
   const [editing, setEditing] = useState(false);
@@ -139,6 +146,8 @@ const NoteCard = memo(function NoteCard({
 
   const badge = item.priority ? PRIORITY_BADGE[item.priority] : null;
   const due = formatDue(item.dueDate);
+  const focusedSeconds = timeOnNote.get(item.id);
+  const focusedLabel = focusedSeconds ? formatDuration(focusedSeconds) : null;
 
   return (
     <Card
@@ -223,6 +232,12 @@ const NoteCard = memo(function NoteCard({
                       {due.dateLabel}
                     </span>
                   </>
+                )}
+                {focusedLabel && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                    <Timer className="h-3 w-3" />
+                    {focusedLabel}
+                  </span>
                 )}
               </div>
             </div>
