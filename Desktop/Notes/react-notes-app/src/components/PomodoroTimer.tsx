@@ -326,7 +326,11 @@ export function PomodoroTimer() {
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[min(18rem,calc(100vw-1rem))] rounded-xl border border-border bg-card/95 p-4 shadow-xl backdrop-blur-xl sm:w-72">
+        <div
+          className={
+            "absolute right-0 top-full mt-2 w-[min(20rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] origin-top-right overflow-y-auto rounded-xl border border-border bg-card/95 p-4 shadow-xl backdrop-blur-xl sm:w-72"
+          }
+        >
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">Pomodoro</span>
@@ -343,28 +347,28 @@ export function PomodoroTimer() {
             {PHASE_LABEL[phase]}
             {pomoCount > 0 && phase === "focus" && ` #${pomoCount + 1}`}
           </p>
-          <div className={`mb-3 text-center text-4xl font-mono font-bold tabular-nums tracking-wider ${notified ? "animate-pulse" : "text-foreground"}`}>
+          <div className={`mb-3 text-center text-2xl font-mono font-bold tabular-nums tracking-wider ${notified ? "animate-pulse" : "text-foreground"}`}>
             {formatTime(secondsLeft)}
           </div>
 
           <div className="mb-4 flex items-center justify-center gap-2">
             {notified ? (
-              <Button size="sm" onClick={advance} className="h-8 gap-1.5">
+              <Button size="sm" onClick={advance} className="h-9 w-full gap-1.5 sm:w-auto">
                 <Play className="h-3.5 w-3.5" />
                 {phase === "focus" ? "Start break" : "Start focus"}
               </Button>
             ) : running ? (
-              <Button size="sm" variant="outline" onClick={pause} className="h-8 gap-1.5">
+              <Button size="sm" variant="outline" onClick={pause} className="h-9 w-full gap-1.5 sm:w-auto">
                 <Pause className="h-3.5 w-3.5" />
                 Pause
               </Button>
             ) : (
-              <Button size="sm" onClick={start} disabled={secondsLeft === 0} className="h-8 gap-1.5">
+              <Button size="sm" onClick={start} disabled={secondsLeft === 0} className="h-9 w-full gap-1.5 sm:w-auto">
                 <Play className="h-3.5 w-3.5" />
                 Start
               </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={reset} className="h-8 gap-1.5">
+            <Button size="sm" variant="ghost" onClick={reset} className="h-9 w-full gap-1.5 sm:w-auto">
               <RotateCcw className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -389,7 +393,7 @@ export function PomodoroTimer() {
                   changeFocus(m);
                   setCustomFocusOpen(false);
                 }}
-                className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
+                className={`min-w-0 flex-1 rounded-lg px-3 py-2 min-h-[34px] text-xs font-medium transition-all ${
                   focusMin === m && !customFocusOpen ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
@@ -450,7 +454,7 @@ export function PomodoroTimer() {
                   changeBreak(m);
                   setCustomBreakOpen(false);
                 }}
-                className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
+                className={`min-w-0 flex-1 rounded-lg px-3 py-2 min-h-[34px] text-xs font-medium transition-all ${
                   breakMin === m && !customBreakOpen ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >

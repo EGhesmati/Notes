@@ -80,7 +80,7 @@ export default function PomodoroStats() {
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-[min(24rem,calc(100vw-1rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-96">
+        <div className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] origin-top-right overflow-y-auto rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-96">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="rounded-lg bg-primary/10 p-1.5 text-primary">

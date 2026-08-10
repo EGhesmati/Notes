@@ -48,7 +48,7 @@ export function useUserNotes() {
     }
   }, [userId, lastUserId]);
 
-  useEffect(() => {
+  const fetchAndApply = useCallback(() => {
     if (!userId) {
       setNotes([]);
       setLoading(false);
@@ -71,9 +71,20 @@ export function useUserNotes() {
         setLoading(false);
       })
       .catch(() => {
-        setLoading(false); // keep local data
+        setLoading(false); // keep local data on transient failure
       });
   }, [userId]);
+
+  useEffect(() => {
+    fetchAndApply();
+  }, [fetchAndApply]);
+
+  // recover from transient network failures: re-fetch when the tab regains focus
+  useEffect(() => {
+    const onFocus = () => fetchAndApply();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchAndApply]);
 
   const addNote = useCallback(async (note: { text: string; color: string; priority?: string; dueDate?: string; pinned?: boolean }) => {
     try {

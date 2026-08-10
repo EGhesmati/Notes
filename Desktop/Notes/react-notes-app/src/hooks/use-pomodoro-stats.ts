@@ -95,24 +95,24 @@ export function recordCompletion(
 }
 
 /** Fetch the synced pomodoro records from the server. */
-async function fetchServerStats(): Promise<PomoStat[]> {
+async function fetchServerStats(): Promise<PomoStat[] | null> {
   const token = localStorage.getItem("token");
-  if (!token) return [];
+  if (!token) return null; // not logged in
   try {
     const res = await fetch(`${API_URL}/api/pomodoros`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) return [];
+    if (!res.ok) return null; // transient failure — caller keeps previous data
     return (await res.json()) as PomoStat[];
   } catch {
-    return [];
+    return null;
   }
 }
 
 /**
  * Reactive accessor for the complete pomodoro dataset — locally queued records
  * merged with the server-synced records. Updates live when any same-tab consumer
- * writes to the localStorage queue.
+ * writes to the localStorage queue or the window regains focus.
  */
 export function usePomodoroStats(
   userId: number,
@@ -129,9 +129,9 @@ export function usePomodoroStats(
     try {
       await syncStats(userId); // push local queue → Neon
       const data = await fetchServerStats(); // pull everything back
-      setServer(data);
+      if (data) setServer(data); // keep previous server data on transient failure
     } catch {
-      // best-effort
+      // best-effort — keep previous server data, will retry on focus
     }
   }, [userId]);
 
@@ -151,6 +151,14 @@ export function usePomodoroStats(
       window.removeEventListener("storage", onStorage);
     };
   }, [userId, reload, refreshServer]);
+
+  // recover from transient network failures: re-sync + re-fetch when the tab
+  // regains focus. This is why a refresh "magically" fixes missing data.
+  useEffect(() => {
+    const onFocus = () => void refreshServer();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshServer]);
 
   const stats = useMemo(() => {
     // merge server + local, de-duplicating by timestamp so a record that has
