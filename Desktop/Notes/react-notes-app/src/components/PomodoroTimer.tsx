@@ -218,12 +218,14 @@ export function PomodoroTimer() {
     clearTimer();
     setFocusMin(m);
     setRunning(false);
-    setPhase("focus");
-    setPomoCount(0);
-    setSecondsLeft(m * 60);
+    setSecondsLeft(() => {
+      if (phase === "focus") return m * 60;
+      if (phase === "short-break") return breakMin * 60;
+      return LONG_BREAK_MIN * 60;
+    });
     setNotified(false);
     clearState(userId);
-  }, [clearTimer, userId]);
+  }, [clearTimer, userId, phase, breakMin]);
 
   const changeBreak = useCallback((m: number) => {
     clearTimer();
@@ -409,9 +411,11 @@ export function PomodoroTimer() {
                     clearTimer();
                     setFocusMin(val);
                     setRunning(false);
-                    setPhase("focus");
-                    setPomoCount(0);
-                    setSecondsLeft(val * 60);
+                    setSecondsLeft(() => {
+                      if (phase === "focus") return val * 60;
+                      if (phase === "short-break") return breakMin * 60;
+                      return LONG_BREAK_MIN * 60;
+                    });
                     setNotified(false);
                     clearState(userId);
                   }

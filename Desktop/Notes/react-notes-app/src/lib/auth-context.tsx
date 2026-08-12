@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(err.error || "Invalid credentials");
     }
     const data = await res.json();
+    localStorage.removeItem(`notes-${data.user.id}`);
     setToken(data.token);
     setUser(data.user);
   }, []);
