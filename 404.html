@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Notes</title>
+    <script>
+      // Redirect to the SPA, preserving OAuth query params so Clerk can
+      // process the sign-in callback (e.g. ?code=... from Google)
+      location.replace("/Notes/" + location.search + location.hash);
+    </script>
+  </head>
+  <body>
+    Redirecting...
+  </body>
+</html>
