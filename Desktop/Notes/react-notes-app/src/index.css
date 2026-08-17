@@ -133,6 +133,9 @@ body {
   background: var(--background);
   background-attachment: fixed;
   color: var(--foreground);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
@@ -148,5 +151,9 @@ body {
   }
   html {
     @apply font-sans;
+  }
+  h1, h2, h3, h4 {
+    line-height: 1.25;
+    letter-spacing: -0.02em;
   }
 }
