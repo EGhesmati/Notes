@@ -114,7 +114,12 @@ export function PomodoroTimer() {
   const userId = user?.id ?? 0;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const endAtRef = useRef<number | null>(null);
-  const restored = loadState(userId);
+  // Read persisted state once on mount via a ref so it doesn't re-run on every render.
+  const restoredRef = useRef<TimerState | null | undefined>(undefined);
+  if (restoredRef.current === undefined) {
+    restoredRef.current = loadState(userId);
+  }
+  const restored = restoredRef.current;
 
   const [open, setOpen] = useState(false);
   const [sound, setSound] = useState(true);
@@ -252,8 +257,22 @@ export function PomodoroTimer() {
       const remaining = Math.max(0, Math.ceil(((endAtRef.current ?? 0) - Date.now()) / 1000));
       setSecondsLeft(remaining);
       if (remaining <= 0) {
+        // Advance pomoCount when a focus session naturally finishes
+        const newPomoCount = phase === "focus" ? pomoCount + 1 : pomoCount;
+        if (phase === "focus") {
+          setPomoCount(newPomoCount);
+        }
         setRunning(false);
-        clearState(userId);
+        // Persist the updated pomoCount so dots survive a reload
+        saveState(userId, {
+          focusMin,
+          breakMin,
+          phase,
+          secondsLeft: 0,
+          pomoCount: newPomoCount,
+          running: false,
+          startedAt: null,
+        });
         if (phase === "focus") {
           setPendingCompletion({ phase, duration: focusMin * 60 });
           setSelectedNoteId("none");
@@ -264,7 +283,7 @@ export function PomodoroTimer() {
       }
     }, 250);
     return clearTimer;
-  }, [running, phase, notify, clearTimer, userId, focusMin]);
+  }, [running, phase, notify, clearTimer, userId, focusMin, breakMin, pomoCount]);
 
   useEffect(() => {
     document.title = running ? `${formatTime(secondsLeft)} · NoteApp` : "NoteApp";
@@ -330,7 +349,7 @@ export function PomodoroTimer() {
       {open && (
         <div
           className={
-            "absolute right-0 top-full mt-2 w-[min(20rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] origin-top-right overflow-y-auto rounded-xl border border-border bg-card/95 p-4 shadow-xl backdrop-blur-xl sm:w-72"
+            "absolute right-0 top-full mt-2 w-[min(20rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] origin-top-right overflow-y-auto rounded-xl border border-border bg-card/95 p-4 shadow-xl backdrop-blur-sm z-50"
           }
         >
           <div className="mb-3 flex items-center justify-between">
