@@ -11,7 +11,7 @@ export default function PomodoroStats() {
   const [open, setOpen] = useState(false);
 
   // complete dataset (local + server-synced), kept reactive by the shared hook
-  const { stats: allStats } = usePomodoroStats(userId);
+  const { stats: allStats, loaded } = usePomodoroStats(userId);
 
   const totals = useMemo(() => {
     const all = allStats;
@@ -104,15 +104,15 @@ export default function PomodoroStats() {
           <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <div className="rounded-xl border border-border/60 bg-background/70 p-2 text-center">
               <p className="text-[10px] text-muted-foreground">Today</p>
-              <p className="text-base font-semibold">{totals.todayCompleted}</p>
+              <p className="text-base font-semibold">{loaded ? totals.todayCompleted : "--"}</p>
             </div>
             <div className="rounded-xl border border-border/60 bg-background/70 p-2 text-center">
               <p className="text-[10px] text-muted-foreground">Week</p>
-              <p className="text-base font-semibold">{totals.weekCompleted}</p>
+              <p className="text-base font-semibold">{loaded ? totals.weekCompleted : "--"}</p>
             </div>
             <div className="rounded-xl border border-border/60 bg-background/70 p-2 text-center">
               <p className="text-[10px] text-muted-foreground">Year</p>
-              <p className="text-base font-semibold">{totals.yearCompleted}</p>
+              <p className="text-base font-semibold">{loaded ? totals.yearCompleted : "--"}</p>
             </div>
           </div>
 
@@ -127,7 +127,7 @@ export default function PomodoroStats() {
                       <span>{bar.label} focus</span>
                     </div>
                     <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                      {bar.sessions} sessions
+                      {loaded ? bar.sessions : "--"} sessions
                     </Badge>
                   </div>
                   <div className="mb-1.5 h-2.5 w-full overflow-hidden rounded-full bg-muted/80">
@@ -137,8 +137,8 @@ export default function PomodoroStats() {
                     />
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>{bar.value} minutes</span>
-                    <span>{Math.round(pct)}%</span>
+                    <span>{loaded ? `${bar.value} minutes` : "--"}</span>
+                    <span>{loaded ? `${Math.round(pct)}%` : "--"}</span>
                   </div>
                 </div>
               );
@@ -151,7 +151,7 @@ export default function PomodoroStats() {
               <span>Total progress</span>
             </div>
             <div className="font-medium">
-              {totals.totalCompleted} sessions • {totals.totalMinutes} min
+              {loaded ? `${totals.totalCompleted} sessions • ${totals.totalMinutes} min` : "--"}
             </div>
           </div>
 

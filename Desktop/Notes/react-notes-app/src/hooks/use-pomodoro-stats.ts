@@ -116,27 +116,36 @@ async function fetchServerStats(): Promise<PomoStat[] | null> {
  */
 export function usePomodoroStats(
   userId: number,
-): { stats: PomoStat[]; reload: () => void } {
+): { stats: PomoStat[]; reload: () => void; loaded: boolean } {
   const [local, setLocal] = useState<PomoStat[]>(() => loadStats(userId));
   const [server, setServer] = useState<PomoStat[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   const reload = useCallback(() => {
     setLocal(loadStats(userId));
   }, [userId]);
 
   const refreshServer = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      setServer([]);
+      setLoaded(true);
+      return;
+    }
     try {
       await syncStats(userId); // push local queue → Neon
       const data = await fetchServerStats(); // pull everything back
       if (data) setServer(data); // keep previous server data on transient failure
     } catch {
       // best-effort — keep previous server data, will retry on focus
+    } finally {
+      setLoaded(true);
     }
   }, [userId]);
 
   // reactive local queue + background server refresh on every local change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoaded(false);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     reload();
     const onStorage = (e: StorageEvent) => {
@@ -171,7 +180,7 @@ export function usePomodoroStats(
     return [...byTs.values()];
   }, [server, local]);
 
-  return { stats, reload };
+  return { stats, reload, loaded };
 }
 
 /** Total focus seconds spent per note id. */

@@ -6,6 +6,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import { statsKey } from "@/hooks/use-pomodoro-stats";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -94,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // clear user-scoped caches so a fresh login re-fetches from the backend
     if (user) {
       localStorage.removeItem(`notes-${user.id}`);
+      localStorage.removeItem(statsKey(user.id));
     }
     setToken(null);
     setUser(null);
