@@ -128,9 +128,9 @@ function AppShell({ signOut }: { signOut: () => void }) {
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
-      <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-2">
+      <nav className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3.5">
+          <div className="flex items-center gap-2.5">
             <AppIcon className="h-5 w-5" />
             <span className="text-sm font-semibold tracking-tight text-foreground">
               Hello, {user?.name ?? "there"}
@@ -170,29 +170,29 @@ function AppShell({ signOut }: { signOut: () => void }) {
       </nav>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
-        <div className="mb-8 text-center">
+        <div className="mb-10 text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
             <AppIcon className="mr-2 inline-block h-8 w-8 align-middle" />
             Notes
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">write it down, keep it safe</p>
+          <p className="mt-2.5 text-sm text-muted-foreground">write it down, keep it safe</p>
         </div>
 
-        <div className="mb-2 flex gap-3">
+        <div className="mb-2 flex gap-2.5">
           <Input
             placeholder="Write a note..."
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addNote()}
-            className="h-12 border-border bg-card/80 backdrop-blur-xl placeholder:text-muted-foreground/60 focus-visible:ring-ring"
+            className="h-11 border-border bg-card/80 backdrop-blur-xl placeholder:text-muted-foreground/50 focus-visible:ring-ring"
           />
-          <Button onClick={addNote} size="lg" className="h-12 px-5 shadow-lg shadow-foreground/10 transition-all hover:shadow-xl hover:shadow-foreground/15 active:scale-95">
-            <Plus className="h-5 w-5" />
+          <Button onClick={addNote} size="lg" className="h-11 gap-1.5 px-5 shadow-md shadow-foreground/8 transition-all hover:shadow-lg hover:shadow-foreground/12 active:scale-[0.97]">
+            <Plus className="h-4 w-4" />
             Add
           </Button>
         </div>
-        <div className="mb-1 ml-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="text-[11px] font-medium text-muted-foreground">Priority</span>
+        <div className="mb-1 ml-1 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Priority</span>
           {(["low", "medium", "high"] as Priority[]).map((p) => {
             const sel = priority === p;
             const b = PRIORITY_BADGE[p];
@@ -201,35 +201,35 @@ function AppShell({ signOut }: { signOut: () => void }) {
                 key={p}
                 type="button"
                 onClick={() => setPriority((prev) => (prev === p ? undefined : p))}
-                className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all ${
-                  sel ? `${b.className} ring-2 ring-offset-1 ring-offset-background` : "bg-muted text-muted-foreground hover:bg-muted/80"
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all duration-150 ${
+                  sel ? `${b.className} ring-2 ring-offset-1 ring-offset-background` : "bg-muted text-muted-foreground hover:bg-muted/70"
                 }`}
               >
                 {b.label}
               </button>
             );
           })}
-          <span className="text-[10px] text-muted-foreground/60">|</span>
-          <span className="text-[11px] font-medium text-muted-foreground">Due</span>
+          <span className="text-[10px] text-muted-foreground/40">·</span>
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Due</span>
           <input
             type="date"
             value={dueDate}
             onChange={(e) => { setDueDate(e.target.value); if (!e.target.value) setDueTime(""); }}
-            className="h-7 w-32 rounded-md border border-border bg-card/80 px-2 text-[11px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            className="h-7 w-32 rounded-md border border-border bg-card/80 px-2 text-[11px] text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
           />
           {dueDate && <TimeChips value={dueTime} onChange={setDueTime} />}
         </div>
-        <p className="mb-5 ml-1 mt-1 text-xs text-muted-foreground">
+        <p className="mb-6 ml-1 mt-1.5 text-xs text-muted-foreground/60">
           {text.length} character{text.length !== 1 && "s"}
         </p>
 
         <div className="relative mb-5">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
           <Input
             placeholder="Search notes..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-11 border-border bg-card/80 pl-10 backdrop-blur-xl focus-visible:ring-ring"
+            className="h-10 border-border bg-card/80 pl-9 backdrop-blur-xl focus-visible:ring-ring"
           />
         </div>
 
@@ -269,9 +269,9 @@ function AppShell({ signOut }: { signOut: () => void }) {
         />
       )}
 
-      <footer className="border-t border-border/50 bg-background/70 backdrop-blur-xl">
+      <footer className="border-t border-border/60 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto max-w-5xl px-6 py-4 text-center">
-          <p className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+          <p className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground/70">
             made with{" "}
             <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" />{" "}
             by ErfanGhesmati
@@ -296,15 +296,15 @@ function ConfirmModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
-      <div className="mx-auto mt-20 w-[min(100%-2rem,28rem)] rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="border-b border-border px-5 py-4">
-          <h2 className="text-lg font-semibold">{title}</h2>
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm">
+      <div className="mx-auto mt-20 w-[min(100%-2rem,28rem)] rounded-2xl border border-border bg-card shadow-xl">
+        <div className="border-b border-border/60 px-5 py-4">
+          <h2 className="text-base font-semibold">{title}</h2>
         </div>
         <div className="px-5 py-4">
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
         </div>
-        <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+        <div className="flex justify-end gap-2 border-t border-border/60 px-5 py-4">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button variant="destructive" onClick={onConfirm}>{confirmLabel}</Button>
         </div>
@@ -346,14 +346,14 @@ function UsersModal({ onClose }: { onClose: () => void }) {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
-      <div className="mx-auto mt-6 w-[min(100%-1rem,56rem)] rounded-2xl border border-border bg-card shadow-2xl sm:mt-10">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm">
+      <div className="mx-auto mt-6 w-[min(100%-1rem,56rem)] rounded-2xl border border-border bg-card shadow-xl sm:mt-10">
+        <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
           <div className="flex items-center gap-3">
-            <AppIcon className="h-8 w-8" />
+            <AppIcon className="h-7 w-7" />
             <div>
-              <h2 className="text-lg font-semibold">Users</h2>
-              <p className="text-sm text-muted-foreground">Safe summary only</p>
+              <h2 className="text-base font-semibold">Users</h2>
+              <p className="text-xs text-muted-foreground">Safe summary only</p>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">

@@ -52,7 +52,7 @@ export function LoginPage() {
     return (
       <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-4">
       <AppIcon className="h-10 w-10" />
-        <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-lg text-center">
+        <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-md text-center">
           <h2 className="text-lg font-semibold text-foreground">Your passcode</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Copy it now — you won't see it again.
@@ -87,20 +87,20 @@ export function LoginPage() {
         <p className="text-sm text-muted-foreground">write it down, keep it safe</p>
       </div>
 
-      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-lg">
-        <div className="mb-4 flex gap-1 rounded-lg bg-muted p-0.5">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-md">
+        <div className="mb-5 flex gap-1 rounded-lg bg-muted p-1">
           <button
             onClick={() => setMode("login")}
-            className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-all ${
-              mode === "login" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+            className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-all duration-150 ${
+              mode === "login" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Sign in
           </button>
           <button
             onClick={() => setMode("register")}
-            className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-all ${
-              mode === "register" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+            className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-all duration-150 ${
+              mode === "register" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Register
@@ -143,7 +143,7 @@ export function LoginPage() {
               localStorage.setItem("user", JSON.stringify(offlineUser));
               window.location.reload();
             }}
-            className="mt-2 w-full text-center text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            className="mt-3 w-full text-center text-[11px] text-muted-foreground/70 hover:text-muted-foreground transition-colors duration-150"
           >
             Continue offline (localStorage)
           </button>

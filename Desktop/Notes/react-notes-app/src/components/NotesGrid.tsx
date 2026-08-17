@@ -151,7 +151,7 @@ const NoteCard = memo(function NoteCard({
 
   return (
     <Card
-      className={`group relative flex flex-col border-l-4 ${item.color} bg-card shadow-sm backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}
+      className={`group relative flex flex-col border-l-4 ${item.color} bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-foreground/12`}
     >
       {item.pinned && (
         <Pin className="absolute right-2 top-2 h-3.5 w-3.5 rotate-45 fill-primary/30 text-primary" />
@@ -190,7 +190,7 @@ const NoteCard = memo(function NoteCard({
                 type="date"
                 value={editDueDate}
                 onChange={(e) => setEditDueDate(e.target.value)}
-                className="h-7 w-30 rounded-md border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-7 w-30 rounded-md border border-border bg-background px-2 text-[11px] text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
               />
               <TimeChips value={editDueTime} onChange={setEditDueTime} />
             </div>
@@ -213,7 +213,7 @@ const NoteCard = memo(function NoteCard({
                   </span>
                 )}
               </div>
-              <p className="text-sm leading-relaxed text-foreground break-words">
+              <p className="text-sm leading-relaxed text-foreground break-words font-[450]">
                 {item.text}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -241,15 +241,15 @@ const NoteCard = memo(function NoteCard({
                 )}
               </div>
             </div>
-            <div className="flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all">
-              <Button variant="ghost" size="icon" onClick={() => onTogglePin(item.id)} className={`h-9 w-9 md:h-8 md:w-8 ${item.pinned ? "text-primary" : "text-muted-foreground"} hover:text-foreground`} title={item.pinned ? "Unpin" : "Pin"}>
-                <Pin className={`h-4 w-4 ${item.pinned ? "fill-primary/20" : ""}`} />
+            <div className="flex justify-end gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-150">
+              <Button variant="ghost" size="icon" onClick={() => onTogglePin(item.id)} className={`h-8 w-8 rounded-lg ${item.pinned ? "text-primary" : "text-muted-foreground"} hover:text-foreground`} title={item.pinned ? "Unpin" : "Pin"}>
+                <Pin className={`h-3.5 w-3.5 ${item.pinned ? "fill-primary/20" : ""}`} />
               </Button>
-              <Button variant="ghost" size="icon" onClick={startEdit} className="h-9 w-9 md:h-8 md:w-8 text-muted-foreground hover:text-foreground" title="Edit">
-                <Pencil className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={startEdit} className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" title="Edit">
+                <Pencil className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => onDelete(item.id)} className="h-9 w-9 md:h-8 md:w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Delete">
-                <Trash2 className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={() => onDelete(item.id)} className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Delete">
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
           </>
