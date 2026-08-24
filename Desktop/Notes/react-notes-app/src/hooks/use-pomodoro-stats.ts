@@ -194,3 +194,69 @@ export function formatDuration(seconds: number): string {
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
 }
+
+/** Calculate current focus streak (consecutive days with ≥1 focus session). */
+export function calculateStreak(stats: PomoStat[]): number {
+  const focusStats = stats.filter((s) => s.phase === "focus");
+  if (focusStats.length === 0) return 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const activeDays = new Set<string>();
+
+  for (const s of focusStats) {
+    const date = new Date(s.ts);
+    date.setHours(0, 0, 0, 0);
+    activeDays.add(date.toISOString().slice(0, 10));
+  }
+
+  let streak = 0;
+  const checkDate = new Date(today);
+
+  const todayStr = checkDate.toISOString().slice(0, 10);
+  if (!activeDays.has(todayStr)) {
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+
+  for (let i = 0; i < 365; i++) {
+    const dateStr = checkDate.toISOString().slice(0, 10);
+    if (activeDays.has(dateStr)) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
+/** Get last 7 days focus data for trend visualization. */
+export interface DailyTrend {
+  day: string;
+  minutes: number;
+  sessions: number;
+}
+
+export function getWeeklyTrend(stats: PomoStat[]): DailyTrend[] {
+  const focusStats = stats.filter((s) => s.phase === "focus");
+  const dayMs = 24 * 60 * 60 * 1000;
+  const result: DailyTrend[] = [];
+
+  for (let i = 6; i >= 0; i--) {
+    const startOfDay = new Date();
+    startOfDay.setDate(startOfDay.getDate() - i);
+    startOfDay.setHours(0, 0, 0, 0);
+    const startDate = startOfDay.getTime();
+    const endDate = startDate + dayMs;
+
+    const dayStats = focusStats.filter((s) => s.ts >= startDate && s.ts < endDate);
+    const dayName = startOfDay.toLocaleDateString("en-US", { weekday: "short" });
+    const minutes = Math.round(dayStats.reduce((acc, s) => acc + s.duration, 0) / 60);
+    const sessions = dayStats.length;
+
+    result.push({ day: dayName, minutes, sessions });
+  }
+
+  return result;
+}

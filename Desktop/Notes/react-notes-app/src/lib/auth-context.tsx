@@ -58,6 +58,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  // Re-fetch the user profile on mount so isAdmin always reflects the DB.
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setUser(data.user ?? data);
+      })
+      .catch(() => {/* ignore network errors — keep cached user */});
+  }, [token]);
+
   const signIn = useCallback(async (name: string, passcode: string) => {
     const res = await fetch(`${API_URL}/api/auth/login`, {
       method: "POST",

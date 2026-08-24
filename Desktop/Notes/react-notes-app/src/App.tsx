@@ -29,7 +29,10 @@ import type { Priority } from "@/types";
 
 const NotesGrid = lazy(() => import("@/components/NotesGrid"));
 
-function toISO(date: string | undefined, time: string | undefined): string | undefined {
+function toISO(
+  date: string | undefined,
+  time: string | undefined
+): string | undefined {
   if (!date) return undefined;
   const t = time || "23:59";
   return new Date(`${date}T${t}:00`).toISOString();
@@ -37,6 +40,7 @@ function toISO(date: string | undefined, time: string | undefined): string | und
 
 export default function App() {
   const { isLoggedIn, signOut } = useAuth();
+
   if (!isLoggedIn) {
     return <LoginPage />;
   }
@@ -47,14 +51,26 @@ export default function App() {
 function AppShell({ signOut }: { signOut: () => void }) {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
+
   const [text, setText] = useState("");
   const [priority, setPriority] = useState<Priority | undefined>();
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
-  const { notes, setNotes: addNoteApi, editNote: editNoteApi, deleteNote: deleteNoteApi } = useUserNotes();
+
+  const {
+    notes,
+    setNotes: addNoteApi,
+    editNote: editNoteApi,
+    deleteNote: deleteNoteApi,
+  } = useUserNotes();
+
   // complete pomodoro dataset (local + server) → total focus time per note
   const { stats: pomoStats } = usePomodoroStats(userId);
-  const timeOnNote = useMemo(() => timePerNoteMap(pomoStats), [pomoStats]);
+  const timeOnNote = useMemo(
+    () => timePerNoteMap(pomoStats),
+    [pomoStats]
+  );
+
   const [search, setSearch] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
@@ -70,15 +86,19 @@ function AppShell({ signOut }: { signOut: () => void }) {
 
   const addNote = useCallback(() => {
     const trimmed = text.trim();
+
     if (!trimmed) return;
+
     const color =
       NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)];
+
     addNoteApi({
       text: trimmed,
       color,
       priority,
       dueDate: toISO(dueDate, dueTime),
     });
+
     setText("");
     setPriority(undefined);
     setDueDate("");
@@ -86,45 +106,59 @@ function AppShell({ signOut }: { signOut: () => void }) {
   }, [text, priority, dueDate, dueTime, addNoteApi]);
 
   const editNote = useCallback(
-    (id: number, newText: string, newPriority?: Priority, newDueDate?: string, newDueTime?: string) => {
+    (
+      id: number,
+      newText: string,
+      newPriority?: Priority,
+      newDueDate?: string,
+      newDueTime?: string
+    ) => {
       editNoteApi(id, {
         text: newText,
         priority: newPriority || null,
         dueDate: toISO(newDueDate, newDueTime) || null,
       });
     },
-    [editNoteApi],
+    [editNoteApi]
   );
 
   const deleteNote = useCallback(
     (id: number) => deleteNoteApi(id),
-    [deleteNoteApi],
+    [deleteNoteApi]
   );
 
   const togglePin = useCallback(
     (id: number) => {
       const note = notes.find((n) => n.id === id);
+
       if (note) {
         editNoteApi(id, { pinned: !note.pinned });
       }
     },
-    [notes, editNoteApi],
+    [notes, editNoteApi]
   );
 
   const filtered = useMemo(() => {
     const matches = debouncedSearch
       ? notes.filter((n) =>
-          n.text.toLowerCase().includes(debouncedSearch.toLowerCase()),
+          n.text.toLowerCase().includes(debouncedSearch.toLowerCase())
         )
       : notes;
+
     return [...matches].sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+
+      return (
+        new Date(b.createdAt).getTime() -
+        new Date(a.createdAt).getTime()
+      );
     });
   }, [notes, debouncedSearch]);
 
-  if (!hydrated) return <AppLoadingScreen />;
+  if (!hydrated) {
+    return <AppLoadingScreen />;
+  }
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
@@ -132,18 +166,28 @@ function AppShell({ signOut }: { signOut: () => void }) {
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3.5">
           <div className="flex items-center gap-2.5">
             <AppIcon className="h-5 w-5" />
+
             <span className="text-sm font-semibold tracking-tight text-foreground">
               Hello, {user?.name ?? "there"}
             </span>
           </div>
+
           <div className="flex items-center gap-1">
             <PomodoroTimer />
             <PomodoroStats />
+
             {user?.isAdmin && (
-              <Button variant="ghost" size="icon" onClick={() => setShowUsers(true)} className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" title="Users">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowUsers(true)}
+                className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"
+                title="Users"
+              >
                 <Shield className="h-[16px] w-[16px]" />
               </Button>
             )}
+
             <Button
               variant="ghost"
               size="icon"
@@ -153,6 +197,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
             >
               <LogOut className="h-[16px] w-[16px]" />
             </Button>
+
             <Button
               variant="ghost"
               size="icon"
@@ -175,7 +220,10 @@ function AppShell({ signOut }: { signOut: () => void }) {
             <AppIcon className="mr-2 inline-block h-8 w-8 align-middle" />
             Notes
           </h1>
-          <p className="mt-2.5 text-sm text-muted-foreground">write it down, keep it safe</p>
+
+          <p className="mt-2.5 text-sm text-muted-foreground">
+            write it down, keep it safe
+          </p>
         </div>
 
         <div className="mb-2 flex gap-2.5">
@@ -186,45 +234,75 @@ function AppShell({ signOut }: { signOut: () => void }) {
             onKeyDown={(e) => e.key === "Enter" && addNote()}
             className="h-11 border-border bg-card/80 backdrop-blur-xl placeholder:text-muted-foreground/50 focus-visible:ring-ring"
           />
-          <Button onClick={addNote} size="lg" className="h-11 gap-1.5 px-5 shadow-md shadow-foreground/8 transition-all hover:shadow-lg hover:shadow-foreground/12 active:scale-[0.97]">
+
+          <Button
+            onClick={addNote}
+            size="lg"
+            className="h-11 gap-1.5 px-5 shadow-md shadow-foreground/8 transition-all hover:shadow-lg hover:shadow-foreground/12 active:scale-[0.97]"
+          >
             <Plus className="h-4 w-4" />
             Add
           </Button>
         </div>
+
         <div className="mb-1 ml-1 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Priority</span>
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Priority
+          </span>
+
           {(["low", "medium", "high"] as Priority[]).map((p) => {
             const sel = priority === p;
             const b = PRIORITY_BADGE[p];
+
             return (
               <button
                 key={p}
                 type="button"
-                onClick={() => setPriority((prev) => (prev === p ? undefined : p))}
+                onClick={() =>
+                  setPriority((prev) => (prev === p ? undefined : p))
+                }
                 className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all duration-150 ${
-                  sel ? `${b.className} ring-2 ring-offset-1 ring-offset-background` : "bg-muted text-muted-foreground hover:bg-muted/70"
+                  sel
+                    ? `${b.className} ring-2 ring-offset-1 ring-offset-background`
+                    : "bg-muted text-muted-foreground hover:bg-muted/70"
                 }`}
               >
                 {b.label}
               </button>
             );
           })}
+
           <span className="text-[10px] text-muted-foreground/40">·</span>
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Due</span>
+
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Due
+          </span>
+
           <input
             type="date"
             value={dueDate}
-            onChange={(e) => { setDueDate(e.target.value); if (!e.target.value) setDueTime(""); }}
+            onChange={(e) => {
+              setDueDate(e.target.value);
+
+              if (!e.target.value) {
+                setDueTime("");
+              }
+            }}
             className="h-7 w-32 rounded-md border border-border bg-card/80 px-2 text-[11px] text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
           />
-          {dueDate && <TimeChips value={dueTime} onChange={setDueTime} />}
+
+          {dueDate && (
+            <TimeChips value={dueTime} onChange={setDueTime} />
+          )}
         </div>
+
         <p className="mb-6 ml-1 mt-1.5 text-xs text-muted-foreground/60">
           {text.length} character{text.length !== 1 && "s"}
         </p>
 
         <div className="relative mb-5">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
+
           <Input
             placeholder="Search notes..."
             value={search}
@@ -237,9 +315,11 @@ function AppShell({ signOut }: { signOut: () => void }) {
           <Badge variant="secondary" className="text-xs">
             {notes.length} note{notes.length !== 1 && "s"}
           </Badge>
+
           {debouncedSearch && (
             <Badge variant="outline" className="text-xs">
-              {filtered.length} match{filtered.length !== 1 && "es"}
+              {filtered.length} match
+              {filtered.length !== 1 && "es"}
             </Badge>
           )}
         </div>
@@ -249,13 +329,28 @@ function AppShell({ signOut }: { signOut: () => void }) {
             No notes yet. Add your first one!
           </p>
         ) : (
-          <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
-            <NotesGrid notes={filtered} onDelete={deleteNote} onEdit={editNote} onTogglePin={togglePin} timeOnNote={timeOnNote} />
+          <Suspense
+            fallback={
+              <div className="flex justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            }
+          >
+            <NotesGrid
+              notes={filtered}
+              onDelete={deleteNote}
+              onEdit={editNote}
+              onTogglePin={togglePin}
+              timeOnNote={timeOnNote}
+            />
           </Suspense>
         )}
       </main>
 
-      {showUsers && user?.isAdmin && <UsersModal onClose={() => setShowUsers(false)} />}
+      {showUsers && user?.isAdmin && (
+        <UsersModal onClose={() => setShowUsers(false)} />
+      )}
+
       {showSignOut && (
         <ConfirmModal
           title="Sign out"
@@ -301,12 +396,21 @@ function ConfirmModal({
         <div className="border-b border-border/60 px-5 py-4">
           <h2 className="text-base font-semibold">{title}</h2>
         </div>
+
         <div className="px-5 py-4">
-          <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </p>
         </div>
+
         <div className="flex justify-end gap-2 border-t border-border/60 px-5 py-4">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="destructive" onClick={onConfirm}>{confirmLabel}</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+
+          <Button variant="destructive" onClick={onConfirm}>
+            {confirmLabel}
+          </Button>
         </div>
       </div>
     </div>
@@ -314,32 +418,61 @@ function ConfirmModal({
 }
 
 function UsersModal({ onClose }: { onClose: () => void }) {
-  const [users, setUsers] = useState<Array<{ id: number; name: string; createdAt: string; isAdmin: boolean }>>([]);
+  const [users, setUsers] = useState<
+    Array<{
+      id: number;
+      name: string;
+      createdAt: string;
+      isAdmin: boolean;
+    }>
+  >([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let mounted = true;
+
     async function load() {
       const token = localStorage.getItem("token");
+
       if (!token) return;
+
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/admin/users`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/admin/users`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || "forbidden");
         }
+
         const data = await res.json();
-        if (mounted) setUsers(data);
+
+        if (mounted) {
+          setUsers(data);
+        }
       } catch (err) {
-        if (mounted) setError(err instanceof Error ? err.message : "forbidden");
+        if (mounted) {
+          setError(
+            err instanceof Error ? err.message : "forbidden"
+          );
+        }
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
+
     load();
+
     return () => {
       mounted = false;
     };
@@ -351,18 +484,30 @@ function UsersModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
           <div className="flex items-center gap-3">
             <AppIcon className="h-7 w-7" />
+
             <div>
               <h2 className="text-base font-semibold">Users</h2>
-              <p className="text-xs text-muted-foreground">Safe summary only</p>
+              <p className="text-xs text-muted-foreground">
+                Safe summary only
+              </p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-8 w-8"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
+
         <div className="max-h-[70vh] overflow-auto p-5">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading users...</p>
+            <p className="text-sm text-muted-foreground">
+              Loading users...
+            </p>
           ) : error ? (
             <p className="text-sm text-rose-500">{error}</p>
           ) : (
@@ -376,17 +521,33 @@ function UsersModal({ onClose }: { onClose: () => void }) {
                     <th className="px-4 py-3">Created</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {users.map((u) => (
-                    <tr key={u.id} className="border-b border-border/60 last:border-b-0">
+                    <tr
+                      key={u.id}
+                      className="border-b border-border/60 last:border-b-0"
+                    >
                       <td className="px-4 py-3">{u.id}</td>
-                      <td className="px-4 py-3 font-medium">{u.name}</td>
+
+                      <td className="px-4 py-3 font-medium">
+                        {u.name}
+                      </td>
+
                       <td className="px-4 py-3">
-                        <Badge variant={u.isAdmin ? "default" : "secondary"} className="text-[10px]">
+                        <Badge
+                          variant={
+                            u.isAdmin ? "default" : "secondary"
+                          }
+                          className="text-[10px]"
+                        >
                           {u.isAdmin ? "Admin" : "User"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{new Date(u.createdAt).toLocaleString()}</td>
+
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {new Date(u.createdAt).toLocaleString()}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
