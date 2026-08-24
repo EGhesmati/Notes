@@ -1,23 +1,24 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { X, Plus, Check, ChevronDown, ChevronUp, Clock, Bell, BellOff, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Play, Pause, RotateCcw, Timer, X, Volume2, VolumeX } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth-context";
-import type { NoteItem } from "@/types";
-import { type Phase, recordCompletion } from "@/hooks/use-pomodoro-stats";
+import { recordCompletion, PomoStat } from "@/hooks/use-pomodoro-stats";
+import NoteSelect from "./NoteSelect";
 
-const FOCUS_OPTIONS = [25, 60, 90];
+const FOCUS_OPTIONS = [15, 25, 45, 60];
 const BREAK_OPTIONS = [5, 10, 15];
-const LONG_BREAK_MIN = 30;
+const LONG_BREAK_MIN = 15;
 
-function stateKey(userId: number) {
+function stateKey(userId: number): string {
   return `pomodoro_state_${userId}`;
 }
 
 interface TimerState {
   focusMin: number;
   breakMin: number;
-  phase: Phase;
+  phase: "focus" | "short-break" | "long-break";
   secondsLeft: number;
   pomoCount: number;
   running: boolean;
@@ -28,250 +29,363 @@ function loadState(userId: number): TimerState | null {
   try {
     const raw = localStorage.getItem(stateKey(userId));
     if (!raw) return null;
-    return JSON.parse(raw);
+    return JSON.parse(raw) as TimerState;
   } catch {
     return null;
   }
 }
 
-function saveState(userId: number, state: TimerState) {
-  localStorage.setItem(stateKey(userId), JSON.stringify(state));
+function saveState(userId: number, state: TimerState): void {
+  try {
+    localStorage.setItem(stateKey(userId), JSON.stringify(state));
+  } catch {
+    // ignore
+  }
 }
 
-function clearState(userId: number) {
-  localStorage.removeItem(stateKey(userId));
+function clearState(userId: number): void {
+  try {
+    localStorage.removeItem(stateKey(userId));
+  } catch {
+    // ignore
+  }
 }
 
-function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+function formatTime(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-const PHASE_LABEL: Record<Phase, string> = {
-  focus: "Focus",
+const PHASE_LABEL: Record<string, string> = {
+  focus: "Focus Time",
   "short-break": "Short Break",
   "long-break": "Long Break",
 };
 
-const PHASE_COLOR: Record<Phase, string> = {
-  focus: "text-rose-400/70",
-  "short-break": "text-emerald-400/70",
-  "long-break": "text-sky-400/70",
+const PHASE_COLOR: Record<string, string> = {
+  focus: "from-violet-500 to-fuchsia-500",
+  "short-break": "from-emerald-500 to-teal-500",
+  "long-break": "from-sky-500 to-blue-500",
 };
 
 let _audioCtx: AudioContext | null = null;
 
-function getAudioCtx(): AudioContext | null {
-  try {
-    if (!_audioCtx) _audioCtx = new AudioContext();
-    if (_audioCtx.state === "suspended") _audioCtx.resume();
-    return _audioCtx;
-  } catch {
-    return null;
+function getAudioCtx(): AudioContext {
+  if (!_audioCtx) {
+    _audioCtx = new AudioContext();
   }
+  return _audioCtx;
 }
 
-function playBeep() {
-  const ctx = getAudioCtx();
-  if (!ctx) return;
+function playBeep(): void {
   try {
+    const ctx = getAudioCtx();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
     gain.connect(ctx.destination);
+    osc.frequency.value = 800;
     osc.type = "sine";
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
     gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
     osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.4);
-  } catch {}
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {
+    // audio not available
+  }
 }
 
-function playChime() {
-  const ctx = getAudioCtx();
-  if (!ctx) return;
+function playChime(): void {
   try {
-    [523, 659, 784].forEach((freq, i) => {
+    const ctx = getAudioCtx();
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
+      osc.frequency.value = freq;
       osc.type = "sine";
       const t = ctx.currentTime + i * 0.15;
-      osc.frequency.setValueAtTime(freq, t);
       gain.gain.setValueAtTime(0.2, t);
-      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
       osc.start(t);
-      osc.stop(t + 0.3);
+      osc.stop(t + 0.4);
     });
-  } catch {}
+  } catch {
+    // audio not available
+  }
 }
 
-export function PomodoroTimer() {
+export default function PomodoroTimer() {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const endAtRef = useRef<number | null>(null);
-  const restored = loadState(userId);
+  const restored = useRef(false);
 
   const [open, setOpen] = useState(false);
   const [sound, setSound] = useState(true);
-  const [focusMin, setFocusMin] = useState(restored?.focusMin ?? 25);
-  const [breakMin, setBreakMin] = useState(restored?.breakMin ?? 5);
-  const [phase, setPhase] = useState<Phase>(restored?.phase ?? "focus");
-  const [secondsLeft, setSecondsLeft] = useState(() => {
-    if (restored?.running && restored?.startedAt) {
-      const elapsed = Math.floor((Date.now() - restored.startedAt) / 1000);
-      const remaining = Math.max(0, (restored.secondsLeft || 25 * 60) - elapsed);
-      endAtRef.current = Date.now() + remaining * 1000;
-      return remaining;
-    }
-    return restored?.secondsLeft ?? 25 * 60;
-  });
-  const [running, setRunning] = useState(restored?.running ?? false);
-  const [pomoCount, setPomoCount] = useState(restored?.pomoCount ?? 0);
+  const [focusMin, setFocusMin] = useState(25);
+  const [breakMin, setBreakMin] = useState(5);
+  const [phase, setPhase] = useState<"focus" | "short-break" | "long-break">("focus");
+  const [secondsLeft, setSecondsLeft] = useState(focusMin * 60);
+  const [elapsed, setElapsed] = useState(0);
+  const [remaining, setRemaining] = useState(focusMin * 60);
+  const [running, setRunning] = useState(false);
+  const [pomoCount, setPomoCount] = useState(0);
   const [notified, setNotified] = useState(false);
+
+  // Custom duration modal states
   const [customFocusOpen, setCustomFocusOpen] = useState(false);
   const [customFocusVal, setCustomFocusVal] = useState("");
   const [customBreakOpen, setCustomBreakOpen] = useState(false);
   const [customBreakVal, setCustomBreakVal] = useState("");
+
+  // Note picker state
   const [notePickerOpen, setNotePickerOpen] = useState(false);
-  const [pendingCompletion, setPendingCompletion] = useState<{ phase: Phase; duration: number } | null>(null);
-  const [selectedNoteId, setSelectedNoteId] = useState<number | "none">("none");
-  const [noteOptions, setNoteOptions] = useState<NoteItem[]>([]);
+  const [pendingCompletion, setPendingCompletion] = useState<{ duration: number } | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
+  const [noteOptions, setNoteOptions] = useState<{ id: number; title: string }[]>([]);
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    endAtRef.current = null;
+    setRunning(false);
+    setElapsed(0);
+    setNotified(false);
   }, []);
 
-  const nextPhase = useCallback(
-    (current: Phase): Phase => (current === "focus" ? (pomoCount + 1) % 4 === 0 ? "long-break" : "short-break" : "focus"),
-    [pomoCount],
-  );
-
-  const startPhase = useCallback((p: Phase, count: number) => {
-    setPhase(p);
-    setPomoCount(count);
-    const dur = p === "focus" ? focusMin * 60 : p === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
-    setSecondsLeft(dur);
-    setNotified(false);
-  }, [focusMin, breakMin]);
-
-  const notify = useCallback((phaseLabel: string) => {
-    if (sound) {
-      phaseLabel === "Focus" ? playChime() : playBeep();
+  const nextPhase = useCallback(() => {
+    if (phase === "focus") {
+      const newCount = pomoCount + 1;
+      const isLongBreak = newCount % 4 === 0;
+      setPhase(isLongBreak ? "long-break" : "short-break");
+      setSecondsLeft((isLongBreak ? LONG_BREAK_MIN : breakMin) * 60);
+      setPomoCount(newCount);
+    } else {
+      setPhase("focus");
+      setSecondsLeft(focusMin * 60);
     }
-    if (Notification.permission === "granted") {
-      new Notification("Pomodoro", { body: `${phaseLabel} finished!`, icon: "/Notes/favicon.svg" });
-    }
-    setNotified(true);
-  }, [sound]);
+    setElapsed(0);
+    setRunning(false);
+    endAtRef.current = null;
+    clearState(userId);
+  }, [phase, pomoCount, breakMin, focusMin, userId]);
 
-  // Resolve the pending completion: every exit path of the note-picker modal
-  // records the session so a completed pomodoro is never silently lost.
-  const confirmCompletion = useCallback(
-    (noteId: number | null) => {
-      if (!pendingCompletion) return;
-      recordCompletion(userId, pendingCompletion.phase, pendingCompletion.duration, noteId);
-      setPendingCompletion(null);
-      setNotePickerOpen(false);
+  const notify = useCallback(
+    (title: string, body: string) => {
+      if (!("Notification" in window)) return;
+      if (Notification.permission === "granted") {
+        try {
+          new Notification(title, { body, icon: "/favicon.ico" });
+        } catch {
+          // notification failed
+        }
+      }
     },
-    [userId, pendingCompletion],
+    [],
   );
+
+  const confirmCompletion = useCallback(() => {
+    if (phase === "focus") {
+      setPendingCompletion({ duration: focusMin * 60 - elapsed });
+      setNotePickerOpen(true);
+    } else {
+      nextPhase();
+    }
+  }, [phase, focusMin, elapsed, nextPhase]);
 
   const start = useCallback(() => {
-    getAudioCtx();
-    setNotified(false);
+    if (running) {
+      // Pause
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      endAtRef.current = null;
+      setRunning(false);
+      saveState(userId, {
+        focusMin,
+        breakMin,
+        phase,
+        secondsLeft,
+        pomoCount,
+        running: false,
+        startedAt: null,
+      });
+      return;
+    }
+
+    // Calculate remaining time for accurate countdown
+    const dur = phase === "focus" ? focusMin * 60 : phase === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
+    const startedAt = Date.now() + (dur - secondsLeft) * 1000;
+    endAtRef.current = startedAt + dur * 1000;
+
     setRunning(true);
-    endAtRef.current = Date.now() + secondsLeft * 1000;
+    setNotified(false);
+    intervalRef.current = setInterval(() => {
+      if (!endAtRef.current) return;
+      const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
+      setSecondsLeft(left);
+      setElapsed(dur - left);
+      setRemaining(left);
+
+      if (left <= 10 && left > 0 && sound && !notified) {
+        setNotified(true);
+        playBeep();
+      }
+
+      if (left === 0) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        intervalRef.current = null;
+        endAtRef.current = null;
+        playChime();
+        if (sound) {
+          notify(PHASE_LABEL[phase], "Time's up! 🍅");
+        }
+        confirmCompletion();
+      }
+    }, 250);
+
+    saveState(userId, {
+      focusMin,
+      breakMin,
+      phase,
+      secondsLeft: left = dur,
+      pomoCount,
+      running: true,
+      startedAt,
+    });
+  }, [running, phase, focusMin, breakMin, secondsLeft, pomoCount, userId, sound, notified, notify, confirmCompletion]);
+
+  const pause = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    endAtRef.current = null;
+    setRunning(false);
     saveState(userId, {
       focusMin,
       breakMin,
       phase,
       secondsLeft,
       pomoCount,
-      running: true,
-      startedAt: Date.now(),
+      running: false,
+      startedAt: null,
     });
-  }, [focusMin, breakMin, phase, secondsLeft, pomoCount, userId]);
-
-  const pause = useCallback(() => {
-    clearTimer();
-    setRunning(false);
-    clearState(userId);
-  }, [clearTimer, userId]);
+  }, [userId, focusMin, breakMin, phase, secondsLeft, pomoCount]);
 
   const reset = useCallback(() => {
     clearTimer();
-    setRunning(false);
+    const dur = phase === "focus" ? focusMin * 60 : phase === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
+    setSecondsLeft(dur);
+    setElapsed(0);
+    setRemaining(dur);
     setNotified(false);
     clearState(userId);
-    startPhase("focus", 0);
-  }, [clearTimer, startPhase, userId]);
+  }, [clearTimer, phase, focusMin, breakMin, userId]);
 
-  const changeFocus = useCallback((m: number) => {
-    clearTimer();
-    setFocusMin(m);
-    setRunning(false);
-    setSecondsLeft(() => {
-      if (phase === "focus") return m * 60;
-      if (phase === "short-break") return breakMin * 60;
-      return LONG_BREAK_MIN * 60;
-    });
-    setNotified(false);
-    clearState(userId);
-  }, [clearTimer, userId, phase, breakMin]);
-
-  const changeBreak = useCallback((m: number) => {
-    clearTimer();
-    setBreakMin(m);
-    clearState(userId);
-  }, [clearTimer, userId]);
-
-  useEffect(() => {
-    const onNotes = () => {
-      try {
-        setNoteOptions(JSON.parse(localStorage.getItem(`notes-${userId}`) || "[]") as NoteItem[]);
-      } catch {
-        setNoteOptions([]);
+  const changeFocus = useCallback(
+    (val: number) => {
+      setFocusMin(val);
+      if (!running) {
+        setSecondsLeft(val * 60);
+        setRemaining(val * 60);
       }
-    };
-    onNotes();
-    window.addEventListener("storage", onNotes);
-    return () => window.removeEventListener("storage", onNotes);
-  }, [userId]);
+    },
+    [running],
+  );
 
-  useEffect(() => {
-    if (!running) return;
-    intervalRef.current = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil(((endAtRef.current ?? 0) - Date.now()) / 1000));
-      setSecondsLeft(remaining);
-      if (remaining <= 0) {
-        setRunning(false);
-        clearState(userId);
-        if (phase === "focus") {
-          setPendingCompletion({ phase, duration: focusMin * 60 });
-          setSelectedNoteId("none");
-          setNotePickerOpen(true);
-        }
-        const label = PHASE_LABEL[phase];
-        setTimeout(() => notify(label), 50);
+  const changeBreak = useCallback(
+    (val: number) => {
+      setBreakMin(val);
+      if (!running) {
+        setSecondsLeft(val * 60);
+        setRemaining(val * 60);
       }
-    }, 250);
-    return clearTimer;
-  }, [running, phase, notify, clearTimer, userId, focusMin]);
+    },
+    [running],
+  );
+
+  const onNotes = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notes", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setNoteOptions(data.map((n: any) => ({ id: n.id, title: n.title || "Untitled" })));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
-    document.title = running ? `${formatTime(secondsLeft)} · NoteApp` : "NoteApp";
+    if (notePickerOpen) {
+      onNotes();
+    }
+  }, [notePickerOpen, onNotes]);
+
+  // Restore state on mount
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    const saved = loadState(userId);
+    if (saved) {
+      setFocusMin(saved.focusMin);
+      setBreakMin(saved.breakMin);
+      setPhase(saved.phase);
+      setSecondsLeft(saved.secondsLeft);
+      setRemaining(saved.secondsLeft);
+      setPomoCount(saved.pomoCount);
+      if (saved.running && saved.startedAt) {
+        const dur = saved.phase === "focus" ? saved.focusMin * 60 : saved.phase === "long-break" ? LONG_BREAK_MIN * 60 : saved.breakMin * 60;
+        const elapsedSinceStart = Math.floor((Date.now() - saved.startedAt) / 1000);
+        const newRemaining = Math.max(0, saved.secondsLeft - elapsedSinceStart);
+        setSecondsLeft(newRemaining);
+        setRemaining(newRemaining);
+        setElapsed(elapsedSinceStart);
+        setRunning(true);
+        endAtRef.current = saved.startedAt + dur * 1000;
+        intervalRef.current = setInterval(() => {
+          if (!endAtRef.current) return;
+          const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
+          setSecondsLeft(left);
+          setElapsed(dur - left);
+          setRemaining(left);
+          if (left <= 10 && left > 0 && sound && !notified) {
+            setNotified(true);
+            playBeep();
+          }
+          if (left === 0) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            intervalRef.current = null;
+            endAtRef.current = null;
+            playChime();
+            if (sound) {
+              notify(PHASE_LABEL[saved.phase], "Time's up! 🍅");
+            }
+            setRunning(false);
+            setPendingCompletion({ duration: dur - elapsedSinceStart });
+            setNotePickerOpen(true);
+          }
+        }, 250);
+      }
+    }
+  }, [userId, sound, notified, notify]);
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      document.title = "NoteApp";
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [running, secondsLeft]);
+  }, []);
 
   const requestNotification = useCallback(() => {
     if ("Notification" in window && Notification.permission === "default") {
@@ -282,270 +396,454 @@ export function PomodoroTimer() {
   const advance = useCallback(() => {
     if (phase === "focus") {
       const newCount = pomoCount + 1;
-      startPhase(nextPhase(phase), newCount);
+      const isLongBreak = newCount % 4 === 0;
+      const dur = isLongBreak ? LONG_BREAK_MIN * 60 : breakMin * 60;
+      recordCompletion(userId, "focus", focusMin * 60, selectedNoteId);
+      setPhase(isLongBreak ? "long-break" : "short-break");
+      setSecondsLeft(dur);
+      setRemaining(dur);
+      setPomoCount(newCount);
+      setSelectedNoteId(null);
     } else {
-      startPhase("focus", pomoCount);
+      const dur = focusMin * 60;
+      recordCompletion(userId, phase, breakMin * 60);
+      setPhase("focus");
+      setSecondsLeft(dur);
+      setRemaining(dur);
+      setSelectedNoteId(null);
     }
-    setRunning(true);
-    const dur = phase === "focus"
-      ? (nextPhase(phase) === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60)
-      : focusMin * 60;
-    endAtRef.current = Date.now() + dur * 1000;
-    saveState(userId, {
-      focusMin,
-      breakMin,
-      phase: phase === "focus" ? nextPhase(phase) : "focus",
-      secondsLeft: dur,
-      pomoCount: phase === "focus" ? pomoCount + 1 : pomoCount,
-      running: true,
-      startedAt: Date.now(),
-    });
-  }, [phase, pomoCount, focusMin, breakMin, nextPhase, startPhase, userId]);
+    setElapsed(0);
+    setNotified(false);
+    setPendingCompletion(null);
+  }, [phase, pomoCount, breakMin, focusMin, userId, selectedNoteId]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open]);
+  const handleNoteSelect = useCallback(
+    (noteId: number) => {
+      setSelectedNoteId(noteId);
+      setNotePickerOpen(false);
+    },
+    [],
+  );
+
+  const handleClearNotes = useCallback(() => {
+    setSelectedNoteId(null);
+    setNotePickerOpen(false);
+  }, []);
+
+  const duration = phase === "focus" ? focusMin * 60 : phase === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
+  const label = PHASE_LABEL[phase];
+  const color = PHASE_COLOR[phase];
+
+  const isValidNumber = (val: string) => {
+    const num = parseInt(val, 10);
+    return !isNaN(num) && num > 0 && num <= 180;
+  };
+
+  const confirmCustomFocus = useCallback(() => {
+    if (isValidNumber(customFocusVal)) {
+      const val = parseInt(customFocusVal, 10);
+      changeFocus(val);
+      setCustomFocusOpen(false);
+      setCustomFocusVal("");
+    }
+  }, [customFocusVal, changeFocus]);
+
+  const confirmCustomBreak = useCallback(() => {
+    if (isValidNumber(customBreakVal)) {
+      const val = parseInt(customBreakVal, 10);
+      changeBreak(val);
+      setCustomBreakOpen(false);
+      setCustomBreakVal("");
+    }
+  }, [customBreakVal, changeBreak]);
+
+  const cycleFocus = useCallback(
+    (delta: number) => {
+      const currentIdx = FOCUS_OPTIONS.indexOf(focusMin);
+      const newIdx = Math.max(0, Math.min(FOCUS_OPTIONS.length - 1, currentIdx + delta));
+      changeFocus(FOCUS_OPTIONS[newIdx]);
+    },
+    [focusMin, changeFocus],
+  );
+
+  const cycleBreak = useCallback(
+    (delta: number) => {
+      const currentIdx = BREAK_OPTIONS.indexOf(breakMin);
+      const newIdx = Math.max(0, Math.min(BREAK_OPTIONS.length - 1, currentIdx + delta));
+      changeBreak(BREAK_OPTIONS[newIdx]);
+    },
+    [breakMin, changeBreak],
+  );
 
   return (
     <div className="relative">
+      {/* Toggle Button */}
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => {
-          setOpen((o) => !o);
-          requestNotification();
-        }}
-        className={`relative h-8 w-8 rounded-full ${running ? "text-primary" : "text-muted-foreground"} hover:text-foreground`}
-        title="Pomodoro"
+        onClick={() => setOpen((v) => !v)}
+        className={`h-8 w-8 rounded-full transition-all ${
+          open
+            ? "bg-primary/10 text-primary shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+        }`}
+        title="Pomodoro timer"
       >
-        <Timer className="h-[18px] w-[18px]" />
-        {running && <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />}
+        <Clock className="h-[18px] w-[18px]" />
       </Button>
 
+      {/* Main Panel */}
       {open && (
-        <div
-          className={
-            "absolute right-0 top-full mt-2 w-[min(20rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] origin-top-right overflow-y-auto rounded-xl border border-border bg-card/95 p-4 shadow-xl backdrop-blur-xl sm:w-72"
-          }
-        >
-          <div className="mb-3 flex items-center justify-between">
+        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,_calc(100vw-1rem))] max-h-[calc(100vh-4rem)] origin-top-right overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl sm:w-[24rem]">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">Pomodoro</span>
-              <button onClick={() => setSound((s) => !s)} className="text-muted-foreground hover:text-foreground" title={sound ? "Mute" : "Unmute"}>
-                {sound ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
-              </button>
+              <div className={`rounded-lg bg-gradient-to-r ${color} p-1.5 text-white shadow-sm`}>
+                <Clock className="h-3.5 w-3.5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pomodoro Timer</p>
+                <p className="text-sm font-medium text-foreground">{label}</p>
+              </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="h-6 w-6 text-muted-foreground hover:text-foreground">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setOpen(false)}
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            >
               <X className="h-3.5 w-3.5" />
             </Button>
           </div>
 
-          <p className={`mb-1 text-center text-xs font-semibold uppercase tracking-wider ${PHASE_COLOR[phase]}`}>
-            {PHASE_LABEL[phase]}
-            {pomoCount > 0 && phase === "focus" && ` #${pomoCount + 1}`}
-          </p>
-          <div className={`mb-3 text-center text-2xl font-mono font-bold tabular-nums tracking-wider ${notified ? "animate-pulse" : "text-foreground"}`}>
-            {formatTime(secondsLeft)}
-          </div>
-
-          <div className="mb-4 flex items-center justify-center gap-2">
-            {notified ? (
-              <Button size="sm" onClick={advance} className="h-9 w-full gap-1.5 sm:w-auto">
-                <Play className="h-3.5 w-3.5" />
-                {phase === "focus" ? "Start break" : "Start focus"}
-              </Button>
-            ) : running ? (
-              <Button size="sm" variant="outline" onClick={pause} className="h-9 w-full gap-1.5 sm:w-auto">
-                <Pause className="h-3.5 w-3.5" />
-                Pause
-              </Button>
-            ) : (
-              <Button size="sm" onClick={start} disabled={secondsLeft === 0} className="h-9 w-full gap-1.5 sm:w-auto">
-                <Play className="h-3.5 w-3.5" />
-                Start
-              </Button>
-            )}
-            <Button size="sm" variant="ghost" onClick={reset} className="h-9 w-full gap-1.5 sm:w-auto">
-              <RotateCcw className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-
-          <div className="mb-3 flex items-center justify-center gap-1">
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className={`h-2 w-2 rounded-full transition-all ${
-                  i < pomoCount % 4 ? "bg-primary" : pomoCount >= 4 && i === 0 ? "bg-primary/40" : "bg-muted"
-                }`}
-              />
-            ))}
-          </div>
-
-          <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">Focus</p>
-          <div className="mb-3 flex flex-wrap gap-1.5">
-            {FOCUS_OPTIONS.map((m) => (
-              <button
-                key={m}
-                onClick={() => {
-                  changeFocus(m);
-                  setCustomFocusOpen(false);
-                }}
-                className={`min-w-0 flex-1 rounded-lg px-3 py-2 min-h-[34px] text-xs font-medium transition-all ${
-                  focusMin === m && !customFocusOpen ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                {m}m
-              </button>
-            ))}
-            {customFocusOpen ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const val = parseInt(customFocusVal, 10);
-                  if (val > 0 && val <= 180) {
-                    clearTimer();
-                    setFocusMin(val);
-                    setRunning(false);
-                    setSecondsLeft(() => {
-                      if (phase === "focus") return val * 60;
-                      if (phase === "short-break") return breakMin * 60;
-                      return LONG_BREAK_MIN * 60;
-                    });
-                    setNotified(false);
-                    clearState(userId);
-                  }
-                  setCustomFocusOpen(false);
-                  setCustomFocusVal("");
-                }}
-                className="min-w-0 flex-1"
-              >
-                <Input
-                  type="number"
-                  min={1}
-                  max={180}
-                  placeholder="min"
-                  value={customFocusVal}
-                  onChange={(e) => setCustomFocusVal(e.target.value)}
-                  className="h-7 w-full rounded-lg px-2 py-1 text-xs"
-                  autoFocus
-                  onBlur={() => {
-                    setCustomFocusOpen(false);
-                    setCustomFocusVal("");
-                  }}
-                />
-              </form>
-            ) : (
-              <button
-                onClick={() => setCustomFocusOpen(true)}
-                className="flex-1 rounded-lg bg-muted px-2 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:bg-muted/80"
-              >
-                Custom
-              </button>
-            )}
-          </div>
-
-          <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">Short break</p>
-          <div className="flex flex-wrap gap-1.5">
-            {BREAK_OPTIONS.map((m) => (
-              <button
-                key={m}
-                onClick={() => {
-                  changeBreak(m);
-                  setCustomBreakOpen(false);
-                }}
-                className={`min-w-0 flex-1 rounded-lg px-3 py-2 min-h-[34px] text-xs font-medium transition-all ${
-                  breakMin === m && !customBreakOpen ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                {m}m
-              </button>
-            ))}
-            {customBreakOpen ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const val = parseInt(customBreakVal, 10);
-                  if (val > 0 && val <= 60) {
-                    clearTimer();
-                    setBreakMin(val);
-                    clearState(userId);
-                  }
-                  setCustomBreakOpen(false);
-                  setCustomBreakVal("");
-                }}
-                className="min-w-0 flex-1"
-              >
-                <Input
-                  type="number"
-                  min={1}
-                  max={60}
-                  placeholder="min"
-                  value={customBreakVal}
-                  onChange={(e) => setCustomBreakVal(e.target.value)}
-                  className="h-7 w-full rounded-lg px-2 py-1 text-xs"
-                  autoFocus
-                  onBlur={() => {
-                    setCustomBreakOpen(false);
-                    setCustomBreakVal("");
-                  }}
-                />
-              </form>
-            ) : (
-              <button
-                onClick={() => setCustomBreakOpen(true)}
-                className="flex-1 rounded-lg bg-muted px-2 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:bg-muted/80"
-              >
-                Custom
-              </button>
-            )}
-          </div>
-          <p className="mt-1.5 text-[10px] text-muted-foreground">Long break: {LONG_BREAK_MIN}m (every 4th)</p>
-        </div>
-      )}
-
-      {notePickerOpen && pendingCompletion && (
-        <div className="fixed inset-0 z-[60] bg-black/50 px-4 backdrop-blur-sm">
-          <div className="mx-auto mt-24 w-full max-w-md rounded-2xl border border-border bg-card p-4 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold">Track this session</p>
-                <p className="text-xs text-muted-foreground">Choose the note you worked on, or skip it.</p>
+          {/* Content */}
+          <div className="max-h-[calc(100vh-10rem)] overflow-y-auto p-4 sm:max-h-[28rem]">
+            {/* Timer Display */}
+            <div className="mb-4 flex flex-col items-center">
+              <div className={`mb-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r ${color} px-3 py-1 text-xs font-medium text-white shadow-sm`}>
+                {running ? (
+                  <>
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                    Running
+                  </>
+                ) : (
+                  <>
+                    <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+                    Paused
+                  </>
+                )}
               </div>
-              <Button variant="ghost" size="icon" onClick={() => confirmCompletion(selectedNoteId === "none" ? null : selectedNoteId)} className="h-7 w-7">
+              <div className={`mb-1 bg-gradient-to-r ${color} bg-clip-text text-center`}>
+                <span className="font-mono text-5xl font-bold text-transparent">{formatTime(phase === "focus" ? secondsLeft : secondsLeft)}</span>
+              </div>
+              {pomoCount > 0 && (
+                <Badge variant="outline" className="mt-1 text-xs">
+                  #{pomoCount + 1} • {pomoCount} completed
+                </Badge>
+              )}
+            </div>
+
+            {/* Controls */}
+            <div className="mb-4 flex items-center justify-center gap-2">
+              {!running ? (
+                <Button
+                  onClick={start}
+                  className={`flex-1 bg-gradient-to-r ${color} text-white shadow-sm hover:opacity-90`}
+                >
+                  Start
+                </Button>
+              ) : (
+                <Button
+                  onClick={pause}
+                  variant="secondary"
+                  className="flex-1"
+                >
+                  Pause
+                </Button>
+              )}
+              <Button
+                onClick={reset}
+                variant="outline"
+                size="icon"
+                className="h-10 w-10"
+                title="Reset"
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="space-y-2">
-              <select
-                value={selectedNoteId}
-                onChange={(e) => setSelectedNoteId(e.target.value === "none" ? "none" : Number(e.target.value))}
-                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm"
-              >
-                <option value="none">No note</option>
-                {noteOptions.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.text}
-                  </option>
-                ))}
-              </select>
-              <div className="flex justify-end gap-2 pt-1">
-                <Button
-                  variant="outline"
-                  onClick={() => confirmCompletion(null)}
-                >
-                  Skip
-                </Button>
-                <Button
-                  onClick={() => confirmCompletion(selectedNoteId === "none" ? null : selectedNoteId)}
-                >
-                  Save
-                </Button>
+
+            {/* Settings Toggle */}
+            <Button
+              onClick={() => setCustomFocusOpen(true)}
+              variant="ghost"
+              size="sm"
+              className="mb-2 h-8 w-full justify-between text-xs"
+            >
+              <span>⚙️ Settings</span>
+              <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+
+            {/* Quick Duration Selectors - Inline */}
+            <div className="space-y-3">
+              {/* Focus Duration */}
+              <div className="rounded-xl border border-border/60 bg-background/60 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-medium">Focus Duration</span>
+                  <button
+                    onClick={() => setCustomFocusOpen(true)}
+                    className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                    Custom
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => cycleFocus(-1)}
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                  <div className="flex-1 text-center">
+                    <span className="text-lg font-bold">{focusMin}</span>
+                    <span className="ml-1 text-xs text-muted-foreground">min</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => cycleFocus(1)}
+                  >
+                    <ChevronUp className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="mt-2 flex gap-1">
+                  {FOCUS_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => changeFocus(opt)}
+                      className={`flex-1 rounded-md py-1 text-[10px] font-medium transition-colors ${
+                        focusMin === opt
+                          ? `bg-gradient-to-r ${color} text-white`
+                          : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {opt}m
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Break Duration */}
+              <div className="rounded-xl border border-border/60 bg-background/60 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-medium">Break Duration</span>
+                  <button
+                    onClick={() => setCustomBreakOpen(true)}
+                    className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                    Custom
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => cycleBreak(-1)}
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                  <div className="flex-1 text-center">
+                    <span className="text-lg font-bold">{breakMin}</span>
+                    <span className="ml-1 text-xs text-muted-foreground">min</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => cycleBreak(1)}
+                  >
+                    <ChevronUp className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="mt-2 flex gap-1">
+                  {BREAK_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => changeBreak(opt)}
+                      className={`flex-1 rounded-md py-1 text-[10px] font-medium transition-colors ${
+                        breakMin === opt
+                          ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
+                          : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {opt}m
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sound Toggle */}
+              <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 p-3">
+                <div className="flex items-center gap-2">
+                  {sound ? (
+                    <Bell className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <BellOff className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="text-xs font-medium">Sound Alerts</span>
+                </div>
+                <button
+                  onClick={() => setSound(!sound)}
+                  className={`relative h-5 w-9 rounded-full transition-colors ${
+                    sound ? "bg-primary" : "bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                      sound ? "translate-x-4" : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Notification Permission */}
+              {!("Notification" in window) || Notification.permission === "denied" ? (
+                <Button
+                  onClick={requestNotification}
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs"
+                >
+                  Enable Browser Notifications
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Focus Duration Modal - Inline Style */}
+      {customFocusOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-[22rem]">
+            <h3 className="mb-3 text-sm font-semibold">Custom Focus Duration</h3>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min={1}
+                max={180}
+                value={customFocusVal}
+                onChange={(e) => setCustomFocusVal(e.target.value)}
+                placeholder="Minutes (1-180)"
+                className="flex-1"
+                onKeyDown={(e) => e.key === "Enter" && confirmCustomFocus()}
+              />
+              <Button onClick={confirmCustomFocus} className="shrink-0">
+                <Check className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="mt-2 text-[10px] text-muted-foreground">Enter minutes between 1 and 180</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setCustomFocusOpen(false);
+                setCustomFocusVal("");
+              }}
+              className="mt-3 w-full text-xs"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Break Duration Modal - Inline Style */}
+      {customBreakOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-[22rem]">
+            <h3 className="mb-3 text-sm font-semibold">Custom Break Duration</h3>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                value={customBreakVal}
+                onChange={(e) => setCustomBreakVal(e.target.value)}
+                placeholder="Minutes (1-60)"
+                className="flex-1"
+                onKeyDown={(e) => e.key === "Enter" && confirmCustomBreak()}
+              />
+              <Button onClick={confirmCustomBreak} className="shrink-0">
+                <Check className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="mt-2 text-[10px] text-muted-foreground">Enter minutes between 1 and 60</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setCustomBreakOpen(false);
+                setCustomBreakVal("");
+              }}
+              className="mt-3 w-full text-xs"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Note Selection Modal */}
+      {notePickerOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-[min(24rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl sm:w-[26rem]">
+            <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+              <h3 className="text-sm font-semibold">Associate with Note</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleClearNotes}
+                className="h-6 w-6 text-muted-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="max-h-[20rem] overflow-y-auto p-4">
+              <NoteSelect
+                onSelect={handleNoteSelect}
+                notes={noteOptions}
+                selectedId={selectedNoteId}
+              />
+            </div>
+            <div className="border-t border-border/50 px-4 py-3 flex gap-2">
+              <Button
+                onClick={() => {
+                  if (selectedNoteId !== null) {
+                    advance();
+                  }
+                }}
+                disabled={selectedNoteId === null}
+                className={`flex-1 bg-gradient-to-r ${PHASE_COLOR[phase]} text-white`}
+              >
+                <Check className="mr-2 h-4 w-4" />
+                Save with Note
+              </Button>
+              <Button
+                onClick={() => {
+                  setSelectedNoteId(null);
+                  advance();
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Skip Note
+              </Button>
             </div>
           </div>
         </div>
