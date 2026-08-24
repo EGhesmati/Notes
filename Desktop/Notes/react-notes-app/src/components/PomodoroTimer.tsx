@@ -256,7 +256,7 @@ export default function PomodoroTimer() {
       focusMin,
       breakMin,
       phase,
-      secondsLeft: left = dur,
+      secondsLeft: dur,
       pomoCount,
       running: true,
       startedAt,
@@ -851,3 +851,5 @@ export default function PomodoroTimer() {
     </div>
   );
 }
+
+

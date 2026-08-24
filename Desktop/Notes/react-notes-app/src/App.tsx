@@ -351,10 +351,7 @@ function UsersModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-3">
             <AppIcon className="h-8 w-8" />
-            <div>
-              <h2 className="text-lg font-semibold">Users</h2>
-              <p className="text-sm text-muted-foreground">Safe summary only</p>
-            </div>
+            <h2 className="text-lg font-semibold">Users</h2>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
             <X className="h-4 w-4" />

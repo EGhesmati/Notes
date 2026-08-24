@@ -89,6 +89,14 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
+// Returns the current user's fresh profile (used by the client to sync isAdmin).
+app.get("/api/auth/me", authMiddleware, async (req, res) => {
+  const { rows } = await pool.query("SELECT id, name, is_admin FROM users WHERE id = $1", [(req as any).userId]);
+  if (rows.length === 0) return res.status(404).json({ error: "user not found" });
+  const u = rows[0];
+  res.json({ id: u.id, name: u.name, isAdmin: !!u.is_admin });
+});
+
 // ---- Notes ----
 
 app.get("/api/notes", authMiddleware, async (req, res) => {
