@@ -127,9 +127,23 @@ function getAudioCtx(): AudioContext {
   return _audioCtx;
 }
 
+/** Unlock / resume the AudioContext from within a user gesture so the browser allows audio. */
+function unlockAudio(): Promise<void> {
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === "suspended") {
+      return ctx.resume();
+    }
+  } catch {
+    // audio not available
+  }
+  return Promise.resolve();
+}
+
 function playChime(): void {
   try {
     const ctx = getAudioCtx();
+    if (ctx.state !== "running") return;
     const notes = [523.25, 659.25, 783.99, 1046.5];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
@@ -536,6 +550,7 @@ export function PomodoroTimer() {
   );
 
   const start = useCallback(() => {
+    unlockAudio();
     if (runningRef.current) {
       // Pause
       if (intervalRef.current) clearInterval(intervalRef.current);
