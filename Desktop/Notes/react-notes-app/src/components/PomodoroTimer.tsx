@@ -64,13 +64,13 @@ const PHASE_LABEL: Record<string, string> = {
 };
 
 const PHASE_COLOR: Record<string, string> = {
-  focus: "from-red-500 to-rose-500",
+  focus: "from-foreground to-foreground/70",
   "short-break": "from-emerald-500 to-teal-500",
   "long-break": "from-sky-500 to-blue-500",
 };
 
 const RING_COLOR: Record<string, string> = {
-  focus: "text-red-500",
+  focus: "text-foreground",
   "short-break": "text-emerald-500",
   "long-break": "text-sky-500",
 };
@@ -82,24 +82,6 @@ function getAudioCtx(): AudioContext {
     _audioCtx = new AudioContext();
   }
   return _audioCtx;
-}
-
-function playBeep(): void {
-  try {
-    const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 800;
-    osc.type = "sine";
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.3);
-  } catch {
-    // audio not available
-  }
 }
 
 function playChime(): void {
@@ -164,7 +146,6 @@ export function PomodoroTimer() {
   const [secondsLeft, setSecondsLeft] = useState(focusMin * 60);
   const [running, setRunning] = useState(false);
   const [pomoCount, setPomoCount] = useState(0);
-  const [notified, setNotified] = useState(false);
 
   // Custom duration modal states
   const [customFocusOpen, setCustomFocusOpen] = useState(false);
@@ -184,7 +165,6 @@ export function PomodoroTimer() {
     }
     endAtRef.current = null;
     setRunning(false);
-    setNotified(false);
   }, []);
 
   const nextPhase = useCallback(() => {
@@ -252,16 +232,10 @@ export function PomodoroTimer() {
     endAtRef.current = startedAt + dur * 1000;
 
     setRunning(true);
-    setNotified(false);
     intervalRef.current = setInterval(() => {
       if (!endAtRef.current) return;
       const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
       setSecondsLeft(left);
-
-      if (left <= 10 && left > 0 && soundRef.current && !notified) {
-        setNotified(true);
-        playBeep();
-      }
 
       if (left === 0) {
         if (intervalRef.current) clearInterval(intervalRef.current);
@@ -284,7 +258,7 @@ export function PomodoroTimer() {
       running: true,
       startedAt,
     });
-  }, [running, phase, focusMin, breakMin, secondsLeft, pomoCount, userId, notified, notify, confirmCompletion]);
+  }, [running, phase, focusMin, breakMin, secondsLeft, pomoCount, userId, notify, confirmCompletion]);
 
   const pause = useCallback(() => {
     if (intervalRef.current) {
@@ -308,7 +282,6 @@ export function PomodoroTimer() {
     clearTimer();
     const dur = phase === "focus" ? focusMin * 60 : phase === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
     setSecondsLeft(dur);
-    setNotified(false);
     clearState(userId);
   }, [clearTimer, phase, focusMin, breakMin, userId]);
 
@@ -334,12 +307,13 @@ export function PomodoroTimer() {
 
   const onNotes = useCallback(async () => {
     try {
-      const res = await fetch("/api/notes", {
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const res = await fetch(`${API_URL}/api/notes`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
       });
       if (!res.ok) return;
       const data = await res.json();
-      setNoteOptions(data.map((n: any) => ({ id: n.id, text: n.title || n.text || "Untitled" })));
+      setNoteOptions(data.map((n: any) => ({ id: n.id, text: n.text || n.title || "Untitled" })));
     } catch {
       // ignore
     }
@@ -373,10 +347,6 @@ export function PomodoroTimer() {
           if (!endAtRef.current) return;
           const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
           setSecondsLeft(left);
-          if (left <= 10 && left > 0 && soundRef.current && !notified) {
-            setNotified(true);
-            playBeep();
-          }
           if (left === 0) {
             if (intervalRef.current) clearInterval(intervalRef.current);
             intervalRef.current = null;
@@ -391,7 +361,7 @@ export function PomodoroTimer() {
         }, 250);
       }
     }
-  }, [userId, notified, notify]);
+  }, [userId, notify]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -423,7 +393,6 @@ export function PomodoroTimer() {
       setSecondsLeft(dur);
       setSelectedNoteId(null);
     }
-    setNotified(false);
   }, [phase, pomoCount, breakMin, focusMin, userId, selectedNoteId]);
 
   const handleClearNotes = useCallback(() => {
@@ -435,7 +404,6 @@ export function PomodoroTimer() {
   const color = PHASE_COLOR[phase];
   const duration = phase === "focus" ? focusMin * 60 : phase === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
   const progress = duration > 0 ? Math.min(1, Math.max(0, secondsLeft / duration)) : 0;
-  const lowTime = running && secondsLeft <= 10 && phase === "focus";
 
   const isValidNumber = (val: string) => {
     const num = parseInt(val, 10);
@@ -535,30 +503,24 @@ export function PomodoroTimer() {
                     strokeWidth="12"
                     strokeLinecap="round"
                     stroke="currentColor"
-                    className={`transition-[stroke-dashoffset] duration-500 ${lowTime ? "animate-pulse" : ""}`}
+                    className="transition-[stroke-dashoffset] duration-500"
                     strokeDasharray={Math.PI * 172}
                     strokeDashoffset={Math.PI * 172 * (1 - progress)}
                   />
                 </svg>
                 {/* soft glow blob behind */}
-                <div className={`absolute h-28 w-28 rounded-full bg-gradient-to-br ${color} blur-3xl transition-opacity ${lowTime ? "animate-pulse opacity-40" : "opacity-15"}`} />
+                <div className={`absolute h-28 w-28 rounded-full bg-gradient-to-br ${color} opacity-15 blur-3xl`} />
                 <div className="relative z-10 flex flex-col items-center">
                   <span
-                    className={`mb-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                    className={`mb-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
                       running
                         ? `bg-gradient-to-r ${color} text-white`
                         : "bg-muted text-muted-foreground"
-                    } ${lowTime ? "bg-red-500" : ""}`}
+                    }`}
                   >
-                    {running
-                      ? phase === "focus"
-                        ? lowTime
-                          ? "Hurry!"
-                          : "Focus"
-                        : "Break"
-                      : "Ready"}
+                    {running ? (phase === "focus" ? "Focus" : "Break") : "Ready"}
                   </span>
-                  <span className={`font-mono text-6xl font-semibold leading-none tracking-tight tabular-nums ${lowTime ? "text-red-500" : ""}`}>
+                  <span className="font-mono text-6xl font-semibold leading-none tracking-tight tabular-nums">
                     {formatTime(secondsLeft)}
                   </span>
                   {pomoCount > 0 && (
