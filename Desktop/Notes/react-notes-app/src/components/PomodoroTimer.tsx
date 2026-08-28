@@ -863,8 +863,8 @@ export function PomodoroTimer() {
                   strokeDashoffset={CENTER * (1 - progress)}
                 />
               </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-mono text-6xl font-medium leading-none tracking-tight tabular-nums text-foreground sm:text-7xl">
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
+                <span className="w-full max-w-[calc(100%-2rem)] overflow-hidden truncate text-center font-mono text-5xl font-medium leading-none tracking-tight tabular-nums text-foreground sm:text-6xl">
                   {formatTime(secondsLeft)}
                 </span>
                 <span className="mt-3 text-xs font-medium text-muted-foreground">
