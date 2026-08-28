@@ -3,7 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BarChart3, CalendarDays, CheckCircle2, Flame, Sparkles, TrendingUp, Trophy, X, Clock, Target } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { usePomodoroStats, PomoStat, timePerNoteMap, formatDuration } from "@/hooks/use-pomodoro-stats";
+import { usePomodoroStats } from "@/hooks/use-pomodoro-stats";
+import type { PomoStat } from "@/hooks/use-pomodoro-stats";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,6 @@ function calculateStreak(stats: PomoStat[]): number {
 /** Get last 7 days focus data for trend visualization. */
 function getWeeklyTrend(stats: PomoStat[]): Array<{ day: string; minutes: number; sessions: number }> {
   const focusStats = stats.filter((s) => s.phase === "focus");
-  const now = Date.now();
   const dayMs = 24 * 60 * 60 * 1000;
   const result: Array<{ day: string; minutes: number; sessions: number }> = [];
 

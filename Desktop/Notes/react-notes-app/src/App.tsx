@@ -72,7 +72,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
     const trimmed = text.trim();
     if (!trimmed) return;
     const color =
-      NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)];
+      NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)].name;
     addNoteApi({
       text: trimmed,
       color,
