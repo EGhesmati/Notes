@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Check, ChevronDown, ChevronUp, Clock, Bell, BellOff, Edit3, Play, Pause, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -755,127 +756,133 @@ export function PomodoroTimer() {
         </div>
       )}
 
-      {/* Custom Focus Duration Modal - Inline Style */}
-      {customFocusOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-[22rem]">
-            <h3 className="mb-3 text-sm font-semibold">Custom Focus Duration</h3>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                min={1}
-                max={180}
-                value={customFocusVal}
-                onChange={(e) => setCustomFocusVal(e.target.value)}
-                placeholder="Minutes (1-180)"
-                className="flex-1"
-                onKeyDown={(e) => e.key === "Enter" && confirmCustomFocus()}
-              />
-              <Button onClick={confirmCustomFocus} className="shrink-0">
-                <Check className="h-4 w-4" />
-              </Button>
-            </div>
-            <p className="mt-2 text-[10px] text-muted-foreground">Enter minutes between 1 and 180</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setCustomFocusOpen(false);
-                setCustomFocusVal("");
-              }}
-              className="mt-3 w-full text-xs"
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Custom Break Duration Modal - Inline Style */}
-      {customBreakOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-[22rem]">
-            <h3 className="mb-3 text-sm font-semibold">Custom Break Duration</h3>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                min={1}
-                max={60}
-                value={customBreakVal}
-                onChange={(e) => setCustomBreakVal(e.target.value)}
-                placeholder="Minutes (1-60)"
-                className="flex-1"
-                onKeyDown={(e) => e.key === "Enter" && confirmCustomBreak()}
-              />
-              <Button onClick={confirmCustomBreak} className="shrink-0">
-                <Check className="h-4 w-4" />
-              </Button>
-            </div>
-            <p className="mt-2 text-[10px] text-muted-foreground">Enter minutes between 1 and 60</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setCustomBreakOpen(false);
-                setCustomBreakVal("");
-              }}
-              className="mt-3 w-full text-xs"
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Note Selection Modal */}
-      {notePickerOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-[min(24rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl sm:w-[26rem]">
-            <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
-              <h3 className="text-sm font-semibold">Associate with Note</h3>
+      {/* Custom Focus Duration Modal */}
+      {customFocusOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-[22rem]">
+              <h3 className="mb-3 text-sm font-semibold">Custom Focus Duration</h3>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={180}
+                  value={customFocusVal}
+                  onChange={(e) => setCustomFocusVal(e.target.value)}
+                  placeholder="Minutes (1-180)"
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === "Enter" && confirmCustomFocus()}
+                />
+                <Button onClick={confirmCustomFocus} className="shrink-0">
+                  <Check className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="mt-2 text-[10px] text-muted-foreground">Enter minutes between 1 and 180</p>
               <Button
                 variant="ghost"
-                size="icon"
-                onClick={handleClearNotes}
-                className="h-6 w-6 text-muted-foreground"
+                size="sm"
+                onClick={() => {
+                  setCustomFocusOpen(false);
+                  setCustomFocusVal("");
+                }}
+                className="mt-3 w-full text-xs"
               >
-                <X className="h-3.5 w-3.5" />
+                Cancel
               </Button>
             </div>
-            <div className="max-h-[20rem] overflow-y-auto p-4">
-              <NoteSelect
-                notes={noteOptions}
-                value={selectedNoteId}
-                onChange={(id) => setSelectedNoteId(id)}
-              />
-            </div>
-            <div className="border-t border-border/50 px-4 py-3 flex gap-2">
+          </div>,
+          document.body,
+        )}
+
+      {/* Custom Break Duration Modal */}
+      {customBreakOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-[22rem]">
+              <h3 className="mb-3 text-sm font-semibold">Custom Break Duration</h3>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={customBreakVal}
+                  onChange={(e) => setCustomBreakVal(e.target.value)}
+                  placeholder="Minutes (1-60)"
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === "Enter" && confirmCustomBreak()}
+                />
+                <Button onClick={confirmCustomBreak} className="shrink-0">
+                  <Check className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="mt-2 text-[10px] text-muted-foreground">Enter minutes between 1 and 60</p>
               <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
-                  if (selectedNoteId !== null) {
+                  setCustomBreakOpen(false);
+                  setCustomBreakVal("");
+                }}
+                className="mt-3 w-full text-xs"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Note Selection Modal */}
+      {notePickerOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-[min(24rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl sm:w-[26rem]">
+              <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+                <h3 className="text-sm font-semibold">Associate with Note</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleClearNotes}
+                  className="h-6 w-6 text-muted-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="max-h-[20rem] overflow-y-auto p-4">
+                <NoteSelect
+                  notes={noteOptions}
+                  value={selectedNoteId}
+                  onChange={(id) => setSelectedNoteId(id)}
+                />
+              </div>
+              <div className="border-t border-border/50 px-4 py-3 flex gap-2">
+                <Button
+                  onClick={() => {
+                    if (selectedNoteId !== null) {
+                      advance();
+                    }
+                  }}
+                  disabled={selectedNoteId === null}
+                  className={`flex-1 bg-gradient-to-r ${PHASE_COLOR[phase]} text-white`}
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Save with Note
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSelectedNoteId(null);
                     advance();
-                  }
-                }}
-                disabled={selectedNoteId === null}
-                className={`flex-1 bg-gradient-to-r ${PHASE_COLOR[phase]} text-white`}
-              >
-                <Check className="mr-2 h-4 w-4" />
-                Save with Note
-              </Button>
-              <Button
-                onClick={() => {
-                  setSelectedNoteId(null);
-                  advance();
-                }}
-                variant="outline"
-                className="flex-1"
-              >
-                Skip Note
-              </Button>
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Skip Note
+                </Button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

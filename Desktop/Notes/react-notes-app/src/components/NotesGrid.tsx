@@ -23,9 +23,24 @@ interface NotesGridProps {
   readonly onReorder: (orderedIds: number[]) => void;
   /** total focus seconds worked per note id */
   readonly timeOnNote: Map<number, number>;
+  readonly view: "grid" | "list" | "kanban";
 }
 
+type CardVariant = "grid" | "list" | "kanban";
+
 const PRIORITY_OPTIONS: Priority[] = ["low", "medium", "high"];
+
+const KANBAN_COLUMNS: {
+  key: Priority | null;
+  label: string;
+  dot: string;
+  header: string;
+}[] = [
+  { key: "high", label: "High", dot: "bg-rose-500", header: "bg-rose-500/10 text-rose-600 dark:text-rose-300" },
+  { key: "medium", label: "Medium", dot: "bg-amber-500", header: "bg-amber-500/10 text-amber-600 dark:text-amber-300" },
+  { key: "low", label: "Low", dot: "bg-sky-500", header: "bg-sky-500/10 text-sky-600 dark:text-sky-300" },
+  { key: null, label: "Unprioritized", dot: "bg-muted-foreground", header: "bg-muted text-muted-foreground" },
+];
 
 function formatDue(iso?: string) {
   if (!iso) return null;
@@ -70,6 +85,7 @@ const NotesGrid = memo(function NotesGrid({
   onTogglePin,
   onReorder,
   timeOnNote,
+  view,
 }: NotesGridProps) {
   const [dragId, setDragId] = useState<number | null>(null);
   const [overId, setOverId] = useState<number | null>(null);
@@ -127,6 +143,29 @@ const NotesGrid = memo(function NotesGrid({
     setDragEnabled(false);
   }, []);
 
+  const renderCard = useCallback(
+    (item: NotesState[number], variant: CardVariant) => (
+      <NoteCard
+        key={item.id}
+        item={item}
+        variant={variant}
+        onDelete={onDelete}
+        onEdit={onEdit}
+        onTogglePin={onTogglePin}
+        timeOnNote={timeOnNote}
+        dragEnabled={dragEnabled}
+        isDragging={dragId === item.id}
+        isOver={overId === item.id && dragId !== item.id}
+        onDragEnabledChange={setDragEnabled}
+        onDragStartItem={handleDragStart}
+        onDragOverItem={handleDragOver}
+        onDropItem={handleDrop}
+        onDragEndItem={clearDrag}
+      />
+    ),
+    [onDelete, onEdit, onTogglePin, timeOnNote, dragEnabled, dragId, overId, handleDragStart, handleDragOver, handleDrop, clearDrag],
+  );
+
   if (notes.length === 0) {
     return (
       <p className="py-16 text-center text-sm italic text-muted-foreground">
@@ -135,26 +174,49 @@ const NotesGrid = memo(function NotesGrid({
     );
   }
 
+  if (view === "list") {
+    return (
+      <div className="flex flex-col gap-3">
+        {notes.map((item) => renderCard(item, "list"))}
+      </div>
+    );
+  }
+
+  if (view === "kanban") {
+    return (
+      <div className="-mx-2 flex gap-4 overflow-x-auto pb-2">
+        {KANBAN_COLUMNS.map((col) => {
+          const colNotes = notes.filter((n) => (col.key === null ? !n.priority : n.priority === col.key));
+          return (
+            <div key={col.label} className="flex min-w-[16rem] max-w-[16rem] flex-1 flex-col rounded-2xl border border-border/60 bg-muted/40 p-3">
+              <div className={`mb-3 flex items-center justify-between rounded-lg px-2.5 py-2 ${col.header}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${col.dot}`} />
+                  <span className="text-xs font-semibold">{col.label}</span>
+                </div>
+                <span className="rounded-full bg-background/70 px-2 py-0.5 text-[10px] font-medium">
+                  {colNotes.length}
+                </span>
+              </div>
+              <div className="flex flex-col gap-3">
+                {colNotes.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border/70 px-3 py-6 text-center text-[11px] text-muted-foreground/60">
+                    Drop notes here
+                  </div>
+                ) : (
+                  colNotes.map((item) => renderCard(item, "kanban"))
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {notes.map((item) => (
-        <NoteCard
-          key={item.id}
-          item={item}
-          onDelete={onDelete}
-          onEdit={onEdit}
-          onTogglePin={onTogglePin}
-          timeOnNote={timeOnNote}
-          dragEnabled={dragEnabled}
-          isDragging={dragId === item.id}
-          isOver={overId === item.id && dragId !== item.id}
-          onDragEnabledChange={setDragEnabled}
-          onDragStartItem={handleDragStart}
-          onDragOverItem={handleDragOver}
-          onDropItem={handleDrop}
-          onDragEndItem={clearDrag}
-        />
-      ))}
+      {notes.map((item) => renderCard(item, "grid"))}
     </div>
   );
 });
@@ -165,6 +227,7 @@ const NoteCard = memo(function NoteCard({
   onEdit,
   onTogglePin,
   timeOnNote,
+  variant,
   dragEnabled,
   isDragging,
   isOver,
@@ -175,6 +238,7 @@ const NoteCard = memo(function NoteCard({
   onDragEndItem,
 }: {
   readonly item: NotesState[number];
+  readonly variant: CardVariant;
   readonly onDelete: (id: number) => void;
   readonly onEdit: (
     id: number,
@@ -233,6 +297,7 @@ const NoteCard = memo(function NoteCard({
   const focusedLabel = focusedSeconds ? formatDuration(focusedSeconds) : null;
   const c = noteColor(item.color);
   const created = new Date(item.createdAt);
+  const compact = variant === "kanban";
 
   return (
     <Card
@@ -338,8 +403,8 @@ const NoteCard = memo(function NoteCard({
             </div>
 
             {/* Note body (markdown) */}
-            <div className="flex flex-1 flex-col px-4 pt-1.5 pb-4">
-              <div className="text-sm leading-relaxed text-foreground">
+            <div className={`flex flex-1 flex-col ${compact ? "px-3 pt-1 pb-3" : "px-4 pt-1.5 pb-4"}`}>
+              <div className={`${compact ? "text-[13px]" : "text-sm"} leading-relaxed text-foreground`}>
                 {renderMarkdown(item.text)}
               </div>
               {(due?.dateLabel || focusedLabel) && (
@@ -361,11 +426,13 @@ const NoteCard = memo(function NoteCard({
             </div>
 
             {/* Footer meta row */}
-            <div className="flex items-center justify-between border-t border-border/60 px-4 py-2">
+            <div className={`flex items-center justify-between border-t border-border/60 ${compact ? "px-3 py-1.5" : "px-4 py-2"}`}>
+              {!compact && (
               <span className="text-[10px] text-muted-foreground/60">
                 {created.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
               </span>
-              <div className="flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+              )}
+              <div className={`ml-auto flex items-center gap-0.5 ${compact ? "" : "opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"}`}>
                 <Button variant="ghost" size="icon" onClick={() => onTogglePin(item.id)} className={`h-7 w-7 ${item.pinned ? "text-primary" : "text-muted-foreground"} hover:text-foreground`} title={item.pinned ? "Unpin" : "Pin"}>
                   <Pin className={`h-3.5 w-3.5 rotate-45 ${item.pinned ? "fill-current" : ""}`} />
                 </Button>

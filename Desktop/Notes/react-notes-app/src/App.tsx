@@ -12,6 +12,9 @@ import {
   LogOut,
   Shield,
   X,
+  LayoutGrid,
+  List,
+  Columns3,
 } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
 import { useTheme } from "@/hooks/use-theme";
@@ -60,6 +63,23 @@ function AppShell({ signOut }: { signOut: () => void }) {
   const [showUsers, setShowUsers] = useState(false);
   const [showSignOut, setShowSignOut] = useState(false);
   const { theme, toggle } = useTheme();
+
+  type ViewMode = "grid" | "list" | "kanban";
+  const [view, setView] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem("notes_view_mode");
+      return saved === "list" || saved === "kanban" ? saved : "grid";
+    } catch {
+      return "grid";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("notes_view_mode", view);
+    } catch {
+      // ignore
+    }
+  }, [view]);
 
   useEffect(() => {
     const id = setTimeout(() => setHydrated(true), 400);
@@ -136,7 +156,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2">
             <AppIcon className="h-5 w-5" />
             <span className="text-sm font-semibold tracking-tight text-foreground">
@@ -176,7 +196,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
         </div>
       </nav>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
             <AppIcon className="mr-2 inline-block h-8 w-8 align-middle" />
@@ -240,15 +260,42 @@ function AppShell({ signOut }: { signOut: () => void }) {
           />
         </div>
 
-        <div className="mb-6 flex items-center gap-2">
-          <Badge variant="secondary" className="text-xs">
-            {notes.length} note{notes.length !== 1 && "s"}
-          </Badge>
-          {debouncedSearch && (
-            <Badge variant="outline" className="text-xs">
-              {filtered.length} match{filtered.length !== 1 && "es"}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              {notes.length} note{notes.length !== 1 && "s"}
             </Badge>
-          )}
+            {debouncedSearch && (
+              <Badge variant="outline" className="text-xs">
+                {filtered.length} match{filtered.length !== 1 && "es"}
+              </Badge>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 rounded-full border border-border/60 bg-card/80 p-1 backdrop-blur-xl">
+            {(
+              [
+                { key: "grid", label: "Grid", Icon: LayoutGrid },
+                { key: "list", label: "List", Icon: List },
+                { key: "kanban", label: "Board", Icon: Columns3 },
+              ] as const
+            ).map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setView(key)}
+                title={`${label} view`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                  view === key
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {notes.length === 0 && !debouncedSearch ? (
@@ -257,7 +304,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
           </p>
         ) : (
           <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
-            <NotesGrid notes={filtered} onDelete={deleteNote} onEdit={editNote} onTogglePin={togglePin} onReorder={handleReorder} timeOnNote={timeOnNote} />
+            <NotesGrid notes={filtered} onDelete={deleteNote} onEdit={editNote} onTogglePin={togglePin} onReorder={handleReorder} timeOnNote={timeOnNote} view={view} />
           </Suspense>
         )}
       </main>
