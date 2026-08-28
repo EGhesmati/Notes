@@ -124,6 +124,7 @@ export default function PomodoroStats() {
     const dayMs = 24 * 60 * 60 * 1000;
     const weekMs = 7 * dayMs;
     const yearMs = 365 * dayMs;
+    const monthMs = 30 * dayMs;
     const totalCompleted = all.filter((s) => s.phase === "focus").length;
     const totalMinutes = Math.round(all.reduce((acc, s) => acc + s.duration, 0) / 60);
     const today = new Date();
@@ -138,10 +139,13 @@ export default function PomodoroStats() {
     const weekMinutes = Math.round(
       all.filter((s) => s.phase === "focus" && s.ts >= now - weekMs).reduce((acc, s) => acc + s.duration, 0) / 60,
     );
+    const monthMinutes = Math.round(
+      all.filter((s) => s.phase === "focus" && s.ts >= now - monthMs).reduce((acc, s) => acc + s.duration, 0) / 60,
+    );
     const yearMinutes = Math.round(
       all.filter((s) => s.phase === "focus" && s.ts >= now - yearMs).reduce((acc, s) => acc + s.duration, 0) / 60,
     );
-    return { totalCompleted, totalMinutes, todayCompleted, weekCompleted, yearCompleted, dayMinutes, weekMinutes, yearMinutes };
+    return { totalCompleted, totalMinutes, todayCompleted, weekCompleted, yearCompleted, dayMinutes, weekMinutes, monthMinutes, yearMinutes };
   }, [allStats]);
 
   const streak = useMemo(() => calculateStreak(allStats), [allStats]);
@@ -268,6 +272,7 @@ export default function PomodoroStats() {
                   {[
                     { label: "Daily Goal", value: totals.dayMinutes, target: 240, color: "from-violet-500 to-fuchsia-500" },
                     { label: "Weekly Goal", value: totals.weekMinutes, target: 1680, color: "from-emerald-500 to-teal-500" },
+                    { label: "Monthly Goal", value: totals.monthMinutes, target: 7200, color: "from-indigo-500 to-violet-500" },
                     { label: "Yearly Goal", value: totals.yearMinutes, target: 87600, color: "from-sky-500 to-blue-500" },
                   ].map((bar) => {
                     const pct = Math.min(100, (bar.value / bar.target) * 100);
