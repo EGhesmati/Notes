@@ -118,11 +118,21 @@ const PHASE_RING: Record<TimerPhase, string> = {
   "long-break": "stroke-indigo-600 dark:stroke-indigo-400",
 };
 
+type AudioCtx = AudioContext & {
+  webkitAudioContext?: typeof AudioContext;
+};
+
 let _audioCtx: AudioContext | null = null;
 
-function getAudioCtx(): AudioContext {
+function getAudioCtx(): AudioContext | null {
+  if (typeof window === "undefined") return null;
   if (!_audioCtx) {
-    _audioCtx = new AudioContext();
+    const Ctor =
+      window.AudioContext ||
+      (window as unknown as AudioCtx).webkitAudioContext ||
+      null;
+    if (!Ctor) return null;
+    _audioCtx = new Ctor();
   }
   return _audioCtx;
 }
@@ -131,6 +141,7 @@ function getAudioCtx(): AudioContext {
 function unlockAudio(): Promise<void> {
   try {
     const ctx = getAudioCtx();
+    if (!ctx) return Promise.resolve();
     if (ctx.state === "suspended") {
       return ctx.resume();
     }
@@ -143,7 +154,10 @@ function unlockAudio(): Promise<void> {
 function playChime(): void {
   try {
     const ctx = getAudioCtx();
-    if (ctx.state !== "running") return;
+    if (!ctx) return;
+    if (ctx.state !== "running") {
+      void ctx.resume();
+    }
     const notes = [523.25, 659.25, 783.99, 1046.5];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
