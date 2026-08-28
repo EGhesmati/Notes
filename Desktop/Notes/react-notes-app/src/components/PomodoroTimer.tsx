@@ -23,7 +23,7 @@ type TimerPhase = "focus" | "short-break" | "long-break";
 
 const FOCUS_OPTIONS = [15, 25, 45, 60];
 const BREAK_OPTIONS = [5, 10, 15];
-const LONG_BREAK_MIN = 15;
+const LONG_BREAK_OPTIONS = [15, 20, 25, 30];
 
 function stateKey(userId: number): string {
   return `pomodoro_state_${userId}`;
@@ -32,6 +32,7 @@ function stateKey(userId: number): string {
 interface PersistedState {
   focusMin: number;
   breakMin: number;
+  longBreakMin: number;
   phase: TimerPhase;
   secondsLeft: number;
   pomoCount: number;
@@ -43,7 +44,17 @@ function loadState(userId: number): PersistedState | null {
   try {
     const raw = localStorage.getItem(stateKey(userId));
     if (!raw) return null;
-    return JSON.parse(raw) as PersistedState;
+    const parsed = JSON.parse(raw) as Partial<PersistedState>;
+    return {
+      focusMin: parsed.focusMin ?? 25,
+      breakMin: parsed.breakMin ?? 5,
+      longBreakMin: parsed.longBreakMin ?? 15,
+      phase: parsed.phase ?? "focus",
+      secondsLeft: parsed.secondsLeft ?? 25 * 60,
+      pomoCount: parsed.pomoCount ?? 0,
+      running: parsed.running ?? false,
+      startedAt: parsed.startedAt ?? null,
+    };
   } catch {
     return null;
   }
@@ -72,9 +83,14 @@ function formatTime(totalSeconds: number): string {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-function durFor(phase: TimerPhase, focusMin: number, breakMin: number): number {
+function durFor(
+  phase: TimerPhase,
+  focusMin: number,
+  breakMin: number,
+  longBreakMin: number,
+): number {
   if (phase === "focus") return focusMin * 60;
-  if (phase === "long-break") return LONG_BREAK_MIN * 60;
+  if (phase === "long-break") return longBreakMin * 60;
   return breakMin * 60;
 }
 
@@ -84,28 +100,22 @@ const PHASE_LABEL: Record<TimerPhase, string> = {
   "long-break": "Long break complete",
 };
 
-const PHASE_COLOR: Record<TimerPhase, string> = {
-  focus: "from-foreground to-foreground/70",
-  "short-break": "from-emerald-500 to-teal-500",
-  "long-break": "from-sky-500 to-blue-500",
-};
-
-const RING_COLOR: Record<TimerPhase, string> = {
-  focus: "text-foreground",
-  "short-break": "text-emerald-500",
-  "long-break": "text-sky-500",
-};
-
 const PHASE_SESSION_LABEL: Record<TimerPhase, string> = {
   focus: "Focus",
   "short-break": "Short break",
   "long-break": "Long break",
 };
 
-const PHASE_DOT: Record<TimerPhase, string> = {
-  focus: "bg-foreground",
-  "short-break": "bg-emerald-500",
-  "long-break": "bg-sky-500",
+const PHASE_ACCENT: Record<TimerPhase, string> = {
+  focus: "text-foreground",
+  "short-break": "text-sky-600 dark:text-sky-400",
+  "long-break": "text-indigo-600 dark:text-indigo-400",
+};
+
+const PHASE_RING: Record<TimerPhase, string> = {
+  focus: "stroke-foreground",
+  "short-break": "stroke-sky-600 dark:stroke-sky-400",
+  "long-break": "stroke-indigo-600 dark:stroke-indigo-400",
 };
 
 let _audioCtx: AudioContext | null = null;
@@ -139,73 +149,92 @@ function playChime(): void {
   }
 }
 
+function SegmentedControl({
+  options,
+  value,
+  onChange,
+  suffix = "m",
+}: {
+  options: number[];
+  value: number;
+  onChange: (v: number) => void;
+  suffix?: string;
+}) {
+  return (
+    <div className="inline-flex rounded-lg border border-border/60 bg-muted/40 p-0.5">
+      {options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onChange(opt)}
+          className={`min-w-[2.75rem] rounded-md px-2.5 py-1.5 text-xs font-medium transition-all ${
+            value === opt
+              ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {opt}
+          {suffix}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function DurationSetting({
-  title,
+  label,
   options,
   value,
   onChange,
   onCustom,
   cycle,
+  suffix = "m",
 }: {
-  title: string;
+  label: string;
   options: number[];
   value: number;
   onChange: (v: number) => void;
   onCustom: () => void;
   cycle: (delta: number) => void;
+  suffix?: string;
 }) {
   return (
-    <div className="px-5 py-3.5">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-foreground">{title}</span>
-        <div className="flex items-center gap-0.5">
+        <span className="text-sm font-medium text-foreground">{label}</span>
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => cycle(-1)}
             className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label={`Decrease ${title.toLowerCase()}`}
+            aria-label={`Decrease ${label.toLowerCase()}`}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-3.5 w-3.5" />
           </button>
-          <span className="min-w-12 text-center font-mono text-sm font-semibold tabular-nums text-foreground">
+          <span className="min-w-10 text-center font-mono text-sm font-semibold tabular-nums text-foreground">
             {value}
+            {suffix}
           </span>
-          <span className="mr-1 text-xs text-muted-foreground">min</span>
           <button
             type="button"
             onClick={() => cycle(1)}
             className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label={`Increase ${title.toLowerCase()}`}
+            aria-label={`Increase ${label.toLowerCase()}`}
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={onCustom}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label={`Custom ${title.toLowerCase()}`}
+            className="ml-0.5 flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label={`Custom ${label.toLowerCase()}`}
             title="Custom"
           >
-            <Edit3 className="h-3.5 w-3.5" />
+            <Edit3 className="h-3 w-3" />
           </button>
         </div>
       </div>
-      <div className="mt-2.5 grid grid-cols-4 gap-1 rounded-lg bg-muted/60 p-1">
-        {options.map((opt) => (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => onChange(opt)}
-            className={`rounded-md py-1.5 text-xs font-medium transition-colors ${
-              value === opt
-                ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {opt}m
-          </button>
-        ))}
-      </div>
+      <SegmentedControl options={options} value={value} onChange={onChange} suffix={suffix} />
     </div>
   );
 }
@@ -222,17 +251,18 @@ function ToggleRow({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between px-5 py-3.5">
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="group flex w-full items-center justify-between rounded-lg py-1 text-left transition-colors"
+    >
       <div className="pr-4">
         <div className="text-sm font-medium text-foreground">{title}</div>
-        <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>
+        <div className="text-xs text-muted-foreground">{description}</div>
       </div>
-      <button
-        type="button"
+      <span
         role="switch"
         aria-checked={checked}
-        aria-label={title}
-        onClick={() => onChange(!checked)}
         className={`relative inline-flex h-[22px] w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
           checked ? "bg-foreground" : "bg-muted dark:bg-secondary"
         }`}
@@ -242,8 +272,58 @@ function ToggleRow({
             checked ? "right-[3px]" : "left-[3px]"
           }`}
         />
-      </button>
-    </div>
+      </span>
+    </button>
+  );
+}
+
+function IconButton({
+  onClick,
+  icon,
+  label,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground transition-all hover:border-border hover:text-foreground active:scale-95"
+    >
+      {icon}
+    </button>
+  );
+}
+
+function PlayButton({
+  onClick,
+  running,
+  phase,
+}: {
+  onClick: () => void;
+  running: boolean;
+  phase: TimerPhase;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={running ? "Pause" : "Start"}
+      aria-label={running ? "Pause" : "Start"}
+      className={`flex h-12 w-12 items-center justify-center rounded-full bg-foreground text-primary-foreground shadow-sm shadow-black/10 transition-all hover:scale-[1.04] active:scale-95 ${
+        phase !== "focus" ? "bg-foreground" : ""
+      }`}
+    >
+      {running ? (
+        <Pause className="h-5 w-5 fill-current" />
+      ) : (
+        <Play className="ml-0.5 h-5 w-5 fill-current" />
+      )}
+    </button>
   );
 }
 
@@ -280,6 +360,7 @@ export function PomodoroTimer() {
 
   const [focusMin, setFocusMin] = useState(25);
   const [breakMin, setBreakMin] = useState(5);
+  const [longBreakMin, setLongBreakMin] = useState(15);
   const [phase, setPhase] = useState<TimerPhase>("focus");
   const [secondsLeft, setSecondsLeft] = useState(focusMin * 60);
   const [running, setRunning] = useState(false);
@@ -290,6 +371,7 @@ export function PomodoroTimer() {
   const pomoCountRef = useRef(pomoCount);
   const focusMinRef = useRef(focusMin);
   const breakMinRef = useRef(breakMin);
+  const longBreakMinRef = useRef(longBreakMin);
   const secondsLeftRef = useRef(secondsLeft);
   const runningRef = useRef(running);
   const selectedNoteIdRef = useRef<number | null>(null);
@@ -300,6 +382,8 @@ export function PomodoroTimer() {
   const [customFocusVal, setCustomFocusVal] = useState("");
   const [customBreakOpen, setCustomBreakOpen] = useState(false);
   const [customBreakVal, setCustomBreakVal] = useState("");
+  const [customLongBreakOpen, setCustomLongBreakOpen] = useState(false);
+  const [customLongBreakVal, setCustomLongBreakVal] = useState("");
 
   // Note picker state
   const [notePickerOpen, setNotePickerOpen] = useState(false);
@@ -314,6 +398,7 @@ export function PomodoroTimer() {
     pomoCountRef.current = pomoCount;
     focusMinRef.current = focusMin;
     breakMinRef.current = breakMin;
+    longBreakMinRef.current = longBreakMin;
     secondsLeftRef.current = secondsLeft;
     runningRef.current = running;
     selectedNoteIdRef.current = selectedNoteId;
@@ -326,7 +411,19 @@ export function PomodoroTimer() {
     } catch {
       // ignore
     }
-  }, [phase, pomoCount, focusMin, breakMin, secondsLeft, running, selectedNoteId, userId, sound, autoStart]);
+  }, [
+    phase,
+    pomoCount,
+    focusMin,
+    breakMin,
+    longBreakMin,
+    secondsLeft,
+    running,
+    selectedNoteId,
+    userId,
+    sound,
+    autoStart,
+  ]);
 
   const setSound = (v: boolean) => {
     soundRef.current = v;
@@ -375,6 +472,7 @@ export function PomodoroTimer() {
       saveState(userIdRef.current, {
         focusMin: focusMinRef.current,
         breakMin: breakMinRef.current,
+        longBreakMin: longBreakMinRef.current,
         phase: next,
         secondsLeft: remaining,
         pomoCount: pomoCountRef.current,
@@ -382,7 +480,7 @@ export function PomodoroTimer() {
         startedAt,
       });
     },
-    [notify, durFor, saveState, clearInterval, setRunning, setSecondsLeft],
+    [notify],
   );
 
   // Advance to the next phase after a completion. Uses refs for fresh values.
@@ -412,6 +510,7 @@ export function PomodoroTimer() {
 
   const handleCompleteRef = useRef(handleComplete);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
     handleCompleteRef.current = handleComplete;
   }, [handleComplete]);
 
@@ -420,7 +519,7 @@ export function PomodoroTimer() {
     (noteId: number | null) => {
       const count = pomoCountRef.current;
       const next: TimerPhase = (count + 1) % 4 === 0 ? "long-break" : "short-break";
-      const nextDur = durFor(next, focusMinRef.current, breakMinRef.current);
+      const nextDur = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
       recordCompletion(userIdRef.current, "focus", focusMinRef.current * 60, noteId);
       setNotePickerOpen(false);
       setSelectedNoteId(null);
@@ -451,6 +550,7 @@ export function PomodoroTimer() {
       saveState(userIdRef.current, {
         focusMin: focusMinRef.current,
         breakMin: breakMinRef.current,
+        longBreakMin: longBreakMinRef.current,
         phase: phaseRef.current,
         secondsLeft: secondsLeftRef.current,
         pomoCount: pomoCountRef.current,
@@ -459,7 +559,7 @@ export function PomodoroTimer() {
       });
       return;
     }
-    const dur = durFor(phaseRef.current, focusMinRef.current, breakMinRef.current);
+    const dur = durFor(phaseRef.current, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
     const remaining = Math.max(1, Math.min(secondsLeftRef.current > 0 ? secondsLeftRef.current : dur, dur));
     beginCountdown({
       next: phaseRef.current,
@@ -473,7 +573,7 @@ export function PomodoroTimer() {
     endAtRef.current = null;
     runningRef.current = false;
     setRunning(false);
-    const dur = durFor(phaseRef.current, focusMinRef.current, breakMinRef.current);
+    const dur = durFor(phaseRef.current, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
     secondsLeftRef.current = dur;
     setSecondsLeft(dur);
     clearState(userIdRef.current);
@@ -488,7 +588,7 @@ export function PomodoroTimer() {
     setSelectedNoteId(null);
     if (p === "focus") {
       const next: TimerPhase = (count + 1) % 4 === 0 ? "long-break" : "short-break";
-      const nextDur = durFor(next, focusMinRef.current, breakMinRef.current);
+      const nextDur = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
       setPhase(next);
       setPomoCount(count + 1);
       secondsLeftRef.current = nextDur;
@@ -506,27 +606,29 @@ export function PomodoroTimer() {
     clearState(userIdRef.current);
   }, []);
 
-  const changeFocus = useCallback(
-    (val: number) => {
-      setFocusMin(val);
-      if (!runningRef.current) {
-        secondsLeftRef.current = val * 60;
-        setSecondsLeft(val * 60);
-      }
-    },
-    [],
-  );
+  const changeFocus = useCallback((val: number) => {
+    setFocusMin(val);
+    if (!runningRef.current && phaseRef.current === "focus") {
+      secondsLeftRef.current = val * 60;
+      setSecondsLeft(val * 60);
+    }
+  }, []);
 
-  const changeBreak = useCallback(
-    (val: number) => {
-      setBreakMin(val);
-      if (!runningRef.current) {
-        secondsLeftRef.current = val * 60;
-        setSecondsLeft(val * 60);
-      }
-    },
-    [],
-  );
+  const changeBreak = useCallback((val: number) => {
+    setBreakMin(val);
+    if (!runningRef.current && phaseRef.current === "short-break") {
+      secondsLeftRef.current = val * 60;
+      setSecondsLeft(val * 60);
+    }
+  }, []);
+
+  const changeLongBreak = useCallback((val: number) => {
+    setLongBreakMin(val);
+    if (!runningRef.current && phaseRef.current === "long-break") {
+      secondsLeftRef.current = val * 60;
+      setSecondsLeft(val * 60);
+    }
+  }, []);
 
   const onNotes = useCallback(async () => {
     try {
@@ -535,8 +637,8 @@ export function PomodoroTimer() {
         headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
       });
       if (!res.ok) return;
-      const data = await res.json();
-      setNoteOptions(data.map((n: any) => ({ id: n.id, text: n.text || n.title || "Untitled" })));
+      const data = (await res.json()) as { id: number; text?: string; title?: string }[];
+      setNoteOptions(data.map((n) => ({ id: n.id, text: n.text || n.title || "Untitled" })));
     } catch {
       // ignore
     }
@@ -544,7 +646,9 @@ export function PomodoroTimer() {
 
   useEffect(() => {
     if (notePickerOpen) {
-      onNotes();
+      // Fetch notes when the picker opens.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void onNotes();
     }
   }, [notePickerOpen, onNotes]);
 
@@ -556,8 +660,11 @@ export function PomodoroTimer() {
     restored.current = true;
     const saved = loadState(userId);
     if (!saved) return;
+    // One-time hydration from persisted state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFocusMin(saved.focusMin);
     setBreakMin(saved.breakMin);
+    setLongBreakMin(saved.longBreakMin);
     setPhase(saved.phase);
     setSecondsLeft(saved.secondsLeft);
     setPomoCount(saved.pomoCount);
@@ -569,13 +676,13 @@ export function PomodoroTimer() {
         pomoCountRef.current = saved.pomoCount;
         focusMinRef.current = saved.focusMin;
         breakMinRef.current = saved.breakMin;
+        longBreakMinRef.current = saved.longBreakMin;
         secondsLeftRef.current = remaining;
         runningRef.current = true;
         userIdRef.current = userId;
         beginCountdownRef.current({ next: saved.phase, remaining });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   // Keep a ref to the latest beginCountdown for the restore path.
@@ -597,7 +704,7 @@ export function PomodoroTimer() {
   }, []);
 
   const scrollToSettings = useCallback(() => {
-    settingsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    settingsRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, []);
 
   const handleClearNotes = useCallback(() => {
@@ -605,13 +712,13 @@ export function PomodoroTimer() {
     setNotePickerOpen(false);
   }, []);
 
-  const duration = durFor(phase, focusMin, breakMin);
+  const duration = durFor(phase, focusMin, breakMin, longBreakMin);
   const progress = duration > 0 ? Math.min(1, Math.max(0, secondsLeft / duration)) : 0;
   const CENTER = Math.PI * 172; // circumference for r=86
 
-  const isValidNumber = (val: string) => {
+  const isValidNumber = (val: string, max = 180) => {
     const num = parseInt(val, 10);
-    return !isNaN(num) && num > 0 && num <= 180;
+    return !isNaN(num) && num > 0 && num <= max;
   };
 
   const confirmCustomFocus = useCallback(() => {
@@ -623,12 +730,20 @@ export function PomodoroTimer() {
   }, [customFocusVal, changeFocus]);
 
   const confirmCustomBreak = useCallback(() => {
-    if (isValidNumber(customBreakVal)) {
+    if (isValidNumber(customBreakVal, 60)) {
       changeBreak(parseInt(customBreakVal, 10));
       setCustomBreakOpen(false);
       setCustomBreakVal("");
     }
   }, [customBreakVal, changeBreak]);
+
+  const confirmCustomLongBreak = useCallback(() => {
+    if (isValidNumber(customLongBreakVal, 60)) {
+      changeLongBreak(parseInt(customLongBreakVal, 10));
+      setCustomLongBreakOpen(false);
+      setCustomLongBreakVal("");
+    }
+  }, [customLongBreakVal, changeLongBreak]);
 
   const cycleFocus = useCallback(
     (delta: number) => {
@@ -646,6 +761,15 @@ export function PomodoroTimer() {
       changeBreak(BREAK_OPTIONS[next]);
     },
     [breakMin, changeBreak],
+  );
+
+  const cycleLongBreak = useCallback(
+    (delta: number) => {
+      const idx = LONG_BREAK_OPTIONS.indexOf(longBreakMin);
+      const next = Math.max(0, Math.min(LONG_BREAK_OPTIONS.length - 1, idx + delta));
+      changeLongBreak(LONG_BREAK_OPTIONS[next]);
+    },
+    [longBreakMin, changeLongBreak],
   );
 
   const cycleInCycle = pomoCount % 4;
@@ -667,18 +791,21 @@ export function PomodoroTimer() {
         <Clock className="h-[18px] w-[18px]" />
       </Button>
 
-      {/* Main Panel */}
+      {/* Full-screen Focus Panel */}
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-[min(26rem,_calc(100vw-1rem))] max-h-[calc(100vh-2rem)] origin-top-right overflow-hidden overflow-y-auto rounded-2xl border border-border/70 bg-card/95 shadow-2xl shadow-black/10 backdrop-blur-xl sm:w-[26rem]">
+        <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-background/97 backdrop-blur-md">
           {/* Header */}
-          <div className="flex items-center justify-between px-5 pt-4 pb-1">
+          <header className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${PHASE_DOT[phase]}`} />
+              <span className="h-2 w-2 rounded-full bg-foreground" />
               <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
                 Pomodoro
               </span>
             </div>
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-1">
+              <span className="hidden text-xs text-muted-foreground sm:inline">
+                Session {pomoCount + 1}
+              </span>
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -700,157 +827,163 @@ export function PomodoroTimer() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-          </div>
+          </header>
 
-          {/* Focus Area */}
-          <div className="flex flex-col items-center px-6 pt-6">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-              {PHASE_SESSION_LABEL[phase]}
-            </span>
+          {/* Main Focus Area */}
+          <main className="flex flex-1 flex-col items-center justify-center px-6 pb-6">
+            <div className="flex w-full max-w-sm flex-col items-center">
+              {/* Phase label */}
+              <span
+                className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${
+                  PHASE_ACCENT[phase]
+                }`}
+              >
+                {PHASE_SESSION_LABEL[phase]}
+              </span>
 
-            <div className={`relative mt-4 flex h-52 w-52 items-center justify-center ${RING_COLOR[phase]}`}>
-              <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
-                <circle cx="100" cy="100" r="86" fill="none" strokeWidth="7" className="stroke-muted/30" />
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="86"
-                  fill="none"
-                  strokeWidth="7"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  className="transition-[stroke-dashoffset] duration-500"
-                  strokeDasharray={CENTER}
-                  strokeDashoffset={CENTER * (1 - progress)}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-mono text-[52px] font-medium leading-none tracking-tight tabular-nums text-foreground">
-                  {formatTime(secondsLeft)}
-                </span>
-                <span className="mt-2 text-[11px] font-medium tracking-wide text-muted-foreground">
-                  {running ? "Running" : secondsLeft === duration ? "Ready" : "Paused"}
-                </span>
-              </div>
-            </div>
-
-            {/* Session status */}
-            <div className="mt-5 flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">Session {pomoCount + 1}</span>
-              <span className="text-muted-foreground/60">·</span>
-              <span>{pomoCount} completed</span>
-            </div>
-          </div>
-
-          {/* Primary Controls */}
-          <div className="mt-6 flex items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={reset}
-              title="Reset"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground transition-all hover:text-foreground active:scale-95"
-            >
-              <RotateCcw className="h-[18px] w-[18px]" />
-            </button>
-
-            <button
-              type="button"
-              onClick={start}
-              title={running ? "Pause" : "Start"}
-              className={`flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br ${PHASE_COLOR[phase]} text-primary-foreground shadow-md shadow-black/10 transition-transform hover:scale-[1.04] active:scale-95`}
-            >
-              {running ? (
-                <Pause className="h-6 w-6 fill-current" />
-              ) : (
-                <Play className="ml-0.5 h-6 w-6 fill-current" />
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={skipPhase}
-              title="Skip"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground transition-all hover:text-foreground active:scale-95"
-            >
-              <SkipForward className="h-[18px] w-[18px] fill-current" />
-            </button>
-          </div>
-
-          {/* Compact cycle progress */}
-          <div className="mt-6 flex flex-col items-center gap-2 px-6">
-            <div className="flex items-center gap-1.5">
-              {[0, 1, 2, 3].map((i) => (
-                <span
-                  key={i}
-                  className={`h-1 w-7 rounded-full transition-colors ${i < cycleInCycle ? "bg-foreground" : "bg-muted"}`}
-                />
-              ))}
-            </div>
-            <span className="text-[11px] text-muted-foreground">
-              {cycleInCycle} of 4 in this cycle
-            </span>
-          </div>
-
-          {/* Settings */}
-          <div ref={settingsRef} className="mt-7 scroll-mt-4 px-5 pb-3">
-            <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Settings
-            </p>
-            <div className="divide-y divide-border/60 rounded-xl border border-border/60 bg-card/60">
-              <DurationSetting
-                title="Focus duration"
-                options={FOCUS_OPTIONS}
-                value={focusMin}
-                onChange={changeFocus}
-                onCustom={() => setCustomFocusOpen(true)}
-                cycle={cycleFocus}
-              />
-              <DurationSetting
-                title="Short break"
-                options={BREAK_OPTIONS}
-                value={breakMin}
-                onChange={changeBreak}
-                onCustom={() => setCustomBreakOpen(true)}
-                cycle={cycleBreak}
-              />
-              <div className="flex items-center justify-between px-5 py-3.5">
-                <span className="text-sm font-medium text-foreground">Long break</span>
-                <span className="font-mono text-sm font-semibold tabular-nums text-muted-foreground">
-                  {LONG_BREAK_MIN} min
-                </span>
-              </div>
-              <ToggleRow
-                title="Auto-start"
-                description="Begin the next session automatically"
-                checked={autoStart}
-                onChange={setAutoStart}
-              />
-              <ToggleRow
-                title="Sound alerts"
-                description={sound ? "Chime and notification on" : "Muted"}
-                checked={sound}
-                onChange={setSound}
-              />
-              {!("Notification" in window) || Notification.permission === "denied" ? (
-                <button
-                  type="button"
-                  onClick={requestNotification}
-                  className="flex w-full items-center justify-between px-5 py-3.5 text-left text-sm font-medium text-primary transition-colors hover:bg-primary/5"
-                >
-                  Enable browser notifications
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              ) : (
-                <div className="flex items-center justify-between px-5 py-3.5">
-                  <div>
-                    <div className="text-sm font-medium text-foreground">Browser notifications</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">Enabled</div>
-                  </div>
-                  <Check className="h-4 w-4 text-foreground" />
+              {/* Timer with progress ring */}
+              <div className="relative mt-5 flex h-64 w-64 items-center justify-center">
+                <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="86"
+                    fill="none"
+                    strokeWidth="5"
+                    className="stroke-muted/40"
+                  />
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="86"
+                    fill="none"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    className={`transition-[stroke-dashoffset] duration-500 ${PHASE_RING[phase]}`}
+                    strokeDasharray={CENTER}
+                    strokeDashoffset={CENTER * (1 - progress)}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-mono text-7xl font-medium leading-none tracking-tight tabular-nums text-foreground sm:text-8xl">
+                    {formatTime(secondsLeft)}
+                  </span>
+                  <span className="mt-3 text-xs font-medium text-muted-foreground">
+                    {running ? "Running" : secondsLeft === duration ? "Ready" : "Paused"}
+                  </span>
                 </div>
-              )}
+              </div>
+
+              {/* Session status */}
+              <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Session {pomoCount + 1}</span>
+                <span className="text-muted-foreground/60">·</span>
+                <span>{pomoCount} completed</span>
+              </div>
+
+              {/* Timer controls */}
+              <div className="mt-8 flex items-center gap-3">
+                <IconButton onClick={reset} icon={<RotateCcw className="h-[18px] w-[18px]" />} label="Reset" />
+                <PlayButton onClick={start} running={running} phase={phase} />
+                <IconButton onClick={skipPhase} icon={<SkipForward className="h-[18px] w-[18px]" />} label="Skip" />
+              </div>
+
+              {/* Cycle progress */}
+              <div className="mt-8 flex items-center gap-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 w-8 rounded-full transition-colors ${
+                      i < cycleInCycle ? "bg-foreground" : "bg-muted"
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="mt-2 text-[11px] text-muted-foreground">
+                {cycleInCycle} of 4 in this cycle
+              </span>
             </div>
-          </div>
+          </main>
+
+          {/* Settings Panel */}
+          <footer
+            ref={settingsRef}
+            className="border-t border-border/60 bg-card/50 px-6 py-5 backdrop-blur-sm"
+          >
+            <div className="mx-auto max-w-md">
+              <div className="mb-4 flex items-center gap-2">
+                <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  Settings
+                </span>
+              </div>
+
+              <div className="space-y-5">
+                {/* Durations */}
+                <div className="space-y-3">
+                  <span className="text-xs font-medium text-muted-foreground">Durations</span>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <DurationSetting
+                      label="Focus"
+                      options={FOCUS_OPTIONS}
+                      value={focusMin}
+                      onChange={changeFocus}
+                      onCustom={() => setCustomFocusOpen(true)}
+                      cycle={cycleFocus}
+                    />
+                    <DurationSetting
+                      label="Short break"
+                      options={BREAK_OPTIONS}
+                      value={breakMin}
+                      onChange={changeBreak}
+                      onCustom={() => setCustomBreakOpen(true)}
+                      cycle={cycleBreak}
+                    />
+                    <DurationSetting
+                      label="Long break"
+                      options={LONG_BREAK_OPTIONS}
+                      value={longBreakMin}
+                      onChange={changeLongBreak}
+                      onCustom={() => setCustomLongBreakOpen(true)}
+                      cycle={cycleLongBreak}
+                    />
+                  </div>
+                </div>
+
+                {/* Behavior */}
+                <div className="space-y-3">
+                  <span className="text-xs font-medium text-muted-foreground">Behavior</span>
+                  <div className="rounded-xl border border-border/60 bg-card/60 p-3">
+                    <ToggleRow
+                      title="Auto-start next session"
+                      description="Begin the next phase automatically"
+                      checked={autoStart}
+                      onChange={setAutoStart}
+                    />
+                    <div className="my-2 h-px bg-border/60" />
+                    <ToggleRow
+                      title="Sound alerts"
+                      description={sound ? "Chime and notification on" : "Muted"}
+                      checked={sound}
+                      onChange={setSound}
+                    />
+                  </div>
+                </div>
+
+                {/* Notifications */}
+                {!("Notification" in window) || Notification.permission === "denied" ? (
+                  <button
+                    type="button"
+                    onClick={requestNotification}
+                    className="flex w-full items-center justify-between rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-card"
+                  >
+                    Enable browser notifications
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </footer>
         </div>
       )}
 
@@ -897,7 +1030,7 @@ export function PomodoroTimer() {
         createPortal(
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
             <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-[22rem]">
-              <h3 className="mb-3 text-sm font-semibold">Custom Break Duration</h3>
+              <h3 className="mb-3 text-sm font-semibold">Custom Short Break Duration</h3>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -920,6 +1053,44 @@ export function PomodoroTimer() {
                 onClick={() => {
                   setCustomBreakOpen(false);
                   setCustomBreakVal("");
+                }}
+                className="mt-3 w-full text-xs"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Custom Long Break Duration Modal */}
+      {customLongBreakOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-[22rem]">
+              <h3 className="mb-3 text-sm font-semibold">Custom Long Break Duration</h3>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={customLongBreakVal}
+                  onChange={(e) => setCustomLongBreakVal(e.target.value)}
+                  placeholder="Minutes (1-60)"
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === "Enter" && confirmCustomLongBreak()}
+                />
+                <Button onClick={confirmCustomLongBreak} className="shrink-0">
+                  <Check className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="mt-2 text-[10px] text-muted-foreground">Enter minutes between 1 and 60</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setCustomLongBreakOpen(false);
+                  setCustomLongBreakVal("");
                 }}
                 className="mt-3 w-full text-xs"
               >
@@ -961,16 +1132,12 @@ export function PomodoroTimer() {
                     }
                   }}
                   disabled={selectedNoteId === null}
-                  className={`flex-1 bg-gradient-to-r ${PHASE_COLOR[phase]} text-primary-foreground`}
+                  className="flex-1 bg-foreground text-primary-foreground hover:bg-foreground/90"
                 >
                   <Check className="mr-2 h-4 w-4" />
                   Save with Note
                 </Button>
-                <Button
-                  onClick={() => finishFocus(null)}
-                  variant="outline"
-                  className="flex-1"
-                >
+                <Button onClick={() => finishFocus(null)} variant="outline" className="flex-1">
                   Skip Note
                 </Button>
               </div>
