@@ -150,7 +150,6 @@ const NoteCard = memo(function NoteCard({
   const focusedLabel = focusedSeconds ? formatDuration(focusedSeconds) : null;
   const c = noteColor(item.color);
   const created = new Date(item.createdAt);
-  const cardIndex = String(item.id).padStart(2, "0");
 
   return (
     <Card
@@ -165,9 +164,6 @@ const NoteCard = memo(function NoteCard({
         {editing ? (
           <div className="flex flex-col gap-3 p-4">
             <div className={`flex items-center gap-2 border-b border-border/60 pb-2`}>
-              <span className={`font-mono text-[11px] font-bold tracking-tight ${c.text}`}>
-                #{cardIndex}
-              </span>
               <span className={`text-[10px] font-bold uppercase tracking-widest text-muted-foreground`}>
                 Editing note
               </span>
@@ -219,13 +215,10 @@ const NoteCard = memo(function NoteCard({
           </div>
         ) : (
           <>
-            {/* Colored index tab */}
+            {/* Colored accent rule */}
             <div className={`relative flex items-center justify-between px-4 pt-3 pb-2`}>
               <span className={`absolute bottom-0 left-4 right-4 h-px ${c.tint}`} />
               <div className="flex items-center gap-2">
-                <span className={`font-mono text-[11px] font-bold tracking-tight ${c.text}`}>
-                  #{cardIndex}
-                </span>
                 {badge && (
                   <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${badge.className}`}>
                     {badge.label}
