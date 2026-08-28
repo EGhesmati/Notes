@@ -132,6 +132,7 @@ export default function PomodoroStats() {
     const todayMs = today.getTime();
     const todayCompleted = all.filter((s) => s.phase === "focus" && s.ts >= todayMs).length;
     const weekCompleted = all.filter((s) => s.phase === "focus" && s.ts >= now - weekMs).length;
+    const monthCompleted = all.filter((s) => s.phase === "focus" && s.ts >= now - monthMs).length;
     const yearCompleted = all.filter((s) => s.phase === "focus" && s.ts >= now - yearMs).length;
     const dayMinutes = Math.round(
       all.filter((s) => s.phase === "focus" && s.ts >= now - dayMs).reduce((acc, s) => acc + s.duration, 0) / 60,
@@ -145,7 +146,7 @@ export default function PomodoroStats() {
     const yearMinutes = Math.round(
       all.filter((s) => s.phase === "focus" && s.ts >= now - yearMs).reduce((acc, s) => acc + s.duration, 0) / 60,
     );
-    return { totalCompleted, totalMinutes, todayCompleted, weekCompleted, yearCompleted, dayMinutes, weekMinutes, monthMinutes, yearMinutes };
+    return { totalCompleted, totalMinutes, todayCompleted, weekCompleted, monthCompleted, yearCompleted, dayMinutes, weekMinutes, monthMinutes, yearMinutes };
   }, [allStats]);
 
   const streak = useMemo(() => calculateStreak(allStats), [allStats]);
@@ -263,6 +264,18 @@ export default function PomodoroStats() {
                     <Target className="h-4 w-4 mx-auto mb-1 text-amber-500" />
                     <p className="text-[10px] text-muted-foreground">This Week</p>
                     <p className="text-lg font-bold">{totals.weekMinutes}m</p>
+                    <p className="text-[10px] text-muted-foreground">focus time</p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-background/70 p-3 text-center">
+                    <Target className="h-4 w-4 mx-auto mb-1 text-indigo-500" />
+                    <p className="text-[10px] text-muted-foreground">This Month</p>
+                    <p className="text-lg font-bold">{totals.monthCompleted}</p>
+                    <p className="text-[10px] text-muted-foreground">sessions</p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-background/70 p-3 text-center">
+                    <Target className="h-4 w-4 mx-auto mb-1 text-indigo-500" />
+                    <p className="text-[10px] text-muted-foreground">This Month</p>
+                    <p className="text-lg font-bold">{totals.monthMinutes}m</p>
                     <p className="text-[10px] text-muted-foreground">focus time</p>
                   </div>
                 </div>
