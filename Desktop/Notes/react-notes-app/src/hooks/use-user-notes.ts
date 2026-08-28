@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchNotes, createNote as apiCreate, updateNote as apiUpdate, deleteNoteApi } from "@/lib/api";
+import { fetchNotes, createNote as apiCreate, updateNote as apiUpdate, deleteNoteApi, reorderNotes } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { NoteItem } from "@/types";
 
@@ -150,5 +150,28 @@ export function useUserNotes() {
     });
   }, [userId]);
 
-  return { notes, setNotes: addNote, editNote, deleteNote, loading } as const;
+  const reorder = useCallback(
+    async (orderedIds: number[]) => {
+      // optimistic local reorder for instant UI feedback
+      setNotes((prev) => {
+        const byId = new Map(prev.map((n) => [n.id, n]));
+        const next = orderedIds
+          .map((id) => byId.get(id))
+          .filter((n): n is NoteItem => !!n);
+        // include any notes not in the list (shouldn't happen in practice)
+        const extras = prev.filter((n) => !orderedIds.includes(n.id));
+        const finalList = [...next, ...extras];
+        void saveLocal(userId, finalList);
+        return finalList;
+      });
+      try {
+        await reorderNotes(orderedIds);
+      } catch {
+        // best-effort; re-fetch on next focus will reconcile
+      }
+    },
+    [userId],
+  );
+
+  return { notes, setNotes: addNote, editNote, deleteNote, reorder, loading } as const;
 }

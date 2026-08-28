@@ -51,7 +51,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
   const [priority, setPriority] = useState<Priority | undefined>();
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
-  const { notes, setNotes: addNoteApi, editNote: editNoteApi, deleteNote: deleteNoteApi } = useUserNotes();
+  const { notes, setNotes: addNoteApi, editNote: editNoteApi, deleteNote: deleteNoteApi, reorder: reorderNotesApi } = useUserNotes();
   // complete pomodoro dataset (local + server) → total focus time per note
   const { stats: pomoStats } = usePomodoroStats(userId);
   const timeOnNote = useMemo(() => timePerNoteMap(pomoStats), [pomoStats]);
@@ -111,6 +111,13 @@ function AppShell({ signOut }: { signOut: () => void }) {
     [notes, editNoteApi],
   );
 
+  const handleReorder = useCallback(
+    (orderedIds: number[]) => {
+      reorderNotesApi(orderedIds);
+    },
+    [reorderNotesApi],
+  );
+
   const filtered = useMemo(() => {
     const matches = debouncedSearch
       ? notes.filter((n) =>
@@ -120,7 +127,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
     return [...matches].sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return 0; // stable: preserve custom drag order within groups
     });
   }, [notes, debouncedSearch]);
 
@@ -250,7 +257,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
           </p>
         ) : (
           <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
-            <NotesGrid notes={filtered} onDelete={deleteNote} onEdit={editNote} onTogglePin={togglePin} timeOnNote={timeOnNote} />
+            <NotesGrid notes={filtered} onDelete={deleteNote} onEdit={editNote} onTogglePin={togglePin} onReorder={handleReorder} timeOnNote={timeOnNote} />
           </Suspense>
         )}
       </main>

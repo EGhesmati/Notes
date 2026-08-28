@@ -31,9 +31,14 @@ await pool.query(`
     priority TEXT,
     due_date TEXT,
     pinned INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
+
+  -- backfill sort_order for existing notes so drag reordering works on old data
+  ALTER TABLE notes ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
+  UPDATE notes SET sort_order = id WHERE sort_order = 0;
 
   CREATE TABLE IF NOT EXISTS pomodoros (
     id SERIAL PRIMARY KEY,
@@ -101,7 +106,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
 
 app.get("/api/notes", authMiddleware, async (req, res) => {
   const { rows } = await pool.query(
-    "SELECT * FROM notes WHERE user_id = $1 ORDER BY pinned DESC, created_at DESC",
+    "SELECT * FROM notes WHERE user_id = $1 ORDER BY pinned DESC, sort_order ASC, created_at DESC",
     [(req as any).userId],
   );
   res.json(rows.map((n: any) => ({
@@ -132,6 +137,23 @@ app.put("/api/notes/:id", authMiddleware, async (req, res) => {
 
 app.delete("/api/notes/:id", authMiddleware, async (req, res) => {
   await pool.query("DELETE FROM notes WHERE id = $1 AND user_id = $2", [req.params.id, (req as any).userId]);
+  res.json({ ok: true });
+});
+
+// ---- Reorder notes ----
+
+app.put("/api/notes/reorder", authMiddleware, async (req, res) => {
+  const { order } = req.body;
+  if (!Array.isArray(order)) return res.status(400).json({ error: "order array required" });
+  // order: array of note ids in their desired display order
+  for (let i = 0; i < order.length; i++) {
+    const noteId = Number(order[i]);
+    if (!Number.isFinite(noteId)) continue;
+    await pool.query(
+      "UPDATE notes SET sort_order = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3",
+      [i, noteId, (req as any).userId],
+    );
+  }
   res.json({ ok: true });
 });
 

@@ -2,11 +2,12 @@ import { memo, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Pencil, Check, X, Calendar, Pin, Timer } from "lucide-react";
+import { Trash2, Pencil, Check, X, Calendar, Pin, Timer, GripVertical } from "lucide-react";
 import { PRIORITY_BADGE, noteColor } from "@/types";
 import type { NotesState, Priority } from "@/types";
 import { formatDuration } from "@/hooks/use-pomodoro-stats";
 import { TimeChips } from "@/components/TimeChips";
+import { renderMarkdown } from "@/lib/markdown";
 
 interface NotesGridProps {
   readonly notes: NotesState;
@@ -19,6 +20,7 @@ interface NotesGridProps {
     dueTime?: string,
   ) => void;
   readonly onTogglePin: (id: number) => void;
+  readonly onReorder: (orderedIds: number[]) => void;
   /** total focus seconds worked per note id */
   readonly timeOnNote: Map<number, number>;
 }
@@ -66,8 +68,65 @@ const NotesGrid = memo(function NotesGrid({
   onDelete,
   onEdit,
   onTogglePin,
+  onReorder,
   timeOnNote,
 }: NotesGridProps) {
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [overId, setOverId] = useState<number | null>(null);
+  const [dragEnabled, setDragEnabled] = useState(false);
+
+  const handleDragStart = useCallback(
+    (e: React.DragEvent, id: number) => {
+      setDragId(id);
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(id));
+    },
+    [],
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent, id: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setOverId(id);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent, targetId: number) => {
+      e.preventDefault();
+      const sourceIdRaw = e.dataTransfer.getData("text/plain") || String(dragId);
+      const sourceId = Number(sourceIdRaw);
+      if (!Number.isFinite(sourceId) || sourceId === targetId || dragId === null) {
+        setDragId(null);
+        setOverId(null);
+        setDragEnabled(false);
+        return;
+      }
+      const ids = notes.map((n) => n.id);
+      const fromIdx = ids.indexOf(sourceId);
+      const toIdx = ids.indexOf(targetId);
+      if (fromIdx === -1 || toIdx === -1) {
+        setDragId(null);
+        setOverId(null);
+        setDragEnabled(false);
+        return;
+      }
+      const next = [...ids];
+      next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, sourceId);
+      onReorder(next);
+      setDragId(null);
+      setOverId(null);
+      setDragEnabled(false);
+    },
+    [notes, onReorder, dragId],
+  );
+
+  const clearDrag = useCallback(() => {
+    setDragId(null);
+    setOverId(null);
+    setDragEnabled(false);
+  }, []);
+
   if (notes.length === 0) {
     return (
       <p className="py-16 text-center text-sm italic text-muted-foreground">
@@ -86,6 +145,14 @@ const NotesGrid = memo(function NotesGrid({
           onEdit={onEdit}
           onTogglePin={onTogglePin}
           timeOnNote={timeOnNote}
+          dragEnabled={dragEnabled}
+          isDragging={dragId === item.id}
+          isOver={overId === item.id && dragId !== item.id}
+          onDragEnabledChange={setDragEnabled}
+          onDragStartItem={handleDragStart}
+          onDragOverItem={handleDragOver}
+          onDropItem={handleDrop}
+          onDragEndItem={clearDrag}
         />
       ))}
     </div>
@@ -98,6 +165,14 @@ const NoteCard = memo(function NoteCard({
   onEdit,
   onTogglePin,
   timeOnNote,
+  dragEnabled,
+  isDragging,
+  isOver,
+  onDragEnabledChange,
+  onDragStartItem,
+  onDragOverItem,
+  onDropItem,
+  onDragEndItem,
 }: {
   readonly item: NotesState[number];
   readonly onDelete: (id: number) => void;
@@ -110,6 +185,14 @@ const NoteCard = memo(function NoteCard({
   ) => void;
   readonly onTogglePin: (id: number) => void;
   readonly timeOnNote: Map<number, number>;
+  readonly dragEnabled: boolean;
+  readonly isDragging: boolean;
+  readonly isOver: boolean;
+  readonly onDragEnabledChange: (v: boolean) => void;
+  readonly onDragStartItem: (e: React.DragEvent, id: number) => void;
+  readonly onDragOverItem: (e: React.DragEvent, id: number) => void;
+  readonly onDropItem: (e: React.DragEvent, id: number) => void;
+  readonly onDragEndItem: () => void;
 }) {
   const defaultDates = fromISO(item.dueDate);
   const [editing, setEditing] = useState(false);
@@ -153,7 +236,15 @@ const NoteCard = memo(function NoteCard({
 
   return (
     <Card
-      className="group relative flex flex-col overflow-hidden rounded-lg border bg-card/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5"
+      draggable={dragEnabled}
+      onDragStart={(e) => onDragStartItem(e, item.id)}
+      onDragOver={(e) => onDragOverItem(e, item.id)}
+      onDrop={(e) => onDropItem(e, item.id)}
+      onDragEnd={onDragEndItem}
+      onDragLeave={() => {}}
+      className={`group relative flex flex-col overflow-hidden rounded-lg border bg-card/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5 ${
+        isDragging ? "opacity-40 scale-[0.98]" : ""
+      } ${isOver ? "ring-2 ring-primary/40" : ""} ${dragEnabled ? "cursor-grab active:cursor-grabbing" : ""}`}
     >
       {item.pinned && (
         <span className="absolute right-3 top-2.5 z-10 text-foreground/30 transition-colors group-hover:text-primary">
@@ -176,6 +267,9 @@ const NoteCard = memo(function NoteCard({
               autoFocus
               className="min-h-[60px] border-border bg-background text-sm"
             />
+            <p className="text-[10px] text-muted-foreground/60">
+              Markdown supported: <span className="font-mono">**bold**</span>, <span className="font-mono">*italic*</span>, <span className="font-mono">`code`</span>, <span className="font-mono">## heading</span>, <span className="font-mono">- lists</span>
+            </p>
             <div className="flex flex-wrap items-center gap-1.5">
               {PRIORITY_OPTIONS.map((p) => {
                 const sel = editPriority === p;
@@ -219,6 +313,14 @@ const NoteCard = memo(function NoteCard({
             <div className={`relative flex items-center justify-between px-4 pt-3 pb-2`}>
               <span className={`absolute bottom-0 left-4 right-4 h-px ${c.tint}`} />
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="cursor-grab rounded px-0.5 text-muted-foreground/0 transition-colors hover:text-muted-foreground active:cursor-grabbing md:group-hover:text-muted-foreground/60"
+                  title="Drag to reorder"
+                  onPointerDown={() => onDragEnabledChange(true)}
+                >
+                  <GripVertical className="h-4 w-4" />
+                </button>
                 {badge && (
                   <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${badge.className}`}>
                     {badge.label}
@@ -232,11 +334,11 @@ const NoteCard = memo(function NoteCard({
               )}
             </div>
 
-            {/* Note body */}
+            {/* Note body (markdown) */}
             <div className="flex flex-1 flex-col px-4 pt-1.5 pb-4">
-              <p className="text-sm leading-relaxed text-foreground break-words">
-                {item.text}
-              </p>
+              <div className="text-sm leading-relaxed text-foreground">
+                {renderMarkdown(item.text)}
+              </div>
               {(due?.dateLabel || focusedLabel) && (
                 <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
                   {due?.dateLabel && (

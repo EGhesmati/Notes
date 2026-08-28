@@ -61,4 +61,14 @@ export async function deleteNoteApi(id: number) {
   return res.json();
 }
 
+export async function reorderNotes(order: number[]) {
+  const res = await fetch(`${API_URL}/api/notes/reorder`, {
+    method: "PUT",
+    headers: getHeaders(),
+    body: JSON.stringify({ order }),
+  });
+  if (!res.ok) throw new Error("Failed to reorder notes");
+  return res.json();
+}
+
 
