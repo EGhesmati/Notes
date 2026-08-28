@@ -454,16 +454,16 @@ export function PomodoroTimer() {
         const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
         secondsLeftRef.current = left;
         setSecondsLeft(left);
-        if (left === 0) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          intervalRef.current = null;
-          endAtRef.current = null;
-          playChime();
-          if (soundRef.current) {
-            notify(PHASE_LABEL[next], "Time's up! 🍅");
+          if (left === 0) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            intervalRef.current = null;
+            endAtRef.current = null;
+            if (soundRef.current) {
+              playChime();
+              notify(PHASE_LABEL[next], "Time's up! 🍅");
+            }
+            handleCompleteRef.current(next);
           }
-          handleCompleteRef.current(next);
-        }
       }, 250);
       saveState(userIdRef.current, {
         focusMin: focusMinRef.current,
