@@ -161,16 +161,16 @@ function SegmentedControl({
   suffix?: string;
 }) {
   return (
-    <div className="inline-flex rounded-lg border border-border/60 bg-muted/40 p-0.5">
+    <div className="grid grid-flow-col auto-cols-fr gap-1 rounded-lg border border-border/60 bg-muted/40 p-1">
       {options.map((opt) => (
         <button
           key={opt}
           type="button"
           onClick={() => onChange(opt)}
-          className={`min-w-[2.75rem] rounded-md px-2.5 py-1.5 text-xs font-medium transition-all ${
+          className={`rounded-md px-1 py-1.5 text-center text-xs font-medium tabular-nums transition-all ${
             value === opt
               ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
-              : "text-muted-foreground hover:text-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
         >
           {opt}
@@ -199,26 +199,26 @@ function DurationSetting({
   suffix?: string;
 }) {
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
+    <div className="rounded-xl border border-border/60 bg-card/60 p-3">
+      <div className="mb-2.5 flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-foreground">{label}</span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => cycle(-1)}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label={`Decrease ${label.toLowerCase()}`}
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
-          <span className="min-w-10 text-center font-mono text-sm font-semibold tabular-nums text-foreground">
+          <span className="min-w-11 text-center font-mono text-sm font-semibold tabular-nums text-foreground">
             {value}
             {suffix}
           </span>
           <button
             type="button"
             onClick={() => cycle(1)}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label={`Increase ${label.toLowerCase()}`}
           >
             <ChevronRight className="h-3.5 w-3.5" />
@@ -226,7 +226,7 @@ function DurationSetting({
           <button
             type="button"
             onClick={onCustom}
-            className="ml-0.5 flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="ml-1 flex h-7 w-7 items-center justify-center rounded-md border border-border/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label={`Custom ${label.toLowerCase()}`}
             title="Custom"
           >
@@ -254,9 +254,9 @@ function ToggleRow({
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="group flex w-full items-center justify-between rounded-lg py-1 text-left transition-colors"
+      className="group flex w-full items-center justify-between gap-4 py-2.5 text-left transition-colors"
     >
-      <div className="pr-4">
+      <div className="min-w-0">
         <div className="text-sm font-medium text-foreground">{title}</div>
         <div className="text-xs text-muted-foreground">{description}</div>
       </div>
@@ -292,7 +292,7 @@ function IconButton({
       onClick={onClick}
       title={label}
       aria-label={label}
-      className="flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground transition-all hover:border-border hover:text-foreground active:scale-95"
+      className="flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground transition-all hover:border-border hover:text-foreground active:scale-95"
     >
       {icon}
     </button>
@@ -302,11 +302,9 @@ function IconButton({
 function PlayButton({
   onClick,
   running,
-  phase,
 }: {
   onClick: () => void;
   running: boolean;
-  phase: TimerPhase;
 }) {
   return (
     <button
@@ -314,14 +312,12 @@ function PlayButton({
       onClick={onClick}
       title={running ? "Pause" : "Start"}
       aria-label={running ? "Pause" : "Start"}
-      className={`flex h-12 w-12 items-center justify-center rounded-full bg-foreground text-primary-foreground shadow-sm shadow-black/10 transition-all hover:scale-[1.04] active:scale-95 ${
-        phase !== "focus" ? "bg-foreground" : ""
-      }`}
+      className="flex h-16 w-16 items-center justify-center rounded-full bg-foreground text-primary-foreground shadow-md shadow-black/10 transition-all hover:scale-[1.03] hover:shadow-lg active:scale-95"
     >
       {running ? (
-        <Pause className="h-5 w-5 fill-current" />
+        <Pause className="h-7 w-7 fill-current" />
       ) : (
-        <Play className="ml-0.5 h-5 w-5 fill-current" />
+        <Play className="ml-1 h-7 w-7 fill-current" />
       )}
     </button>
   );
@@ -793,17 +789,19 @@ export function PomodoroTimer() {
 
       {/* Popup Panel (anchored dropdown, like Pomodoro analytics) */}
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-[min(24rem,_calc(100vw-1rem))] max-h-[calc(100vh-4rem)] overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl sm:w-[26rem]">
-          {/* Header */}
-          <header className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-foreground" />
+        <div className="absolute right-0 z-50 mt-2 w-[min(26rem,_calc(100vw-1rem))] overflow-hidden rounded-xl border border-border/70 bg-background shadow-2xl backdrop-blur-xl sm:w-[28rem]">
+          {/* ── Top Bar ─────────────────────────────────────────────── */}
+          <header className="flex items-center justify-between border-b border-border/60 px-5 py-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-primary-foreground">
+                <Clock className="h-3.5 w-3.5" />
+              </span>
               <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Pomodoro
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="hidden text-xs text-muted-foreground sm:inline">
+              <span className="mr-1 hidden text-xs text-muted-foreground sm:inline">
                 Session {pomoCount + 1}
               </span>
               <Button
@@ -829,161 +827,170 @@ export function PomodoroTimer() {
             </div>
           </header>
 
-          {/* Main Focus Area */}
-          <div className="flex flex-col items-center px-6 py-6">
-            {/* Phase label */}
-            <span
-              className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${
-                PHASE_ACCENT[phase]
-              }`}
-            >
-              {PHASE_SESSION_LABEL[phase]}
-            </span>
+          {/* ── Scrollable body ─────────────────────────────────────── */}
+          <div className="flex max-h-[calc(100vh-6rem)] flex-col overflow-y-auto">
+            {/* Main Timer Area */}
+            <div className="flex flex-col items-center px-6 pt-7 pb-6">
+              <span
+                className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${
+                  PHASE_ACCENT[phase]
+                }`}
+              >
+                {PHASE_SESSION_LABEL[phase]}
+              </span>
 
-            {/* Timer with progress ring */}
-            <div className="relative mt-5 flex h-56 w-56 items-center justify-center">
-              <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="86"
-                  fill="none"
-                  strokeWidth="5"
-                  className="stroke-muted/40"
-                />
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="86"
-                  fill="none"
-                  strokeWidth="5"
-                  strokeLinecap="round"
-                  className={`transition-[stroke-dashoffset] duration-500 ${PHASE_RING[phase]}`}
-                  strokeDasharray={CENTER}
-                  strokeDashoffset={CENTER * (1 - progress)}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-mono text-5xl font-medium leading-none tracking-tight tabular-nums text-foreground sm:text-6xl">
-                  {formatTime(secondsLeft)}
-                </span>
-                <span className="mt-3 text-xs font-medium text-muted-foreground">
-                  {running ? "Running" : secondsLeft === duration ? "Ready" : "Paused"}
-                </span>
-              </div>
-            </div>
-
-            {/* Session status */}
-            <div className="mt-5 flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">Session {pomoCount + 1}</span>
-              <span className="text-muted-foreground/60">·</span>
-              <span>{pomoCount} completed</span>
-            </div>
-
-            {/* Timer controls */}
-            <div className="mt-6 flex items-center gap-3">
-              <IconButton onClick={reset} icon={<RotateCcw className="h-[18px] w-[18px]" />} label="Reset" />
-              <PlayButton onClick={start} running={running} phase={phase} />
-              <IconButton onClick={skipPhase} icon={<SkipForward className="h-[18px] w-[18px]" />} label="Skip" />
-            </div>
-
-            {/* Cycle progress */}
-            <div className="mt-6 flex items-center gap-2">
-              {[0, 1, 2, 3].map((i) => (
-                <span
-                  key={i}
-                  className={`h-1.5 w-8 rounded-full transition-colors ${
-                    i < cycleInCycle ? "bg-foreground" : "bg-muted"
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="mt-2 text-[11px] text-muted-foreground">
-              {cycleInCycle} of 4 in this cycle
-            </span>
-          </div>
-
-          {/* Settings Panel */}
-          <footer
-            ref={settingsRef}
-            className="border-t border-border/60 bg-card/50 px-6 py-5 backdrop-blur-sm"
-          >
-            <div className="mx-auto max-w-md">
-              <div className="mb-4 flex items-center gap-2">
-                <Settings className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                  Settings
-                </span>
-              </div>
-
-              <div className="space-y-5">
-                {/* Durations */}
-                <div className="space-y-3">
-                  <span className="text-xs font-medium text-muted-foreground">Durations</span>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <DurationSetting
-                      label="Focus"
-                      options={FOCUS_OPTIONS}
-                      value={focusMin}
-                      onChange={changeFocus}
-                      onCustom={() => setCustomFocusOpen(true)}
-                      cycle={cycleFocus}
-                    />
-                    <DurationSetting
-                      label="Short break"
-                      options={BREAK_OPTIONS}
-                      value={breakMin}
-                      onChange={changeBreak}
-                      onCustom={() => setCustomBreakOpen(true)}
-                      cycle={cycleBreak}
-                    />
-                    <DurationSetting
-                      label="Long break"
-                      options={LONG_BREAK_OPTIONS}
-                      value={longBreakMin}
-                      onChange={changeLongBreak}
-                      onCustom={() => setCustomLongBreakOpen(true)}
-                      cycle={cycleLongBreak}
-                    />
-                  </div>
-                </div>
-
-                {/* Behavior */}
-                <div className="space-y-3">
-                  <span className="text-xs font-medium text-muted-foreground">Behavior</span>
-                  <div className="rounded-xl border border-border/60 bg-card/60 p-3">
-                    <ToggleRow
-                      title="Auto-start next session"
-                      description="Begin the next phase automatically"
-                      checked={autoStart}
-                      onChange={setAutoStart}
-                    />
-                    <div className="my-2 h-px bg-border/60" />
-                    <ToggleRow
-                      title="Sound alerts"
-                      description={sound ? "Chime and notification on" : "Muted"}
-                      checked={sound}
-                      onChange={setSound}
-                    />
-                  </div>
-                </div>
-
-                {/* Notifications */}
-                {!("Notification" in window) || Notification.permission === "denied" ? (
-                  <button
-                    type="button"
-                    onClick={requestNotification}
-                    className="flex w-full items-center justify-between rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-card"
+              <div className="relative mt-5 flex h-64 w-64 items-center justify-center">
+                <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="86"
+                    fill="none"
+                    strokeWidth="6"
+                    className="stroke-border/50"
+                  />
+                  <circle
+                    cx="100"
+                    cy="100"
+                    r="86"
+                    fill="none"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    className={`transition-[stroke-dashoffset] duration-500 ${PHASE_RING[phase]}`}
+                    strokeDasharray={CENTER}
+                    strokeDashoffset={CENTER * (1 - progress)}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-mono text-6xl font-medium leading-none tracking-tight tabular-nums text-foreground">
+                    {formatTime(secondsLeft)}
+                  </span>
+                  <span
+                    className={`mt-3 text-xs font-medium ${
+                      running ? "text-foreground" : "text-muted-foreground"
+                    }`}
                   >
-                    Enable browser notifications
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                ) : null}
+                    {running ? "Running" : secondsLeft === duration ? "Ready" : "Paused"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Session + Controls */}
+              <div className="mt-8 flex w-full flex-col items-center">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">Session {pomoCount + 1}</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span>{pomoCount} completed</span>
+                </div>
+
+                <div className="mt-5 flex items-center gap-5">
+                  <IconButton onClick={reset} icon={<RotateCcw className="h-[18px] w-[18px]" />} label="Reset" />
+                  <PlayButton onClick={start} running={running} />
+                  <IconButton onClick={skipPhase} icon={<SkipForward className="h-[18px] w-[18px]" />} label="Skip" />
+                </div>
+              </div>
+
+              {/* Cycle indicator */}
+              <div className="mt-7 flex flex-col items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  {[0, 1, 2, 3].map((i) => (
+                    <span
+                      key={i}
+                      className={`h-1 rounded-full transition-colors duration-300 ${
+                        i < cycleInCycle ? "w-6 bg-foreground" : "w-6 bg-border"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-[11px] text-muted-foreground">
+                  {cycleInCycle} of 4 in this cycle
+                </span>
               </div>
             </div>
-          </footer>
+
+            {/* Settings */}
+            <footer
+              ref={settingsRef}
+              className="border-t border-border/60 bg-card/40 px-5 py-5"
+            >
+              <div className="mx-auto max-w-md">
+                <div className="mb-4 flex items-center gap-2">
+                  <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    Settings
+                  </span>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Durations */}
+                  <div className="space-y-3">
+                    <span className="text-xs font-medium text-muted-foreground">Durations</span>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <DurationSetting
+                        label="Focus"
+                        options={FOCUS_OPTIONS}
+                        value={focusMin}
+                        onChange={changeFocus}
+                        onCustom={() => setCustomFocusOpen(true)}
+                        cycle={cycleFocus}
+                      />
+                      <DurationSetting
+                        label="Short break"
+                        options={BREAK_OPTIONS}
+                        value={breakMin}
+                        onChange={changeBreak}
+                        onCustom={() => setCustomBreakOpen(true)}
+                        cycle={cycleBreak}
+                      />
+                      <DurationSetting
+                        label="Long break"
+                        options={LONG_BREAK_OPTIONS}
+                        value={longBreakMin}
+                        onChange={changeLongBreak}
+                        onCustom={() => setCustomLongBreakOpen(true)}
+                        cycle={cycleLongBreak}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Behavior */}
+                  <div className="space-y-3">
+                    <span className="text-xs font-medium text-muted-foreground">Behavior</span>
+                    <div className="rounded-xl border border-border/60 bg-card/60 p-3">
+                      <ToggleRow
+                        title="Auto-start next session"
+                        description="Begin the next phase automatically"
+                        checked={autoStart}
+                        onChange={setAutoStart}
+                      />
+                      <div className="my-0.5 h-px bg-border/60" />
+                      <ToggleRow
+                        title="Sound alerts"
+                        description={sound ? "Chime and notification on" : "Muted"}
+                        checked={sound}
+                        onChange={setSound}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Notifications */}
+                  {!("Notification" in window) || Notification.permission === "denied" ? (
+                    <button
+                      type="button"
+                      onClick={requestNotification}
+                      className="flex w-full items-center justify-between rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-card"
+                    >
+                      Enable browser notifications
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </footer>
+          </div>
         </div>
       )}
+
 
       {/* Custom Focus Duration Modal */}
       {customFocusOpen &&
