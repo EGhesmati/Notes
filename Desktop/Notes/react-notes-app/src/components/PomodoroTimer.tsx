@@ -496,7 +496,7 @@ export function PomodoroTimer() {
 
       {/* Main Panel */}
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,_calc(100vw-1rem))] max-h-[calc(100vh-4rem)] origin-top-right overflow-hidden rounded-[1.75rem] border border-white/20 bg-background/80 shadow-2xl shadow-black/20 backdrop-blur-2xl dark:bg-background/70 sm:w-[24rem]">
+        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,_calc(100vw-1rem))] max-h-[calc(100vh-4rem)] origin-top-right overflow-hidden overflow-y-auto rounded-2xl border border-border/60 bg-card/95 shadow-xl shadow-black/10 backdrop-blur-xl sm:w-[24rem]">
           {/* iOS-style sheet handle */}
           <div className="flex items-center justify-between px-5 pt-3">
             <span className="mx-auto h-1.5 w-10 rounded-full bg-muted-foreground/20" />
@@ -567,7 +567,7 @@ export function PomodoroTimer() {
                 type="button"
                 onClick={reset}
                 title="Reset"
-                className="flex h-14 w-14 items-center justify-center rounded-full border border-border/60 bg-white/60 text-muted-foreground transition-transform hover:scale-105 active:scale-95 dark:bg-white/5"
+                className="flex h-14 w-14 items-center justify-center rounded-full border border-border/60 bg-muted/60 text-muted-foreground transition-transform hover:scale-105 hover:text-foreground active:scale-95 dark:bg-muted/40"
               >
                 <RotateCcw className="h-5 w-5" />
               </button>
@@ -592,7 +592,7 @@ export function PomodoroTimer() {
               Settings
             </p>
 
-            <div className="overflow-hidden rounded-2xl border border-border/60 bg-white/70 shadow-sm dark:bg-white/5">
+            <div className="overflow-hidden rounded-2xl border border-border/60 bg-muted/30 dark:bg-card/40">
               {/* Focus Duration */}
               <div className="px-4 pb-4 pt-3">
                 <div className="mb-2 flex items-center justify-between">
@@ -606,7 +606,7 @@ export function PomodoroTimer() {
                     Custom
                   </button>
                 </div>
-                <div className="mb-2 flex items-center gap-1 rounded-full bg-muted/70 p-1">
+                <div className="mb-2 flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 p-1">
                   {FOCUS_OPTIONS.map((opt) => (
                     <button
                       key={opt}
@@ -626,7 +626,7 @@ export function PomodoroTimer() {
                   <button
                     type="button"
                     onClick={() => cycleFocus(-1)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-white/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-white/10"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-muted/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-muted/40"
                   >
                     <ChevronDown className="h-4 w-4" />
                   </button>
@@ -636,7 +636,7 @@ export function PomodoroTimer() {
                   <button
                     type="button"
                     onClick={() => cycleFocus(1)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-white/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-white/10"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-muted/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-muted/40"
                   >
                     <ChevronUp className="h-4 w-4" />
                   </button>
@@ -658,7 +658,7 @@ export function PomodoroTimer() {
                     Custom
                   </button>
                 </div>
-                <div className="mb-2 flex items-center gap-1 rounded-full bg-muted/70 p-1">
+                <div className="mb-2 flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 p-1">
                   {BREAK_OPTIONS.map((opt) => (
                     <button
                       key={opt}
@@ -678,7 +678,7 @@ export function PomodoroTimer() {
                   <button
                     type="button"
                     onClick={() => cycleBreak(-1)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-white/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-white/10"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-muted/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-muted/40"
                   >
                     <ChevronDown className="h-4 w-4" />
                   </button>
@@ -688,7 +688,7 @@ export function PomodoroTimer() {
                   <button
                     type="button"
                     onClick={() => cycleBreak(1)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-white/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-white/10"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-muted/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-muted/40"
                   >
                     <ChevronUp className="h-4 w-4" />
                   </button>
