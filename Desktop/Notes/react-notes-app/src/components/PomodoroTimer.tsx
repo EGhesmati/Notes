@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { X, Check, ChevronDown, ChevronUp, Clock, Bell, BellOff, Edit3 } from "lucide-react";
+import { X, Check, ChevronDown, ChevronUp, Clock, Bell, BellOff, Edit3, Play, Pause, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
@@ -66,6 +66,12 @@ const PHASE_COLOR: Record<string, string> = {
   focus: "from-violet-500 to-fuchsia-500",
   "short-break": "from-emerald-500 to-teal-500",
   "long-break": "from-sky-500 to-blue-500",
+};
+
+const RING_COLOR: Record<string, string> = {
+  focus: "text-violet-500",
+  "short-break": "text-emerald-500",
+  "long-break": "text-sky-500",
 };
 
 let _audioCtx: AudioContext | null = null;
@@ -489,230 +495,209 @@ export function PomodoroTimer() {
 
       {/* Main Panel */}
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,_calc(100vw-1rem))] max-h-[calc(100vh-4rem)] origin-top-right overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl sm:w-[24rem]">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <div className={`rounded-lg bg-gradient-to-r ${color} p-1.5 text-white shadow-sm`}>
-                <Clock className="h-3.5 w-3.5" />
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pomodoro Timer</p>
-                <p className="text-sm font-medium text-foreground">{label}</p>
-              </div>
-            </div>
+        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,_calc(100vw-1rem))] max-h-[calc(100vh-4rem)] origin-top-right overflow-hidden rounded-[1.75rem] border border-white/20 bg-background/80 shadow-2xl shadow-black/20 backdrop-blur-2xl dark:bg-background/70 sm:w-[24rem]">
+          {/* iOS-style sheet handle */}
+          <div className="flex items-center justify-between px-5 pt-3">
+            <span className="mx-auto h-1.5 w-10 rounded-full bg-muted-foreground/20" />
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setOpen(false)}
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              className="absolute right-3 top-3 h-7 w-7 rounded-full text-muted-foreground hover:bg-muted/70 hover:text-foreground"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
 
+          {/* Header */}
+          <div className="pt-1 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Pomodoro
+            </p>
+            <p className="mt-0.5 text-base font-semibold text-foreground">{label}</p>
+          </div>
+
           {/* Content */}
-          <div className="max-h-[calc(100vh-10rem)] overflow-y-auto p-4 sm:max-h-[28rem]">
+          <div className="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5 pt-2 sm:max-h-[28rem]">
             {/* Timer Display */}
-            <div className="mb-4 flex flex-col items-center">
-              <div className="relative flex h-44 w-44 items-center justify-center">
+            <div className="mb-5 flex flex-col items-center">
+              <div className="relative flex h-48 w-48 items-center justify-center">
                 {/* progress ring */}
-                <svg viewBox="0 0 180 180" className="h-full w-full -rotate-90">
+                <svg viewBox="0 0 200 200" className={`h-full w-full -rotate-90 ${RING_COLOR[phase]}`}>
+                  <circle cx="100" cy="100" r="90" fill="none" strokeWidth="9" className="stroke-muted/30" />
                   <circle
-                    cx="90"
-                    cy="90"
-                    r="80"
+                    cx="100"
+                    cy="100"
+                    r="90"
                     fill="none"
-                    strokeWidth="10"
-                    className="stroke-muted/60"
-                  />
-                  <circle
-                    cx="90"
-                    cy="90"
-                    r="80"
-                    fill="none"
-                    strokeWidth="10"
+                    strokeWidth="9"
                     strokeLinecap="round"
                     stroke="currentColor"
-                    className={`text-primary transition-[stroke-dashoffset] duration-500`}
-                    strokeDasharray={Math.PI * 160}
-                    strokeDashoffset={Math.PI * 160 * (1 - progress)}
+                    className="transition-[stroke-dashoffset] duration-500"
+                    strokeDasharray={Math.PI * 180}
+                    strokeDashoffset={Math.PI * 180 * (1 - progress)}
                   />
                 </svg>
                 {/* soft glow blob behind */}
-                <div className={`absolute h-28 w-28 rounded-full bg-gradient-to-br ${color} opacity-15 blur-2xl`} />
+                <div className={`absolute h-28 w-28 rounded-full bg-gradient-to-br ${color} opacity-20 blur-2xl`} />
                 <div className="relative z-10 flex flex-col items-center">
-                  <div className={`mb-1 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r ${color} px-3 py-1 text-[10px] font-semibold text-white shadow-sm`}>
-                    {running ? (
-                      <>
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                        Running
-                      </>
-                    ) : (
-                      <>
-                        <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
-                        Paused
-                      </>
-                    )}
-                  </div>
-                  <span className="font-mono text-[2.6rem] font-bold leading-none tracking-tight text-foreground">
+                  <span className={`mb-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide ${
+                    running
+                      ? `bg-gradient-to-r ${color} text-white`
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {running ? "In Progress" : "Ready"}
+                  </span>
+                  <span className="font-mono text-6xl font-light leading-none tracking-tight text-foreground tabular-nums">
                     {formatTime(secondsLeft)}
                   </span>
                   {pomoCount > 0 && (
-                    <span className="mt-1.5 text-[10px] font-medium text-muted-foreground">
-                      #{pomoCount + 1} · {pomoCount} done
+                    <span className="mt-2 text-[11px] font-medium text-muted-foreground/80">
+                      #{pomoCount + 1} · {pomoCount} complete
                     </span>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Controls */}
-            <div className="mb-4 flex items-center justify-center gap-2">
-              {!running ? (
-                <Button
-                  onClick={start}
-                  className={`h-11 flex-1 rounded-full bg-gradient-to-r ${color} text-sm font-semibold text-white shadow-md shadow-black/10 transition-transform hover:scale-[1.02] hover:opacity-90 active:scale-[0.98]`}
-                >
-                  Start Focus
-                </Button>
-              ) : (
-                <Button
-                  onClick={pause}
-                  variant="secondary"
-                  className="h-11 flex-1 rounded-full text-sm font-semibold shadow-sm transition-transform hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  Pause
-                </Button>
-              )}
-              <Button
+            {/* Controls — iOS-style big circular control */}
+            <div className="mb-5 flex items-center justify-center gap-9">
+              <button
+                type="button"
                 onClick={reset}
-                variant="outline"
-                size="icon"
-                className="h-11 w-11 rounded-full"
                 title="Reset"
+                className="flex h-14 w-14 items-center justify-center rounded-full border border-border/60 bg-white/60 text-muted-foreground transition-transform hover:scale-105 active:scale-95 dark:bg-white/5"
               >
-                <X className="h-4 w-4" />
-              </Button>
+                <RotateCcw className="h-5 w-5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={running ? pause : start}
+                title={running ? "Pause" : "Start"}
+                className={`flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br ${color} text-white shadow-lg shadow-black/10 transition-transform hover:scale-105 active:scale-95`}
+              >
+                {running ? (
+                  <Pause className="h-8 w-8 fill-current" />
+                ) : (
+                  <Play className="ml-1 h-8 w-8 fill-current" />
+                )}
+              </button>
             </div>
 
             {/* Settings Toggle */}
-            <Button
-              onClick={() => setCustomFocusOpen(true)}
-              variant="ghost"
-              size="sm"
-              className="mb-2 h-8 w-full justify-between text-xs"
-            >
-              <span>⚙️ Settings</span>
-              <ChevronDown className="h-3.5 w-3.5" />
-            </Button>
+            {/* Settings */}
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Settings
+            </p>
 
-            {/* Quick Duration Selectors - Inline */}
-            <div className="space-y-3">
+            <div className="overflow-hidden rounded-2xl border border-border/60 bg-white/70 shadow-sm dark:bg-white/5">
               {/* Focus Duration */}
-              <div className="rounded-xl border border-border/60 bg-background/60 p-3">
+              <div className="px-4 pb-4 pt-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-medium">Focus Duration</span>
+                  <span className="text-sm font-medium text-foreground">Focus Duration</span>
                   <button
+                    type="button"
                     onClick={() => setCustomFocusOpen(true)}
-                    className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/10"
                   >
                     <Edit3 className="h-3 w-3" />
                     Custom
                   </button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => cycleFocus(-1)}
-                  >
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                  <div className="flex-1 text-center">
-                    <span className="text-lg font-bold">{focusMin}</span>
-                    <span className="ml-1 text-xs text-muted-foreground">min</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => cycleFocus(1)}
-                  >
-                    <ChevronUp className="h-3 w-3" />
-                  </Button>
-                </div>
-                <div className="mt-2 flex gap-1">
+                <div className="mb-2 flex items-center gap-1 rounded-full bg-muted/70 p-1">
                   {FOCUS_OPTIONS.map((opt) => (
                     <button
                       key={opt}
+                      type="button"
                       onClick={() => changeFocus(opt)}
-                      className={`flex-1 rounded-md py-1 text-[10px] font-medium transition-colors ${
+                      className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition-all ${
                         focusMin === opt
-                          ? `bg-gradient-to-r ${color} text-white`
-                          : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                          ? `bg-gradient-to-r ${color} text-white shadow-sm`
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       {opt}m
                     </button>
                   ))}
                 </div>
+                <div className="mt-2 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => cycleFocus(-1)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-white/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-white/10"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  <span className="min-w-14 text-center font-mono text-base font-semibold tabular-nums text-foreground">
+                    {focusMin} <span className="text-[11px] font-normal text-muted-foreground">min</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => cycleFocus(1)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-white/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-white/10"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
+              <div className="h-px bg-border/60" />
+
               {/* Break Duration */}
-              <div className="rounded-xl border border-border/60 bg-background/60 p-3">
+              <div className="px-4 pb-4 pt-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-medium">Break Duration</span>
+                  <span className="text-sm font-medium text-foreground">Break Duration</span>
                   <button
+                    type="button"
                     onClick={() => setCustomBreakOpen(true)}
-                    className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/10"
                   >
                     <Edit3 className="h-3 w-3" />
                     Custom
                   </button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => cycleBreak(-1)}
-                  >
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                  <div className="flex-1 text-center">
-                    <span className="text-lg font-bold">{breakMin}</span>
-                    <span className="ml-1 text-xs text-muted-foreground">min</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => cycleBreak(1)}
-                  >
-                    <ChevronUp className="h-3 w-3" />
-                  </Button>
-                </div>
-                <div className="mt-2 flex gap-1">
+                <div className="mb-2 flex items-center gap-1 rounded-full bg-muted/70 p-1">
                   {BREAK_OPTIONS.map((opt) => (
                     <button
                       key={opt}
+                      type="button"
                       onClick={() => changeBreak(opt)}
-                      className={`flex-1 rounded-md py-1 text-[10px] font-medium transition-colors ${
+                      className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition-all ${
                         breakMin === opt
-                          ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
-                          : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                          ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       {opt}m
                     </button>
                   ))}
                 </div>
+                <div className="mt-2 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => cycleBreak(-1)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-white/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-white/10"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  <span className="min-w-14 text-center font-mono text-base font-semibold tabular-nums text-foreground">
+                    {breakMin} <span className="text-[11px] font-normal text-muted-foreground">min</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => cycleBreak(1)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-white/60 text-muted-foreground transition-colors hover:text-foreground dark:bg-white/10"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
-              {/* Sound Toggle */}
-              <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 p-3">
+              <div className="h-px bg-border/60" />
+
+              {/* Sound Alerts */}
+              <div className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-2.5">
                   <span className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
                     sound ? "bg-primary/10 text-primary" : "bg-muted/70 text-muted-foreground"
@@ -720,9 +705,9 @@ export function PomodoroTimer() {
                     {sound ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
                   </span>
                   <div className="flex flex-col">
-                    <span className="text-xs font-medium leading-tight">Sound Alerts</span>
-                    <span className="text-[10px] text-muted-foreground/70">
-                      {sound ? "Beeps & notifications on" : "Muted"}
+                    <span className="text-sm font-medium leading-tight text-foreground">Sound Alerts</span>
+                    <span className="text-[11px] text-muted-foreground/80">
+                      {sound ? "Chime & notification on" : "Muted"}
                     </span>
                   </div>
                 </div>
@@ -744,17 +729,27 @@ export function PomodoroTimer() {
                 </button>
               </div>
 
+              <div className="h-px bg-border/60" />
+
               {/* Notification Permission */}
               {!("Notification" in window) || Notification.permission === "denied" ? (
-                <Button
+                <button
+                  type="button"
                   onClick={requestNotification}
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs"
+                  className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-primary transition-colors hover:bg-primary/5"
                 >
                   Enable Browser Notifications
-                </Button>
-              ) : null}
+                  <ChevronUp className="h-3.5 w-3.5 -rotate-90" />
+                </button>
+              ) : (
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-foreground">Browser Notifications</span>
+                    <span className="text-[11px] text-muted-foreground/80">Enabled</span>
+                  </div>
+                  <Check className="h-4 w-4 text-emerald-500" />
+                </div>
+              )}
             </div>
           </div>
         </div>
