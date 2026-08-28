@@ -321,6 +321,9 @@ const NoteCard = memo(function NoteCard({
                 >
                   <GripVertical className="h-4 w-4" />
                 </button>
+                <span className="font-mono text-[10px] font-semibold text-muted-foreground/60">
+                  #{item.id}
+                </span>
                 {badge && (
                   <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${badge.className}`}>
                     {badge.label}

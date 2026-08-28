@@ -732,13 +732,13 @@ export function PomodoroTimer() {
                   aria-checked={sound}
                   aria-label="Toggle sound alerts"
                   onClick={() => setSound(!sound)}
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                     sound ? "bg-gradient-to-r from-primary to-primary/80" : "bg-muted"
                   }`}
                 >
                   <span
-                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-transform ${
-                      sound ? "translate-x-[22px]" : "translate-x-0.5"
+                    className={`pointer-events-none absolute h-[18px] w-[18px] rounded-full bg-white shadow-md transition-all duration-200 ${
+                      sound ? "left-[23px]" : "left-[3px]"
                     }`}
                   />
                 </button>
