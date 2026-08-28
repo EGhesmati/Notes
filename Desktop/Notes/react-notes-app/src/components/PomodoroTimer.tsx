@@ -1,11 +1,11 @@
-import { useMemo, useState, useRef, useCallback, useEffect } from "react";
-import { X, Plus, Check, ChevronDown, ChevronUp, Clock, Bell, BellOff, Edit3 } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { X, Check, ChevronDown, ChevronUp, Clock, Bell, BellOff, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth-context";
-import { recordCompletion, PomoStat } from "@/hooks/use-pomodoro-stats";
-import NoteSelect from "./NoteSelect";
+import { recordCompletion } from "@/hooks/use-pomodoro-stats";
+import { NoteSelect } from "./NoteSelect";
 
 const FOCUS_OPTIONS = [15, 25, 45, 60];
 const BREAK_OPTIONS = [5, 10, 15];
@@ -118,7 +118,7 @@ function playChime(): void {
   }
 }
 
-export default function PomodoroTimer() {
+export function PomodoroTimer() {
   const { user } = useAuth();
   const userId = user?.id ?? 0;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -131,8 +131,6 @@ export default function PomodoroTimer() {
   const [breakMin, setBreakMin] = useState(5);
   const [phase, setPhase] = useState<"focus" | "short-break" | "long-break">("focus");
   const [secondsLeft, setSecondsLeft] = useState(focusMin * 60);
-  const [elapsed, setElapsed] = useState(0);
-  const [remaining, setRemaining] = useState(focusMin * 60);
   const [running, setRunning] = useState(false);
   const [pomoCount, setPomoCount] = useState(0);
   const [notified, setNotified] = useState(false);
@@ -145,9 +143,8 @@ export default function PomodoroTimer() {
 
   // Note picker state
   const [notePickerOpen, setNotePickerOpen] = useState(false);
-  const [pendingCompletion, setPendingCompletion] = useState<{ duration: number } | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
-  const [noteOptions, setNoteOptions] = useState<{ id: number; title: string }[]>([]);
+  const [noteOptions, setNoteOptions] = useState<{ id: number; text: string }[]>([]);
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current) {
@@ -156,7 +153,6 @@ export default function PomodoroTimer() {
     }
     endAtRef.current = null;
     setRunning(false);
-    setElapsed(0);
     setNotified(false);
   }, []);
 
@@ -171,7 +167,6 @@ export default function PomodoroTimer() {
       setPhase("focus");
       setSecondsLeft(focusMin * 60);
     }
-    setElapsed(0);
     setRunning(false);
     endAtRef.current = null;
     clearState(userId);
@@ -193,12 +188,11 @@ export default function PomodoroTimer() {
 
   const confirmCompletion = useCallback(() => {
     if (phase === "focus") {
-      setPendingCompletion({ duration: focusMin * 60 - elapsed });
       setNotePickerOpen(true);
     } else {
       nextPhase();
     }
-  }, [phase, focusMin, elapsed, nextPhase]);
+  }, [phase, nextPhase]);
 
   const start = useCallback(() => {
     if (running) {
@@ -232,8 +226,6 @@ export default function PomodoroTimer() {
       if (!endAtRef.current) return;
       const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
       setSecondsLeft(left);
-      setElapsed(dur - left);
-      setRemaining(left);
 
       if (left <= 10 && left > 0 && sound && !notified) {
         setNotified(true);
@@ -285,8 +277,6 @@ export default function PomodoroTimer() {
     clearTimer();
     const dur = phase === "focus" ? focusMin * 60 : phase === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
     setSecondsLeft(dur);
-    setElapsed(0);
-    setRemaining(dur);
     setNotified(false);
     clearState(userId);
   }, [clearTimer, phase, focusMin, breakMin, userId]);
@@ -296,7 +286,6 @@ export default function PomodoroTimer() {
       setFocusMin(val);
       if (!running) {
         setSecondsLeft(val * 60);
-        setRemaining(val * 60);
       }
     },
     [running],
@@ -307,7 +296,6 @@ export default function PomodoroTimer() {
       setBreakMin(val);
       if (!running) {
         setSecondsLeft(val * 60);
-        setRemaining(val * 60);
       }
     },
     [running],
@@ -320,7 +308,7 @@ export default function PomodoroTimer() {
       });
       if (!res.ok) return;
       const data = await res.json();
-      setNoteOptions(data.map((n: any) => ({ id: n.id, title: n.title || "Untitled" })));
+      setNoteOptions(data.map((n: any) => ({ id: n.id, text: n.title || n.text || "Untitled" })));
     } catch {
       // ignore
     }
@@ -342,23 +330,18 @@ export default function PomodoroTimer() {
       setBreakMin(saved.breakMin);
       setPhase(saved.phase);
       setSecondsLeft(saved.secondsLeft);
-      setRemaining(saved.secondsLeft);
       setPomoCount(saved.pomoCount);
       if (saved.running && saved.startedAt) {
         const dur = saved.phase === "focus" ? saved.focusMin * 60 : saved.phase === "long-break" ? LONG_BREAK_MIN * 60 : saved.breakMin * 60;
         const elapsedSinceStart = Math.floor((Date.now() - saved.startedAt) / 1000);
         const newRemaining = Math.max(0, saved.secondsLeft - elapsedSinceStart);
         setSecondsLeft(newRemaining);
-        setRemaining(newRemaining);
-        setElapsed(elapsedSinceStart);
         setRunning(true);
         endAtRef.current = saved.startedAt + dur * 1000;
         intervalRef.current = setInterval(() => {
           if (!endAtRef.current) return;
           const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
           setSecondsLeft(left);
-          setElapsed(dur - left);
-          setRemaining(left);
           if (left <= 10 && left > 0 && sound && !notified) {
             setNotified(true);
             playBeep();
@@ -372,7 +355,6 @@ export default function PomodoroTimer() {
               notify(PHASE_LABEL[saved.phase], "Time's up! 🍅");
             }
             setRunning(false);
-            setPendingCompletion({ duration: dur - elapsedSinceStart });
             setNotePickerOpen(true);
           }
         }, 250);
@@ -401,7 +383,6 @@ export default function PomodoroTimer() {
       recordCompletion(userId, "focus", focusMin * 60, selectedNoteId);
       setPhase(isLongBreak ? "long-break" : "short-break");
       setSecondsLeft(dur);
-      setRemaining(dur);
       setPomoCount(newCount);
       setSelectedNoteId(null);
     } else {
@@ -409,28 +390,16 @@ export default function PomodoroTimer() {
       recordCompletion(userId, phase, breakMin * 60);
       setPhase("focus");
       setSecondsLeft(dur);
-      setRemaining(dur);
       setSelectedNoteId(null);
     }
-    setElapsed(0);
     setNotified(false);
-    setPendingCompletion(null);
   }, [phase, pomoCount, breakMin, focusMin, userId, selectedNoteId]);
-
-  const handleNoteSelect = useCallback(
-    (noteId: number) => {
-      setSelectedNoteId(noteId);
-      setNotePickerOpen(false);
-    },
-    [],
-  );
 
   const handleClearNotes = useCallback(() => {
     setSelectedNoteId(null);
     setNotePickerOpen(false);
   }, []);
 
-  const duration = phase === "focus" ? focusMin * 60 : phase === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
   const label = PHASE_LABEL[phase];
   const color = PHASE_COLOR[phase];
 
@@ -816,9 +785,9 @@ export default function PomodoroTimer() {
             </div>
             <div className="max-h-[20rem] overflow-y-auto p-4">
               <NoteSelect
-                onSelect={handleNoteSelect}
                 notes={noteOptions}
-                selectedId={selectedNoteId}
+                value={selectedNoteId}
+                onChange={(id) => setSelectedNoteId(id)}
               />
             </div>
             <div className="border-t border-border/50 px-4 py-3 flex gap-2">

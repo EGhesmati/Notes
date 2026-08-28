@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Trash2, Pencil, Check, X, Calendar, Pin, Timer } from "lucide-react";
-import { PRIORITY_BADGE } from "@/types";
+import { PRIORITY_BADGE, noteColor } from "@/types";
 import type { NotesState, Priority } from "@/types";
 import { formatDuration } from "@/hooks/use-pomodoro-stats";
 import { TimeChips } from "@/components/TimeChips";
@@ -148,17 +148,31 @@ const NoteCard = memo(function NoteCard({
   const due = formatDue(item.dueDate);
   const focusedSeconds = timeOnNote.get(item.id);
   const focusedLabel = focusedSeconds ? formatDuration(focusedSeconds) : null;
+  const c = noteColor(item.color);
+  const created = new Date(item.createdAt);
+  const cardIndex = String(item.id).padStart(2, "0");
 
   return (
     <Card
-      className={`group relative flex flex-col border-l-4 ${item.color} bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-foreground/12`}
+      className="group relative flex flex-col overflow-hidden rounded-lg border bg-card/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5"
     >
       {item.pinned && (
-        <Pin className="absolute right-2 top-2 h-3.5 w-3.5 rotate-45 fill-primary/30 text-primary" />
+        <span className="absolute right-3 top-2.5 z-10 text-foreground/30 transition-colors group-hover:text-primary">
+          <Pin className="h-3.5 w-3.5 rotate-45 fill-current" />
+        </span>
       )}
-      <CardContent className="flex flex-1 flex-col justify-between gap-3 p-4">
+      <CardContent className="flex flex-1 flex-col p-0">
         {editing ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 p-4">
+            <div className={`flex items-center gap-2 border-b border-border/60 pb-2`}>
+              <span className={`font-mono text-[11px] font-bold tracking-tight ${c.text}`}>
+                #{cardIndex}
+              </span>
+              <span className={`text-[10px] font-bold uppercase tracking-widest text-muted-foreground`}>
+                Editing note
+              </span>
+              <span className="ml-auto inline-flex h-1 w-1 animate-pulse rounded-full bg-primary" />
+            </div>
             <Input
               value={editText}
               onChange={(e) => setEditText(e.target.value)}
@@ -190,7 +204,7 @@ const NoteCard = memo(function NoteCard({
                 type="date"
                 value={editDueDate}
                 onChange={(e) => setEditDueDate(e.target.value)}
-                className="h-7 w-30 rounded-md border border-border bg-background px-2 text-[11px] text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-7 w-30 rounded-md border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
               <TimeChips value={editDueTime} onChange={setEditDueTime} />
             </div>
@@ -205,52 +219,65 @@ const NoteCard = memo(function NoteCard({
           </div>
         ) : (
           <>
-            <div>
-              <div className="mb-2 flex items-center gap-2">
+            {/* Colored index tab */}
+            <div className={`relative flex items-center justify-between px-4 pt-3 pb-2`}>
+              <span className={`absolute bottom-0 left-4 right-4 h-px ${c.tint}`} />
+              <div className="flex items-center gap-2">
+                <span className={`font-mono text-[11px] font-bold tracking-tight ${c.text}`}>
+                  #{cardIndex}
+                </span>
                 {badge && (
-                  <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.className}`}>
+                  <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${badge.className}`}>
                     {badge.label}
                   </span>
                 )}
               </div>
-              <p className="text-sm leading-relaxed text-foreground break-words font-[450]">
+              {due?.badge && (
+                <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${due.badge.color}`}>
+                  {due.badge.label}
+                </span>
+              )}
+            </div>
+
+            {/* Note body */}
+            <div className="flex flex-1 flex-col px-4 pt-1.5 pb-4">
+              <p className="text-sm leading-relaxed text-foreground break-words">
                 {item.text}
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <p className="text-[11px] text-muted-foreground/60">
-                  {new Date(item.createdAt).toLocaleString()}
-                </p>
-                {due && (
-                  <>
-                    {due.badge && (
-                      <span className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${due.badge.color}`}>
-                        {due.badge.label}
-                      </span>
-                    )}
+              {(due?.dateLabel || focusedLabel) && (
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {due?.dateLabel && (
                     <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                       <Calendar className="h-3 w-3" />
                       {due.dateLabel}
                     </span>
-                  </>
-                )}
-                {focusedLabel && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                    <Timer className="h-3 w-3" />
-                    {focusedLabel}
-                  </span>
-                )}
-              </div>
+                  )}
+                  {focusedLabel && (
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${c.text}`}>
+                      <Timer className="h-3 w-3" />
+                      {focusedLabel}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="flex justify-end gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-150">
-              <Button variant="ghost" size="icon" onClick={() => onTogglePin(item.id)} className={`h-8 w-8 rounded-lg ${item.pinned ? "text-primary" : "text-muted-foreground"} hover:text-foreground`} title={item.pinned ? "Unpin" : "Pin"}>
-                <Pin className={`h-3.5 w-3.5 ${item.pinned ? "fill-primary/20" : ""}`} />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={startEdit} className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground" title="Edit">
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => onDelete(item.id)} className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Delete">
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+
+            {/* Footer meta row */}
+            <div className="flex items-center justify-between border-t border-border/60 px-4 py-2">
+              <span className="text-[10px] text-muted-foreground/60">
+                {created.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              </span>
+              <div className="flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                <Button variant="ghost" size="icon" onClick={() => onTogglePin(item.id)} className={`h-7 w-7 ${item.pinned ? "text-primary" : "text-muted-foreground"} hover:text-foreground`} title={item.pinned ? "Unpin" : "Pin"}>
+                  <Pin className={`h-3.5 w-3.5 rotate-45 ${item.pinned ? "fill-current" : ""}`} />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={startEdit} className="h-7 w-7 text-muted-foreground hover:text-foreground" title="Edit">
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => onDelete(item.id)} className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Delete">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           </>
         )}
