@@ -64,13 +64,13 @@ const PHASE_LABEL: Record<string, string> = {
 };
 
 const PHASE_COLOR: Record<string, string> = {
-  focus: "from-violet-500 to-fuchsia-500",
+  focus: "from-red-500 to-rose-500",
   "short-break": "from-emerald-500 to-teal-500",
   "long-break": "from-sky-500 to-blue-500",
 };
 
 const RING_COLOR: Record<string, string> = {
-  focus: "text-violet-500",
+  focus: "text-red-500",
   "short-break": "text-emerald-500",
   "long-break": "text-sky-500",
 };
@@ -435,6 +435,7 @@ export function PomodoroTimer() {
   const color = PHASE_COLOR[phase];
   const duration = phase === "focus" ? focusMin * 60 : phase === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
   const progress = duration > 0 ? Math.min(1, Math.max(0, secondsLeft / duration)) : 0;
+  const lowTime = running && secondsLeft <= 10 && phase === "focus";
 
   const isValidNumber = (val: string) => {
     const num = parseInt(val, 10);
@@ -522,34 +523,42 @@ export function PomodoroTimer() {
           <div className="max-h-[calc(100vh-12rem)] overflow-y-auto px-5 pb-5 pt-2 sm:max-h-[28rem]">
             {/* Timer Display */}
             <div className="mb-5 flex flex-col items-center">
-              <div className="relative flex h-48 w-48 items-center justify-center">
+              <div className={`relative flex h-52 w-52 items-center justify-center ${RING_COLOR[phase]}`}>
                 {/* progress ring */}
-                <svg viewBox="0 0 200 200" className={`h-full w-full -rotate-90 ${RING_COLOR[phase]}`}>
-                  <circle cx="100" cy="100" r="90" fill="none" strokeWidth="9" className="stroke-muted/30" />
+                <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
+                  <circle cx="100" cy="100" r="86" fill="none" strokeWidth="12" className="stroke-muted/25" />
                   <circle
                     cx="100"
                     cy="100"
-                    r="90"
+                    r="86"
                     fill="none"
-                    strokeWidth="9"
+                    strokeWidth="12"
                     strokeLinecap="round"
                     stroke="currentColor"
-                    className="transition-[stroke-dashoffset] duration-500"
-                    strokeDasharray={Math.PI * 180}
-                    strokeDashoffset={Math.PI * 180 * (1 - progress)}
+                    className={`transition-[stroke-dashoffset] duration-500 ${lowTime ? "animate-pulse" : ""}`}
+                    strokeDasharray={Math.PI * 172}
+                    strokeDashoffset={Math.PI * 172 * (1 - progress)}
                   />
                 </svg>
                 {/* soft glow blob behind */}
-                <div className={`absolute h-28 w-28 rounded-full bg-gradient-to-br ${color} opacity-20 blur-2xl`} />
+                <div className={`absolute h-28 w-28 rounded-full bg-gradient-to-br ${color} blur-3xl transition-opacity ${lowTime ? "animate-pulse opacity-40" : "opacity-15"}`} />
                 <div className="relative z-10 flex flex-col items-center">
-                  <span className={`mb-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide ${
-                    running
-                      ? `bg-gradient-to-r ${color} text-white`
-                      : "bg-muted text-muted-foreground"
-                  }`}>
-                    {running ? "In Progress" : "Ready"}
+                  <span
+                    className={`mb-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                      running
+                        ? `bg-gradient-to-r ${color} text-white`
+                        : "bg-muted text-muted-foreground"
+                    } ${lowTime ? "bg-red-500" : ""}`}
+                  >
+                    {running
+                      ? phase === "focus"
+                        ? lowTime
+                          ? "Hurry!"
+                          : "Focus"
+                        : "Break"
+                      : "Ready"}
                   </span>
-                  <span className="font-mono text-6xl font-light leading-none tracking-tight text-foreground tabular-nums">
+                  <span className={`font-mono text-6xl font-semibold leading-none tracking-tight tabular-nums ${lowTime ? "text-red-500" : ""}`}>
                     {formatTime(secondsLeft)}
                   </span>
                   {pomoCount > 0 && (
