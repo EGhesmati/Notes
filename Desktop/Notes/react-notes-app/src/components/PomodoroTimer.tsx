@@ -722,6 +722,18 @@ export function PomodoroTimer() {
     };
   }, []);
 
+  // Show the countdown in the browser tab title while the timer is active.
+  useEffect(() => {
+    const originalTitle = document.title;
+    if (open) {
+      const phaseLabel = PHASE_SESSION_LABEL[phase];
+      document.title = `${formatTime(secondsLeft)} · ${phaseLabel} · Pomodoro`;
+    }
+    return () => {
+      document.title = originalTitle;
+    };
+  }, [open, secondsLeft, phase]);
+
   const requestNotification = useCallback(() => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
