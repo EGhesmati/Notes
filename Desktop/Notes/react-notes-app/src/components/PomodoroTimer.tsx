@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { X, Check, ChevronDown, ChevronUp, Clock, Bell, BellOff, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth-context";
 import { recordCompletion } from "@/hooks/use-pomodoro-stats";
 import { NoteSelect } from "./NoteSelect";
@@ -125,8 +124,33 @@ export function PomodoroTimer() {
   const endAtRef = useRef<number | null>(null);
   const restored = useRef(false);
 
+  const soundRef = useRef(true);
+
   const [open, setOpen] = useState(false);
-  const [sound, setSound] = useState(true);
+
+  const [sound, _setSound] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(`pomodoro_sound_${userId}`);
+      return saved === null ? true : saved === "1";
+    } catch {
+      return true;
+    }
+  });
+
+  // keep a ref in sync so running intervals read the latest value
+  useEffect(() => {
+    soundRef.current = sound;
+    try {
+      localStorage.setItem(`pomodoro_sound_${userId}`, sound ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }, [sound, userId]);
+
+  const setSound = (v: boolean) => {
+    soundRef.current = v;
+    _setSound(v);
+  };
   const [focusMin, setFocusMin] = useState(25);
   const [breakMin, setBreakMin] = useState(5);
   const [phase, setPhase] = useState<"focus" | "short-break" | "long-break">("focus");
@@ -227,7 +251,7 @@ export function PomodoroTimer() {
       const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
       setSecondsLeft(left);
 
-      if (left <= 10 && left > 0 && sound && !notified) {
+      if (left <= 10 && left > 0 && soundRef.current && !notified) {
         setNotified(true);
         playBeep();
       }
@@ -237,7 +261,7 @@ export function PomodoroTimer() {
         intervalRef.current = null;
         endAtRef.current = null;
         playChime();
-        if (sound) {
+        if (soundRef.current) {
           notify(PHASE_LABEL[phase], "Time's up! 🍅");
         }
         confirmCompletion();
@@ -253,7 +277,7 @@ export function PomodoroTimer() {
       running: true,
       startedAt,
     });
-  }, [running, phase, focusMin, breakMin, secondsLeft, pomoCount, userId, sound, notified, notify, confirmCompletion]);
+  }, [running, phase, focusMin, breakMin, secondsLeft, pomoCount, userId, notified, notify, confirmCompletion]);
 
   const pause = useCallback(() => {
     if (intervalRef.current) {
@@ -342,7 +366,7 @@ export function PomodoroTimer() {
           if (!endAtRef.current) return;
           const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
           setSecondsLeft(left);
-          if (left <= 10 && left > 0 && sound && !notified) {
+          if (left <= 10 && left > 0 && soundRef.current && !notified) {
             setNotified(true);
             playBeep();
           }
@@ -351,7 +375,7 @@ export function PomodoroTimer() {
             intervalRef.current = null;
             endAtRef.current = null;
             playChime();
-            if (sound) {
+            if (soundRef.current) {
               notify(PHASE_LABEL[saved.phase], "Time's up! 🍅");
             }
             setRunning(false);
@@ -360,7 +384,7 @@ export function PomodoroTimer() {
         }, 250);
       }
     }
-  }, [userId, sound, notified, notify]);
+  }, [userId, notified, notify]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -402,6 +426,8 @@ export function PomodoroTimer() {
 
   const label = PHASE_LABEL[phase];
   const color = PHASE_COLOR[phase];
+  const duration = phase === "focus" ? focusMin * 60 : phase === "long-break" ? LONG_BREAK_MIN * 60 : breakMin * 60;
+  const progress = duration > 0 ? Math.min(1, Math.max(0, secondsLeft / duration)) : 0;
 
   const isValidNumber = (val: string) => {
     const num = parseInt(val, 10);
@@ -489,27 +515,56 @@ export function PomodoroTimer() {
           <div className="max-h-[calc(100vh-10rem)] overflow-y-auto p-4 sm:max-h-[28rem]">
             {/* Timer Display */}
             <div className="mb-4 flex flex-col items-center">
-              <div className={`mb-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r ${color} px-3 py-1 text-xs font-medium text-white shadow-sm`}>
-                {running ? (
-                  <>
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                    Running
-                  </>
-                ) : (
-                  <>
-                    <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
-                    Paused
-                  </>
-                )}
+              <div className="relative flex h-44 w-44 items-center justify-center">
+                {/* progress ring */}
+                <svg viewBox="0 0 180 180" className="h-full w-full -rotate-90">
+                  <circle
+                    cx="90"
+                    cy="90"
+                    r="80"
+                    fill="none"
+                    strokeWidth="10"
+                    className="stroke-muted/60"
+                  />
+                  <circle
+                    cx="90"
+                    cy="90"
+                    r="80"
+                    fill="none"
+                    strokeWidth="10"
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    className={`text-primary transition-[stroke-dashoffset] duration-500`}
+                    strokeDasharray={Math.PI * 160}
+                    strokeDashoffset={Math.PI * 160 * (1 - progress)}
+                  />
+                </svg>
+                {/* soft glow blob behind */}
+                <div className={`absolute h-28 w-28 rounded-full bg-gradient-to-br ${color} opacity-15 blur-2xl`} />
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className={`mb-1 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r ${color} px-3 py-1 text-[10px] font-semibold text-white shadow-sm`}>
+                    {running ? (
+                      <>
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                        Running
+                      </>
+                    ) : (
+                      <>
+                        <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+                        Paused
+                      </>
+                    )}
+                  </div>
+                  <span className="font-mono text-[2.6rem] font-bold leading-none tracking-tight text-foreground">
+                    {formatTime(secondsLeft)}
+                  </span>
+                  {pomoCount > 0 && (
+                    <span className="mt-1.5 text-[10px] font-medium text-muted-foreground">
+                      #{pomoCount + 1} · {pomoCount} done
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className={`mb-1 bg-gradient-to-r ${color} bg-clip-text text-center`}>
-                <span className="font-mono text-5xl font-bold text-transparent">{formatTime(phase === "focus" ? secondsLeft : secondsLeft)}</span>
-              </div>
-              {pomoCount > 0 && (
-                <Badge variant="outline" className="mt-1 text-xs">
-                  #{pomoCount + 1} • {pomoCount} completed
-                </Badge>
-              )}
             </div>
 
             {/* Controls */}
@@ -517,15 +572,15 @@ export function PomodoroTimer() {
               {!running ? (
                 <Button
                   onClick={start}
-                  className={`flex-1 bg-gradient-to-r ${color} text-white shadow-sm hover:opacity-90`}
+                  className={`h-11 flex-1 rounded-full bg-gradient-to-r ${color} text-sm font-semibold text-white shadow-md shadow-black/10 transition-transform hover:scale-[1.02] hover:opacity-90 active:scale-[0.98]`}
                 >
-                  Start
+                  Start Focus
                 </Button>
               ) : (
                 <Button
                   onClick={pause}
                   variant="secondary"
-                  className="flex-1"
+                  className="h-11 flex-1 rounded-full text-sm font-semibold shadow-sm transition-transform hover:scale-[1.02] active:scale-[0.98]"
                 >
                   Pause
                 </Button>
@@ -534,7 +589,7 @@ export function PomodoroTimer() {
                 onClick={reset}
                 variant="outline"
                 size="icon"
-                className="h-10 w-10"
+                className="h-11 w-11 rounded-full"
                 title="Reset"
               >
                 <X className="h-4 w-4" />
@@ -658,23 +713,32 @@ export function PomodoroTimer() {
 
               {/* Sound Toggle */}
               <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 p-3">
-                <div className="flex items-center gap-2">
-                  {sound ? (
-                    <Bell className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <BellOff className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <span className="text-xs font-medium">Sound Alerts</span>
+                <div className="flex items-center gap-2.5">
+                  <span className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                    sound ? "bg-primary/10 text-primary" : "bg-muted/70 text-muted-foreground"
+                  }`}>
+                    {sound ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
+                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium leading-tight">Sound Alerts</span>
+                    <span className="text-[10px] text-muted-foreground/70">
+                      {sound ? "Beeps & notifications on" : "Muted"}
+                    </span>
+                  </div>
                 </div>
                 <button
+                  type="button"
+                  role="switch"
+                  aria-checked={sound}
+                  aria-label="Toggle sound alerts"
                   onClick={() => setSound(!sound)}
-                  className={`relative h-5 w-9 rounded-full transition-colors ${
-                    sound ? "bg-primary" : "bg-muted"
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                    sound ? "bg-gradient-to-r from-primary to-primary/80" : "bg-muted"
                   }`}
                 >
                   <span
-                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                      sound ? "translate-x-4" : "translate-x-0.5"
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-transform ${
+                      sound ? "translate-x-[22px]" : "translate-x-0.5"
                     }`}
                   />
                 </button>
