@@ -95,4 +95,33 @@ export async function reorderNotes(order: number[]) {
   return res.json();
 }
 
+// ---- Account / auth profile changes ----
+
+export async function changePassword(currentPasscode: string, newPasscode: string) {
+  const res = await fetch(`${API_URL}/api/auth/change-password`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ currentPasscode, newPasscode }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to change passcode");
+  }
+  return res.json();
+}
+
+export async function changeUsername(newName: string, currentPasscode: string) {
+  const res = await fetch(`${API_URL}/api/auth/change-username`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify({ newName, currentPasscode }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Failed to change username");
+  }
+  return res.json();
+}
+
+
 

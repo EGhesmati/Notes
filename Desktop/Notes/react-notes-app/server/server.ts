@@ -2,6 +2,7 @@ import { Pool } from "@neondatabase/serverless";
 import express from "express";
 import cors from "cors";
 import jwt from "jsonwebtoken";
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
 const PORT = parseInt(process.env.PORT || "3001", 10);
@@ -43,6 +44,10 @@ await pool.query(`
   -- soft-delete support: trashed notes have a non-null deleted_at timestamp
   ALTER TABLE notes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
+  -- password hashing support: new/changed passwords are stored here as scrypt hashes;
+  -- legacy rows keep a plaintext passcode until they next verify (upgraded on login/change)
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
   CREATE TABLE IF NOT EXISTS pomodoros (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -72,13 +77,44 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
   }
 }
 
+// ---- Password hashing (Node built-in scrypt, no external deps) ----
+// Stored format: "scrypt$<saltHex>$<hashHex>"
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `scrypt$${salt}$${hash}`;
+}
+
+function verifyPassword(password: string, stored: string): boolean {
+  const parts = stored.split("$");
+  if (parts.length !== 3 || parts[0] !== "scrypt") return false;
+  const [, salt, hashHex] = parts;
+  const candidate = scryptSync(password, salt, 64);
+  const expected = Buffer.from(hashHex, "hex");
+  return candidate.length === expected.length && timingSafeEqual(candidate, expected);
+}
+
 app.post("/api/auth/login", async (req, res) => {
   const name = (req.body.name || "").trim();
   const passcode = req.body.passcode;
   if (!name || !passcode) return res.status(400).json({ error: "name and passcode required" });
-  const { rows } = await pool.query("SELECT id, name, is_admin FROM users WHERE name = $1 AND passcode = $2", [name, passcode]);
+  const { rows } = await pool.query("SELECT id, name, is_admin, passcode, password_hash FROM users WHERE name = $1", [name]);
   if (rows.length === 0) return res.status(401).json({ error: "invalid credentials" });
   const user = rows[0];
+
+  const hash = user.password_hash as string | null;
+  const ok = hash
+    ? verifyPassword(String(passcode), hash)
+    : String(user.passcode) === String(passcode);
+
+  if (!ok) return res.status(401).json({ error: "invalid credentials" });
+
+  // Legacy plaintext passcode → upgrade to a scrypt hash on successful login.
+  if (!hash) {
+    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hashPassword(String(passcode)), user.id]);
+  }
+
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
   res.json({ token, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
 });
@@ -103,6 +139,56 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
   if (rows.length === 0) return res.status(404).json({ error: "user not found" });
   const u = rows[0];
   res.json({ id: u.id, name: u.name, isAdmin: !!u.is_admin });
+});
+
+// Change the authenticated user's passcode (verifies the current one first).
+app.post("/api/auth/change-password", authMiddleware, async (req, res) => {
+  const { currentPasscode, newPasscode } = req.body;
+  if (!currentPasscode || !newPasscode) return res.status(400).json({ error: "current and new passcode required" });
+  if (String(newPasscode).length < 4) return res.status(400).json({ error: "new passcode must be at least 4 characters" });
+
+  const { rows } = await pool.query("SELECT passcode, password_hash FROM users WHERE id = $1", [(req as any).userId]);
+  if (rows.length === 0) return res.status(404).json({ error: "user not found" });
+  const user = rows[0];
+  const hash = user.password_hash as string | null;
+  const ok = hash
+    ? verifyPassword(String(currentPasscode), hash)
+    : String(user.passcode) === String(currentPasscode);
+  if (!ok) return res.status(401).json({ error: "current passcode is incorrect" });
+
+  await pool.query("UPDATE users SET passcode = $1, password_hash = $2 WHERE id = $3", [
+    String(newPasscode),
+    hashPassword(String(newPasscode)),
+    (req as any).userId,
+  ]);
+  res.json({ ok: true });
+});
+
+// Change the authenticated user's display name (verifies the current passcode, checks uniqueness).
+app.post("/api/auth/change-username", authMiddleware, async (req, res) => {
+  const { newName, currentPasscode } = req.body;
+  const clean = (newName || "").trim();
+  if (!clean) return res.status(400).json({ error: "new name required" });
+
+  const { rows } = await pool.query("SELECT passcode, password_hash FROM users WHERE id = $1", [(req as any).userId]);
+  if (rows.length === 0) return res.status(404).json({ error: "user not found" });
+  const user = rows[0];
+  const hash = user.password_hash as string | null;
+  const ok = hash
+    ? verifyPassword(String(currentPasscode || ""), hash)
+    : String(user.passcode) === String(currentPasscode || "");
+  if (!ok) return res.status(401).json({ error: "current passcode is incorrect" });
+
+  try {
+    const updated = await pool.query(
+      "UPDATE users SET name = $1 WHERE id = $2 RETURNING id, name, is_admin",
+      [clean, (req as any).userId],
+    );
+    const u = updated.rows[0];
+    res.json({ ok: true, user: { id: u.id, name: u.name, isAdmin: !!u.is_admin } });
+  } catch {
+    res.status(409).json({ error: "name already taken" });
+  }
 });
 
 // ---- Notes ----

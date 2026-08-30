@@ -18,12 +18,15 @@ import {
   Trash2,
   RotateCcw,
   Inbox,
+  UserRound,
+  KeyRound,
 } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useUserNotes } from "@/hooks/use-user-notes";
 import { usePomodoroStats, timePerNoteMap } from "@/hooks/use-pomodoro-stats";
+import { changePassword, changeUsername } from "@/lib/api";
 import { AppLoadingScreen } from "@/components/AppLoadingScreen";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import PomodoroStats from "@/components/PomodoroStats";
@@ -51,7 +54,7 @@ export default function App() {
 }
 
 function AppShell({ signOut }: { signOut: () => void }) {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const userId = user?.id ?? 0;
   const [text, setText] = useState("");
   const [priority, setPriority] = useState<Priority | undefined>();
@@ -66,6 +69,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
   const [showUsers, setShowUsers] = useState(false);
   const [showSignOut, setShowSignOut] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
   const { theme, toggle } = useTheme();
 
   type ViewMode = "grid" | "list" | "kanban";
@@ -189,6 +193,15 @@ function AppShell({ signOut }: { signOut: () => void }) {
                 <Shield className="h-[16px] w-[16px]" />
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowAccount(true)}
+              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"
+              title="Account"
+            >
+              <UserRound className="h-[16px] w-[16px]" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -328,6 +341,13 @@ function AppShell({ signOut }: { signOut: () => void }) {
       </main>
 
       {showUsers && user?.isAdmin && <UsersModal onClose={() => setShowUsers(false)} />}
+      {showAccount && (
+        <AccountModal
+          user={user}
+          onUserUpdated={updateUser}
+          onClose={() => setShowAccount(false)}
+        />
+      )}
       {showTrash && (
         <TrashModal
           trash={trash}
@@ -358,6 +378,159 @@ function AppShell({ signOut }: { signOut: () => void }) {
           </p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function AccountModal({
+  user,
+  onUserUpdated,
+  onClose,
+}: {
+  user: { id: number; name: string; isAdmin?: boolean } | null;
+  onUserUpdated: (patch: { name?: string; isAdmin?: boolean }) => void;
+  onClose: () => void;
+}) {
+  const [username, setUsername] = useState(user?.name ?? "");
+  const [passcodeForUser, setPasscodeForUser] = useState("");
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const flash = (kind: "ok" | "err", text: string) => setMsg({ kind, text });
+
+  const saveUsername = async () => {
+    const clean = username.trim();
+    if (!clean) return flash("err", "Username cannot be empty");
+    if (clean === user?.name) return flash("err", "Username is unchanged");
+    if (!passcodeForUser) return flash("err", "Enter your current passcode");
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await changeUsername(clean, passcodeForUser);
+      onUserUpdated(res.user ?? { name: clean });
+      setPasscodeForUser("");
+      flash("ok", "Username updated");
+    } catch (e) {
+      flash("err", e instanceof Error ? e.message : "Failed to update username");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const savePassword = async () => {
+    if (pwNew.length < 4) return flash("err", "New passcode must be at least 4 characters");
+    if (pwNew !== pwConfirm) return flash("err", "New passcodes do not match");
+    if (!pwCurrent) return flash("err", "Enter your current passcode");
+    setBusy(true);
+    setMsg(null);
+    try {
+      await changePassword(pwCurrent, pwNew);
+      setPwCurrent("");
+      setPwNew("");
+      setPwConfirm("");
+      flash("ok", "Passcode updated");
+    } catch (e) {
+      flash("err", e instanceof Error ? e.message : "Failed to update passcode");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="mx-auto mt-16 w-[min(100%-2rem,30rem)] max-h-[85vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <UserRound className="h-5 w-5 text-muted-foreground" />
+            Account
+          </h2>
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7 text-muted-foreground">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="space-y-6 px-5 py-5">
+          {msg && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-sm ${
+                msg.kind === "ok"
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : "border-destructive/40 bg-destructive/10 text-destructive"
+              }`}
+            >
+              {msg.text}
+            </div>
+          )}
+
+          {/* Change username */}
+          <div className="space-y-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <UserRound className="h-4 w-4 text-muted-foreground" />
+              Change username
+            </h3>
+            <Input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="New username"
+              className="border-border bg-background/70"
+            />
+            <Input
+              type="password"
+              value={passcodeForUser}
+              onChange={(e) => setPasscodeForUser(e.target.value)}
+              placeholder="Current passcode"
+              className="border-border bg-background/70"
+            />
+            <div className="flex justify-end">
+              <Button onClick={saveUsername} disabled={busy} className="bg-foreground text-primary-foreground hover:bg-foreground/90">
+                Save username
+              </Button>
+            </div>
+          </div>
+
+          <div className="h-px bg-border" />
+
+          {/* Change password */}
+          <div className="space-y-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <KeyRound className="h-4 w-4 text-muted-foreground" />
+              Change passcode
+            </h3>
+            <Input
+              type="password"
+              value={pwCurrent}
+              onChange={(e) => setPwCurrent(e.target.value)}
+              placeholder="Current passcode"
+              className="border-border bg-background/70"
+            />
+            <Input
+              type="password"
+              value={pwNew}
+              onChange={(e) => setPwNew(e.target.value)}
+              placeholder="New passcode (4+ chars)"
+              className="border-border bg-background/70"
+            />
+            <Input
+              type="password"
+              value={pwConfirm}
+              onChange={(e) => setPwConfirm(e.target.value)}
+              placeholder="Confirm new passcode"
+              className="border-border bg-background/70"
+            />
+            <div className="flex justify-end">
+              <Button onClick={savePassword} disabled={busy} className="bg-foreground text-primary-foreground hover:bg-foreground/90">
+                Save passcode
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
