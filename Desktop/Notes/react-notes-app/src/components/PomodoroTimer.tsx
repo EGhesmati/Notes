@@ -604,6 +604,21 @@ export function PomodoroTimer() {
     clearState(userIdRef.current);
   }, []);
 
+  const resetCycle = useCallback(() => {
+    pomoCountRef.current = 0;
+    setPomoCount(0);
+    saveState(userIdRef.current, {
+      focusMin: focusMinRef.current,
+      breakMin: breakMinRef.current,
+      longBreakMin: longBreakMinRef.current,
+      phase: phaseRef.current,
+      secondsLeft: secondsLeftRef.current,
+      pomoCount: 0,
+      running: runningRef.current,
+      startedAt: endAtRef.current,
+    });
+  }, []);
+
   const skipPhase = useCallback(() => {
     const p = phaseRef.current;
     const count = pomoCountRef.current;
@@ -943,9 +958,20 @@ export function PomodoroTimer() {
                     />
                   ))}
                 </div>
-                <span className="text-[11px] text-muted-foreground">
-                  {cycleInCycle} of 4 in this cycle
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-muted-foreground">
+                    {cycleInCycle} of 4 in this cycle
+                  </span>
+                  <button
+                    type="button"
+                    onClick={resetCycle}
+                    title="Reset cycle"
+                    aria-label="Reset cycle count"
+                    className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
             </div>
 
