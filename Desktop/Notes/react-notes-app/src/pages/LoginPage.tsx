@@ -1,18 +1,23 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Check } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { AppIcon } from "@/components/AppIcon";
 
 export function LoginPage() {
   const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<"login" | "register" | "show-passcode">("login");
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [passcode, setPasscode] = useState("");
-  const [generatedCode, setGeneratedCode] = useState("");
+  const [regName, setRegName] = useState("");
+  const [regPasscode, setRegPasscode] = useState("");
+  const [regConfirm, setRegConfirm] = useState("");
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
+
+  const switchMode = (m: "login" | "register") => {
+    setMode(m);
+    setError("");
+  };
 
   const handleLogin = async () => {
     setError("");
@@ -25,72 +30,35 @@ export function LoginPage() {
 
   const handleRegister = async () => {
     setError("");
+    if (regPasscode.length < 4) {
+      setError("Passcode must be at least 4 characters");
+      return;
+    }
+    if (regPasscode !== regConfirm) {
+      setError("Passcodes do not match");
+      return;
+    }
     try {
-      const code = await signUp(name);
-      setGeneratedCode(code);
-      setMode("show-passcode");
+      await signUp(regName, regPasscode);
     } catch {
       setError("Name already taken");
     }
   };
-
-  const copyCode = () => {
-    navigator.clipboard.writeText(generatedCode);
-    setCopied(true);
-  };
-
-  const handleSignInWithCode = async () => {
-    setError("");
-    try {
-      await signIn(name, generatedCode);
-    } catch {
-      setError("Sign in failed. Please try again.");
-    }
-  };
-
-  if (mode === "show-passcode") {
-    return (
-      <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-4">
-      <AppIcon className="h-10 w-10" />
-        <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-md text-center">
-          <h2 className="text-lg font-semibold text-foreground">Your passcode</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Copy it now — you won't see it again.
-          </p>
-          <div className="mt-4 flex items-center gap-2">
-            <code className="flex-1 rounded-md bg-muted px-4 py-2 text-lg font-mono font-bold text-foreground tracking-widest">
-              {generatedCode}
-            </code>
-            <Button variant="outline" size="icon" onClick={copyCode} className="h-10 w-10">
-              {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-            </Button>
-          </div>
-          {error && (
-            <p className="mt-2 text-xs text-rose-500">{error}</p>
-          )}
-          <Button
-            className="mt-4 w-full"
-            onClick={handleSignInWithCode}
-          >
-            Sign in with this passcode
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-4">
       <div className="flex flex-col items-center gap-2">
         <AppIcon className="h-10 w-10" />
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Notes App</h1>
-        <p className="text-sm text-muted-foreground">write it down, keep it safe</p>
+        <p className="text-sm text-muted-foreground">
+          {mode === "login" ? "write it down, keep it safe" : "Create your account"}
+        </p>
       </div>
 
       <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-md">
         <div className="mb-5 flex gap-1 rounded-lg bg-muted p-1">
           <button
-            onClick={() => setMode("login")}
+            onClick={() => switchMode("login")}
             className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-all duration-150 ${
               mode === "login" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
@@ -98,7 +66,7 @@ export function LoginPage() {
             Sign in
           </button>
           <button
-            onClick={() => setMode("register")}
+            onClick={() => switchMode("register")}
             className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-all duration-150 ${
               mode === "register" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
@@ -110,13 +78,11 @@ export function LoginPage() {
         <div className="space-y-3">
           <Input
             placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") mode === "login" ? handleLogin() : handleRegister();
-            }}
+            value={mode === "login" ? name : regName}
+            onChange={(e) => (mode === "login" ? setName(e.target.value) : setRegName(e.target.value))}
+            onKeyDown={(e) => e.key === "Enter" && (mode === "login" ? handleLogin() : handleRegister())}
           />
-          {mode === "login" && (
+          {mode === "login" ? (
             <Input
               type="password"
               placeholder="Passcode"
@@ -124,29 +90,50 @@ export function LoginPage() {
               onChange={(e) => setPasscode(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             />
+          ) : (
+            <>
+              <Input
+                type="password"
+                placeholder="Choose a passcode (4+ chars)"
+                value={regPasscode}
+                onChange={(e) => setRegPasscode(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleRegister()}
+              />
+              <Input
+                type="password"
+                placeholder="Confirm passcode"
+                value={regConfirm}
+                onChange={(e) => setRegConfirm(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleRegister()}
+              />
+            </>
           )}
-          {error && (
-            <p className="text-xs text-rose-500">{error}</p>
-          )}
+          {error && <p className="text-xs text-rose-500">{error}</p>}
           <Button
             className="w-full"
             onClick={mode === "login" ? handleLogin : handleRegister}
-            disabled={!name.trim() || (mode === "login" && !passcode.trim())}
+            disabled={
+              mode === "login"
+                ? !name.trim() || !passcode.trim()
+                : !regName.trim() || !regPasscode.trim() || !regConfirm.trim()
+            }
           >
-            {mode === "login" ? "Sign in" : "Register"}
+            {mode === "login" ? "Sign in" : "Create account"}
           </Button>
 
-          <button
-            onClick={() => {
-              const offlineUser = { id: 0, name: "offline" };
-              localStorage.setItem("token", "offline");
-              localStorage.setItem("user", JSON.stringify(offlineUser));
-              window.location.reload();
-            }}
-            className="mt-3 w-full text-center text-[11px] text-muted-foreground/70 hover:text-muted-foreground transition-colors duration-150"
-          >
-            Continue offline (localStorage)
-          </button>
+          {mode === "login" && (
+            <button
+              onClick={() => {
+                const offlineUser = { id: 0, name: "offline" };
+                localStorage.setItem("token", "offline");
+                localStorage.setItem("user", JSON.stringify(offlineUser));
+                window.location.reload();
+              }}
+              className="mt-3 w-full text-center text-[11px] text-muted-foreground/70 hover:text-muted-foreground transition-colors duration-150"
+            >
+              Continue offline (localStorage)
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -19,7 +19,7 @@ interface AuthContextValue {
   isLoggedIn: boolean;
   user: User | null;
   signIn: (name: string, passcode: string) => Promise<void>;
-  signUp: (name: string) => Promise<string>;
+  signUp: (name: string, passcode: string) => Promise<void>;
   signOut: () => void;
   updateUser: (patch: Partial<User>) => void;
   refreshToken: (token: string) => void;
@@ -89,20 +89,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }, []);
 
-  const signUp = useCallback(async (name: string) => {
+  const signUp = useCallback(async (name: string, passcode: string) => {
     const res = await fetch(`${API_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, passcode }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || "Registration failed");
     }
     const data = await res.json();
-    // Don't set token/user here — let the user see the passcode first,
-    // then sign in explicitly via signIn().
-    return data.passcode as string;
+    // Registering with a chosen passcode signs the user in immediately.
+    setToken(data.token);
+    setUser(data.user);
   }, []);
 
   const signOut = useCallback(() => {

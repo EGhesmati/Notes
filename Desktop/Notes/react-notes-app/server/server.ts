@@ -132,13 +132,17 @@ app.post("/api/auth/login", async (req, res) => {
 
 app.post("/api/auth/register", async (req, res) => {
   const name = (req.body.name || "").trim();
+  const passcode = String(req.body.passcode ?? "");
   if (!name) return res.status(400).json({ error: "name required" });
-  const passcode = Array.from({ length: 8 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]).join("");
+  if (passcode.length < 4) return res.status(400).json({ error: "passcode must be at least 4 characters" });
   try {
-    const { rows } = await pool.query("INSERT INTO users (name, passcode) VALUES ($1, $2) RETURNING id, name, is_admin, token_version", [name, passcode]);
+    const { rows } = await pool.query(
+      "INSERT INTO users (name, passcode, password_hash) VALUES ($1, $2, $3) RETURNING id, name, is_admin, token_version",
+      [name, passcode, hashPassword(passcode)],
+    );
     const user = rows[0];
     const token = jwt.sign({ userId: user.id, version: Number(user.token_version) ?? 0 }, JWT_SECRET, { expiresIn: "30d" });
-    res.json({ token, passcode, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
+    res.json({ token, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
   } catch {
     res.status(409).json({ error: "name already taken" });
   }
