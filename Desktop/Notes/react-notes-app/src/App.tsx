@@ -346,6 +346,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
           user={user}
           onUserUpdated={updateUser}
           onClose={() => setShowAccount(false)}
+          onSignOut={signOut}
         />
       )}
       {showTrash && (
@@ -386,10 +387,12 @@ function AccountModal({
   user,
   onUserUpdated,
   onClose,
+  onSignOut,
 }: {
   user: { id: number; name: string; isAdmin?: boolean } | null;
   onUserUpdated: (patch: { name?: string; isAdmin?: boolean }) => void;
   onClose: () => void;
+  onSignOut: () => void;
 }) {
   const [username, setUsername] = useState(user?.name ?? "");
   const [passcodeForUser, setPasscodeForUser] = useState("");
@@ -428,10 +431,9 @@ function AccountModal({
     setMsg(null);
     try {
       await changePassword(pwCurrent, pwNew);
-      setPwCurrent("");
-      setPwNew("");
-      setPwConfirm("");
-      flash("ok", "Passcode updated");
+      // Invalidate the live session so the user signs in fresh with the new passcode.
+      onClose();
+      onSignOut();
     } catch (e) {
       flash("err", e instanceof Error ? e.message : "Failed to update passcode");
     } finally {

@@ -48,6 +48,9 @@ await pool.query(`
   -- legacy rows keep a plaintext passcode until they next verify (upgraded on login/change)
   ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
+  -- token_version is bumped on password change to invalidate all previously issued JWTs
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;
+
   CREATE TABLE IF NOT EXISTS pomodoros (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -65,11 +68,15 @@ app.use(express.json());
 
 // ---- Auth ----
 
-function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+async function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "unauthorized" });
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { userId: number };
+    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { userId: number; version?: number };
+    const { rows } = await pool.query("SELECT token_version FROM users WHERE id = $1", [payload.userId]);
+    if (rows.length === 0 || Number(rows[0].token_version) !== (payload.version ?? 0)) {
+      return res.status(401).json({ error: "invalid token" });
+    }
     (req as any).userId = payload.userId;
     next();
   } catch {
@@ -99,7 +106,7 @@ app.post("/api/auth/login", async (req, res) => {
   const name = (req.body.name || "").trim();
   const passcode = req.body.passcode;
   if (!name || !passcode) return res.status(400).json({ error: "name and passcode required" });
-  const { rows } = await pool.query("SELECT id, name, is_admin, passcode, password_hash FROM users WHERE name = $1", [name]);
+  const { rows } = await pool.query("SELECT id, name, is_admin, passcode, password_hash, token_version FROM users WHERE name = $1", [name]);
   if (rows.length === 0) return res.status(401).json({ error: "invalid credentials" });
   const user = rows[0];
 
@@ -115,7 +122,7 @@ app.post("/api/auth/login", async (req, res) => {
     await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hashPassword(String(passcode)), user.id]);
   }
 
-  const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
+  const token = jwt.sign({ userId: user.id, version: Number(user.token_version) ?? 0 }, JWT_SECRET, { expiresIn: "30d" });
   res.json({ token, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
 });
 
@@ -124,9 +131,9 @@ app.post("/api/auth/register", async (req, res) => {
   if (!name) return res.status(400).json({ error: "name required" });
   const passcode = Array.from({ length: 8 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]).join("");
   try {
-    const { rows } = await pool.query("INSERT INTO users (name, passcode) VALUES ($1, $2) RETURNING id, name, is_admin", [name, passcode]);
+    const { rows } = await pool.query("INSERT INTO users (name, passcode) VALUES ($1, $2) RETURNING id, name, is_admin, token_version", [name, passcode]);
     const user = rows[0];
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
+    const token = jwt.sign({ userId: user.id, version: Number(user.token_version) ?? 0 }, JWT_SECRET, { expiresIn: "30d" });
     res.json({ token, passcode, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
   } catch {
     res.status(409).json({ error: "name already taken" });
@@ -156,12 +163,12 @@ app.post("/api/auth/change-password", authMiddleware, async (req, res) => {
     : String(user.passcode) === String(currentPasscode);
   if (!ok) return res.status(401).json({ error: "current passcode is incorrect" });
 
-  await pool.query("UPDATE users SET passcode = $1, password_hash = $2 WHERE id = $3", [
+  await pool.query("UPDATE users SET passcode = $1, password_hash = $2, token_version = token_version + 1 WHERE id = $3", [
     String(newPasscode),
     hashPassword(String(newPasscode)),
     (req as any).userId,
   ]);
-  res.json({ ok: true });
+  res.json({ ok: true, versionBumped: true });
 });
 
 // Change the authenticated user's display name (verifies the current passcode, checks uniqueness).
@@ -280,11 +287,15 @@ app.put("/api/notes/reorder", authMiddleware, async (req, res) => {
 
 // ---- Safe admin user summary ----
 
-function adminMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+async function adminMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "unauthorized" });
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { userId: number };
+    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { userId: number; version?: number };
+    const { rows } = await pool.query("SELECT token_version FROM users WHERE id = $1", [payload.userId]);
+    if (rows.length === 0 || Number(rows[0].token_version) !== (payload.version ?? 0)) {
+      return res.status(401).json({ error: "invalid token" });
+    }
     (req as any).userId = payload.userId;
     next();
   } catch {
