@@ -54,7 +54,7 @@ export default function App() {
 }
 
 function AppShell({ signOut }: { signOut: () => void }) {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, refreshToken } = useAuth();
   const userId = user?.id ?? 0;
   const [text, setText] = useState("");
   const [priority, setPriority] = useState<Priority | undefined>();
@@ -345,8 +345,8 @@ function AppShell({ signOut }: { signOut: () => void }) {
         <AccountModal
           user={user}
           onUserUpdated={updateUser}
+          onTokenRefreshed={refreshToken}
           onClose={() => setShowAccount(false)}
-          onSignOut={signOut}
         />
       )}
       {showTrash && (
@@ -387,12 +387,12 @@ function AccountModal({
   user,
   onUserUpdated,
   onClose,
-  onSignOut,
+  onTokenRefreshed,
 }: {
   user: { id: number; name: string; isAdmin?: boolean } | null;
   onUserUpdated: (patch: { name?: string; isAdmin?: boolean }) => void;
   onClose: () => void;
-  onSignOut: () => void;
+  onTokenRefreshed: (token: string) => void;
 }) {
   const [username, setUsername] = useState(user?.name ?? "");
   const [passcodeForUser, setPasscodeForUser] = useState("");
@@ -430,10 +430,13 @@ function AccountModal({
     setBusy(true);
     setMsg(null);
     try {
-      await changePassword(pwCurrent, pwNew);
-      // Invalidate the live session so the user signs in fresh with the new passcode.
-      onClose();
-      onSignOut();
+      const res = await changePassword(pwCurrent, pwNew);
+      // Keep the user signed in by swapping to the fresh token issued for the new version.
+      if (res?.token) onTokenRefreshed(res.token);
+      setPwCurrent("");
+      setPwNew("");
+      setPwConfirm("");
+      flash("ok", "Passcode updated");
     } catch (e) {
       flash("err", e instanceof Error ? e.message : "Failed to update passcode");
     } finally {

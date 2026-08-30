@@ -22,6 +22,7 @@ interface AuthContextValue {
   signUp: (name: string) => Promise<string>;
   signOut: () => void;
   updateUser: (patch: Partial<User>) => void;
+  refreshToken: (token: string) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -117,9 +118,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev ? { ...prev, ...patch } : prev));
   }, []);
 
+  // Swap in a fresh token without logging the user out (e.g. after a passcode change).
+  const refreshToken = useCallback((token: string) => {
+    setToken(token);
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ isLoggedIn: !!token, user, signIn, signUp, signOut, updateUser }}
+      value={{ isLoggedIn: !!token, user, signIn, signUp, signOut, updateUser, refreshToken }}
     >
       {children}
     </AuthContext.Provider>

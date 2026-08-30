@@ -172,7 +172,13 @@ app.post("/api/auth/change-password", authMiddleware, async (req, res) => {
     hashPassword(String(newPasscode)),
     (req as any).userId,
   ]);
-  res.json({ ok: true, versionBumped: true });
+
+  // Issue a fresh token against the new version so the user stays signed in.
+  let version = 1;
+  const v = await pool.query("SELECT token_version FROM users WHERE id = $1", [(req as any).userId]);
+  if (v.rows.length > 0) version = Number(v.rows[0].token_version);
+  const token = jwt.sign({ userId: (req as any).userId, version }, JWT_SECRET, { expiresIn: "30d" });
+  res.json({ ok: true, token });
 });
 
 // Change the authenticated user's display name (verifies the current passcode, checks uniqueness).
