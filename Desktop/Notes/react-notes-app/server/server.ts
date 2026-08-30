@@ -104,26 +104,30 @@ function verifyPassword(password: string, stored: string): boolean {
 
 app.post("/api/auth/login", async (req, res) => {
   const name = (req.body.name || "").trim();
-  const passcode = req.body.passcode;
+  const passcode = String(req.body.passcode ?? "");
   if (!name || !passcode) return res.status(400).json({ error: "name and passcode required" });
   const { rows } = await pool.query("SELECT id, name, is_admin, passcode, password_hash, token_version FROM users WHERE name = $1", [name]);
   if (rows.length === 0) return res.status(401).json({ error: "invalid credentials" });
-  const user = rows[0];
 
-  const hash = user.password_hash as string | null;
-  const ok = hash
-    ? verifyPassword(String(passcode), hash)
-    : String(user.passcode) === String(passcode);
-
-  if (!ok) return res.status(401).json({ error: "invalid credentials" });
+  // usernames aren't unique in the schema, so match the row whose (hashed or plaintext)
+  // passcode actually verifies, like the original name+passcode query did.
+  let matched: any = null;
+  for (const row of rows) {
+    const hash = row.password_hash as string | null;
+    const ok = hash
+      ? verifyPassword(passcode, hash)
+      : String(row.passcode) === passcode;
+    if (ok) { matched = row; break; }
+  }
+  if (!matched) return res.status(401).json({ error: "invalid credentials" });
 
   // Legacy plaintext passcode → upgrade to a scrypt hash on successful login.
-  if (!hash) {
-    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hashPassword(String(passcode)), user.id]);
+  if (!matched.password_hash) {
+    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hashPassword(passcode), matched.id]);
   }
 
-  const token = jwt.sign({ userId: user.id, version: Number(user.token_version) ?? 0 }, JWT_SECRET, { expiresIn: "30d" });
-  res.json({ token, user: { id: user.id, name: user.name, isAdmin: !!user.is_admin } });
+  const token = jwt.sign({ userId: matched.id, version: Number(matched.token_version) ?? 0 }, JWT_SECRET, { expiresIn: "30d" });
+  res.json({ token, user: { id: matched.id, name: matched.name, isAdmin: !!matched.is_admin } });
 });
 
 app.post("/api/auth/register", async (req, res) => {
