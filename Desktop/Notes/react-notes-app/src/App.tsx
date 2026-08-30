@@ -287,7 +287,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
                 title={`${label} view`}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
                   view === key
-                    ? "bg-primary text-white shadow-sm"
+                    ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                 }`}
               >
