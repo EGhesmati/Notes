@@ -15,6 +15,9 @@ import {
   LayoutGrid,
   List,
   Columns3,
+  Trash2,
+  RotateCcw,
+  Inbox,
 } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
 import { useTheme } from "@/hooks/use-theme";
@@ -28,7 +31,7 @@ import { TimeChips } from "@/components/TimeChips";
 import { useAuth } from "@/lib/auth-context";
 import { LoginPage } from "@/pages/LoginPage";
 import { NOTE_COLORS, PRIORITY_BADGE } from "@/types";
-import type { Priority } from "@/types";
+import type { NoteItem, Priority } from "@/types";
 
 const NotesGrid = lazy(() => import("@/components/NotesGrid"));
 
@@ -54,7 +57,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
   const [priority, setPriority] = useState<Priority | undefined>();
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
-  const { notes, setNotes: addNoteApi, editNote: editNoteApi, deleteNote: deleteNoteApi, reorder: reorderNotesApi } = useUserNotes();
+  const { notes, trash, setNotes: addNoteApi, editNote: editNoteApi, deleteNote: deleteNoteApi, restoreNote, deleteNotePermanent, reorder: reorderNotesApi } = useUserNotes();
   // complete pomodoro dataset (local + server) → total focus time per note
   const { stats: pomoStats } = usePomodoroStats(userId);
   const timeOnNote = useMemo(() => timePerNoteMap(pomoStats), [pomoStats]);
@@ -62,6 +65,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
   const [hydrated, setHydrated] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
   const [showSignOut, setShowSignOut] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
   const { theme, toggle } = useTheme();
 
   type ViewMode = "grid" | "list" | "kanban";
@@ -164,6 +168,20 @@ function AppShell({ signOut }: { signOut: () => void }) {
             </span>
           </div>
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowTrash(true)}
+              className={`relative h-8 w-8 rounded-full text-muted-foreground hover:text-foreground ${trash.length > 0 ? "text-muted-foreground" : ""}`}
+              title="Trash"
+            >
+              <Trash2 className="h-[16px] w-[16px]" />
+              {trash.length > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold leading-none text-white">
+                  {trash.length}
+                </span>
+              )}
+            </Button>
             <PomodoroTimer />
             <PomodoroStats />
             {user?.isAdmin && (
@@ -310,6 +328,14 @@ function AppShell({ signOut }: { signOut: () => void }) {
       </main>
 
       {showUsers && user?.isAdmin && <UsersModal onClose={() => setShowUsers(false)} />}
+      {showTrash && (
+        <TrashModal
+          trash={trash}
+          onRestore={restoreNote}
+          onDelete={deleteNotePermanent}
+          onClose={() => setShowTrash(false)}
+        />
+      )}
       {showSignOut && (
         <ConfirmModal
           title="Sign out"
@@ -332,6 +358,61 @@ function AppShell({ signOut }: { signOut: () => void }) {
           </p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function TrashModal({
+  trash,
+  onRestore,
+  onDelete,
+  onClose,
+}: {
+  trash: readonly NoteItem[];
+  onRestore: (id: number) => void;
+  onDelete: (id: number) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="mx-auto mt-20 w-[min(100%-2rem,36rem)] rounded-2xl border border-border bg-card shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <Inbox className="h-5 w-5 text-muted-foreground" />
+            Trash
+            <Badge variant="outline" className="ml-1">{trash.length}</Badge>
+          </h2>
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7 text-muted-foreground">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto px-3 py-2">
+          {trash.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">Trash is empty.</p>
+          ) : (
+            trash.map((n) => (
+              <div key={n.id} className="flex items-center gap-3 border-b border-border/50 px-2 py-3 last:border-0">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-muted-foreground">{n.text || "(empty note)"}</p>
+                  <p className="text-[11px] text-muted-foreground/60">
+                    Deleted {n.deletedAt ? new Date(n.deletedAt).toLocaleString() : ""}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => onRestore(n.id)} className="shrink-0">
+                  <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                  Restore
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => onDelete(n.id)} className="h-7 w-7 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Delete forever">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }

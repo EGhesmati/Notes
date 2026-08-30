@@ -61,6 +61,30 @@ export async function deleteNoteApi(id: number) {
   return res.json();
 }
 
+export async function fetchTrashedNotes() {
+  const res = await fetch(`${API_URL}/api/notes/trash`, { headers: getHeaders() });
+  if (!res.ok) throw new Error("Failed to fetch trashed notes");
+  return res.json();
+}
+
+export async function restoreNoteApi(id: number) {
+  const res = await fetch(`${API_URL}/api/notes/${id}/restore`, {
+    method: "POST",
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to restore note");
+  return res.json();
+}
+
+export async function deleteNotePermanentApi(id: number) {
+  const res = await fetch(`${API_URL}/api/notes/${id}/permanent`, {
+    method: "DELETE",
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to permanently delete note");
+  return res.json();
+}
+
 export async function reorderNotes(order: number[]) {
   const res = await fetch(`${API_URL}/api/notes/reorder`, {
     method: "PUT",

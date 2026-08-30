@@ -40,6 +40,50 @@ export function saveStats(userId: number, stats: PomoStat[]): void {
   }
 }
 
+// ---- Daily focus goal (per user, stored locally) ----
+
+const DEFAULT_DAILY_GOAL_MIN = 240; // 4h
+
+export function dailyGoalKey(userId: number): string {
+  return `pomodoro_daily_goal_${userId}`;
+}
+
+export function getDailyGoal(userId: number): number {
+  try {
+    const raw = localStorage.getItem(dailyGoalKey(userId));
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_DAILY_GOAL_MIN;
+  } catch {
+    return DEFAULT_DAILY_GOAL_MIN;
+  }
+}
+
+export function setDailyGoal(userId: number, minutes: number): void {
+  const safe = Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_DAILY_GOAL_MIN;
+  try {
+    localStorage.setItem(dailyGoalKey(userId), String(safe));
+  } catch {
+    // ignore
+  }
+}
+
+/** Today's focus activity using calendar-day boundaries (local time). */
+export function todaysFocus(stats: PomoStat[]): { minutes: number; sessions: number } {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const startMs = start.getTime();
+  let minutes = 0;
+  let sessions = 0;
+  for (const s of stats) {
+    if (s.phase !== "focus") continue;
+    if (s.ts >= startMs) {
+      sessions += 1;
+      minutes += s.duration / 60;
+    }
+  }
+  return { minutes: Math.round(minutes), sessions };
+}
+
 // prevents two consumers (App shell + stats popover) from double-POSTing the
 // same queued items to Neon at the same time.
 let _syncingUserId: number | null = null;

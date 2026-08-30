@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchNotes, createNote as apiCreate, updateNote as apiUpdate, deleteNoteApi, reorderNotes } from "@/lib/api";
+import { fetchNotes, fetchTrashedNotes, createNote as apiCreate, updateNote as apiUpdate, deleteNoteApi, restoreNoteApi, deleteNotePermanentApi, reorderNotes } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { NoteItem } from "@/types";
 
@@ -12,10 +12,15 @@ interface RawNote {
   due_date: string | null;
   // server returns pinned as a boolean (true/false); coerce with !! when reading
   pinned: boolean | number | null;
+  deleted_at?: string | null;
 }
 
 function lsKey(userId: number) {
   return `notes-${userId}`;
+}
+
+function trashKey(userId: number) {
+  return `trashed-${userId}`;
 }
 
 function loadLocal(userId: number | null): NoteItem[] {
@@ -32,10 +37,38 @@ function saveLocal(userId: number | null, notes: NoteItem[]) {
   localStorage.setItem(lsKey(userId), JSON.stringify(notes));
 }
 
+function loadTrash(userId: number | null): NoteItem[] {
+  if (!userId) return [];
+  try {
+    return JSON.parse(localStorage.getItem(trashKey(userId)) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveTrash(userId: number | null, notes: NoteItem[]) {
+  if (!userId) return;
+  localStorage.setItem(trashKey(userId), JSON.stringify(notes));
+}
+
+function mapRaw(n: RawNote): NoteItem {
+  return {
+    id: n.id,
+    text: n.text,
+    createdAt: n.created_at,
+    color: n.color,
+    priority: (n.priority as NoteItem["priority"]) || undefined,
+    dueDate: n.due_date || undefined,
+    pinned: !!n.pinned,
+    deletedAt: n.deleted_at || undefined,
+  };
+}
+
 export function useUserNotes() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [notes, setNotes] = useState<NoteItem[]>(() => loadLocal(userId));
+  const [trash, setTrash] = useState<NoteItem[]>(() => loadTrash(userId));
   const [lastUserId, setLastUserId] = useState(userId);
   const [loading, setLoading] = useState(true);
 
@@ -43,6 +76,7 @@ export function useUserNotes() {
   useEffect(() => {
     if (userId !== lastUserId) {
       setNotes(loadLocal(userId));
+      setTrash(loadTrash(userId));
       setLastUserId(userId);
       setLoading(true);
     }
@@ -57,21 +91,22 @@ export function useUserNotes() {
     setLoading(true);
     fetchNotes()
       .then((data: RawNote[]) => {
-        const mapped = data.map((n: RawNote) => ({
-          id: n.id,
-          text: n.text,
-          createdAt: n.created_at,
-          color: n.color,
-          priority: (n.priority as NoteItem["priority"]) || undefined,
-          dueDate: n.due_date || undefined,
-          pinned: !!n.pinned,
-        }));
+        const mapped = data.map(mapRaw);
         setNotes(mapped);
         saveLocal(userId, mapped);
         setLoading(false);
       })
       .catch(() => {
         setLoading(false); // keep local data on transient failure
+      });
+    fetchTrashedNotes()
+      .then((data: RawNote[]) => {
+        const mapped = data.map(mapRaw);
+        setTrash(mapped);
+        saveTrash(userId, mapped);
+      })
+      .catch(() => {
+        // keep local trash on transient failure
       });
   }, [userId]);
 
@@ -137,6 +172,7 @@ export function useUserNotes() {
     });
   }, [userId]);
 
+  // Soft-delete: remove from the active list and add to the local trash.
   const deleteNote = useCallback(async (id: number) => {
     try {
       await deleteNoteApi(id);
@@ -144,8 +180,52 @@ export function useUserNotes() {
       // ignore
     }
     setNotes((prev) => {
+      const removed = prev.filter((n) => n.id === id);
       const next = prev.filter((n) => n.id !== id);
       saveLocal(userId, next);
+      if (removed.length > 0) {
+        setTrash((t) => {
+          const trashed = [{ ...removed[0], deletedAt: new Date().toISOString() }, ...t.filter((x) => x.id !== id)];
+          saveTrash(userId, trashed);
+          return trashed;
+        });
+      }
+      return next;
+    });
+  }, [userId]);
+
+  // Restore a trashed note back to the active list.
+  const restoreNote = useCallback(async (id: number) => {
+    try {
+      await restoreNoteApi(id);
+    } catch {
+      // ignore
+    }
+    setTrash((t) => {
+      const restores = t.filter((n) => n.id === id);
+      const next = t.filter((n) => n.id !== id);
+      saveTrash(userId, next);
+      if (restores.length > 0) {
+        setNotes((prev) => {
+          const updated = [{ ...restores[0], deletedAt: undefined }, ...prev];
+          saveLocal(userId, updated);
+          return updated;
+        });
+      }
+      return next;
+    });
+  }, [userId]);
+
+  // Permanently delete a trashed note (no restore possible).
+  const deleteNotePermanent = useCallback(async (id: number) => {
+    try {
+      await deleteNotePermanentApi(id);
+    } catch {
+      // ignore
+    }
+    setTrash((prev) => {
+      const next = prev.filter((n) => n.id !== id);
+      saveTrash(userId, next);
       return next;
     });
   }, [userId]);
@@ -173,5 +253,5 @@ export function useUserNotes() {
     [userId],
   );
 
-  return { notes, setNotes: addNote, editNote, deleteNote, reorder, loading } as const;
+  return { notes, trash, setNotes: addNote, editNote, deleteNote, restoreNote, deleteNotePermanent, reorder, loading } as const;
 }

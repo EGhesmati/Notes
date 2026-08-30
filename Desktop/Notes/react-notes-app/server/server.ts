@@ -40,6 +40,9 @@ await pool.query(`
   ALTER TABLE notes ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
   UPDATE notes SET sort_order = id WHERE sort_order = 0;
 
+  -- soft-delete support: trashed notes have a non-null deleted_at timestamp
+  ALTER TABLE notes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
   CREATE TABLE IF NOT EXISTS pomodoros (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -106,7 +109,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
 
 app.get("/api/notes", authMiddleware, async (req, res) => {
   const { rows } = await pool.query(
-    "SELECT * FROM notes WHERE user_id = $1 ORDER BY pinned DESC, sort_order ASC, created_at DESC",
+    "SELECT * FROM notes WHERE user_id = $1 AND deleted_at IS NULL ORDER BY pinned DESC, sort_order ASC, created_at DESC",
     [(req as any).userId],
   );
   res.json(rows.map((n: any) => ({
@@ -114,6 +117,28 @@ app.get("/api/notes", authMiddleware, async (req, res) => {
     dueDate: n.due_date || undefined,
     pinned: !!n.pinned,
   })));
+});
+
+// List trashed (soft-deleted) notes, most recently deleted first.
+app.get("/api/notes/trash", authMiddleware, async (req, res) => {
+  const { rows } = await pool.query(
+    "SELECT * FROM notes WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC",
+    [(req as any).userId],
+  );
+  res.json(rows.map((n: any) => ({
+    ...n,
+    dueDate: n.due_date || undefined,
+    pinned: !!n.pinned,
+  })));
+});
+
+// Restore a soft-deleted note back to the active list.
+app.post("/api/notes/:id/restore", authMiddleware, async (req, res) => {
+  await pool.query(
+    "UPDATE notes SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 AND user_id = $2",
+    [req.params.id, (req as any).userId],
+  );
+  res.json({ ok: true });
 });
 
 app.post("/api/notes", authMiddleware, async (req, res) => {
@@ -135,7 +160,17 @@ app.put("/api/notes/:id", authMiddleware, async (req, res) => {
   res.json({ ok: true });
 });
 
+// Soft-delete: hide the note from the active list and put it in the trash.
 app.delete("/api/notes/:id", authMiddleware, async (req, res) => {
+  await pool.query(
+    "UPDATE notes SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND user_id = $2",
+    [req.params.id, (req as any).userId],
+  );
+  res.json({ ok: true });
+});
+
+// Permanently remove a note (only from the trash view).
+app.delete("/api/notes/:id/permanent", authMiddleware, async (req, res) => {
   await pool.query("DELETE FROM notes WHERE id = $1 AND user_id = $2", [req.params.id, (req as any).userId]);
   res.json({ ok: true });
 });

@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { BarChart3, CalendarDays, CheckCircle2, Flame, Sparkles, TrendingUp, Trophy, X, Clock, Target } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { BarChart3, CalendarDays, CheckCircle2, Flame, Sparkles, TrendingUp, Trophy, X, Clock, Target, Check, Pencil } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { usePomodoroStats } from "@/hooks/use-pomodoro-stats";
+import { usePomodoroStats, todaysFocus, getDailyGoal, setDailyGoal } from "@/hooks/use-pomodoro-stats";
 import type { PomoStat } from "@/hooks/use-pomodoro-stats";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -117,6 +118,23 @@ export default function PomodoroStats() {
   const [activeTab, setActiveTab] = useState<"overview" | "trends" | "notes">("overview");
 
   const { stats: allStats } = usePomodoroStats(userId);
+
+  const [goal, setGoal] = useState<number>(() => getDailyGoal(userId));
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState(String(getDailyGoal(userId)));
+
+  const today = useMemo(() => todaysFocus(allStats), [allStats]);
+
+  const saveGoal = () => {
+    const n = parseInt(goalInput, 10);
+    if (Number.isFinite(n) && n > 0) {
+      setDailyGoal(userId, n);
+      setGoal(n);
+    } else {
+      setGoalInput(String(goal));
+    }
+    setEditingGoal(false);
+  };
 
   const totals = useMemo(() => {
     const all = allStats;
@@ -282,8 +300,63 @@ export default function PomodoroStats() {
 
                 {/* Progress Bars */}
                 <div className="space-y-3">
+                  {/* Daily Goal (user-configurable) */}
+                  <div className="rounded-xl border border-border/60 bg-background/60 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      {editingGoal ? (
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            type="number"
+                            min={1}
+                            value={goalInput}
+                            onChange={(e) => setGoalInput(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && saveGoal()}
+                            className="h-7 w-24 text-xs"
+                            autoFocus
+                          />
+                          <span className="text-[10px] text-muted-foreground">min</span>
+                          <Button size="icon" variant="outline" className="h-7 w-7" onClick={saveGoal} aria-label="Save goal">
+                            <Check className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-xs font-medium">Daily Goal</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGoalInput(String(goal));
+                              setEditingGoal(true);
+                            }}
+                            className="flex items-center gap-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Edit
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-foreground">{today.minutes} min</span>
+                      <Badge variant={today.minutes >= goal ? "default" : "outline"} className="h-5 px-1.5 text-[10px]">
+                        {goal > 0 ? Math.min(100, Math.round((today.minutes / goal) * 100)) : 0}%
+                      </Badge>
+                    </div>
+                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted/80">
+                      <div
+                        className={`h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-700 ${
+                          today.minutes >= goal ? "from-emerald-500 to-teal-500" : ""
+                        }`}
+                        style={{ width: `${goal > 0 ? Math.min(100, (today.minutes / goal) * 100) : 0}%` }}
+                      />
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
+                      <span>{today.sessions} sessions today</span>
+                      <span>target {goal} min</span>
+                    </div>
+                  </div>
+
                   {[
-                    { label: "Daily Goal", value: totals.dayMinutes, target: 240, color: "from-violet-500 to-fuchsia-500" },
                     { label: "Weekly Goal", value: totals.weekMinutes, target: 1680, color: "from-emerald-500 to-teal-500" },
                     { label: "Monthly Goal", value: totals.monthMinutes, target: 7200, color: "from-indigo-500 to-violet-500" },
                     { label: "Yearly Goal", value: totals.yearMinutes, target: 87600, color: "from-sky-500 to-blue-500" },

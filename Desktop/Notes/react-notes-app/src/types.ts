@@ -8,6 +8,7 @@ export interface NoteItem {
   priority?: Priority;
   dueDate?: string;
   pinned?: boolean;
+  deletedAt?: string;
 }
 
 export type NotesState = readonly NoteItem[];

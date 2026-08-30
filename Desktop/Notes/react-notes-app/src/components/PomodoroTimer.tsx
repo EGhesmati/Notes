@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -12,11 +12,13 @@ import {
   RotateCcw,
   SkipForward,
   Settings,
+  CheckCircle2,
+  Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
-import { recordCompletion } from "@/hooks/use-pomodoro-stats";
+import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus } from "@/hooks/use-pomodoro-stats";
 import { NoteSelect } from "./NoteSelect";
 
 type TimerPhase = "focus" | "short-break" | "long-break";
@@ -414,6 +416,11 @@ export function PomodoroTimer() {
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
   const [noteOptions, setNoteOptions] = useState<{ id: number; text: string }[]>([]);
 
+  // Today's recap modal
+  const [recapOpen, setRecapOpen] = useState(false);
+  const { stats: pomoStats } = usePomodoroStats(userId);
+  const recap = useMemo(() => todaysFocus(pomoStats), [pomoStats]);
+
   // Settings scroll target
   const settingsRef = useRef<HTMLDivElement | null>(null);
 
@@ -548,6 +555,14 @@ export function PomodoroTimer() {
       setNotePickerOpen(false);
       setSelectedNoteId(null);
       setPomoCount(count + 1);
+
+      // Show the "today recap" once today's focus goal is reached.
+      const goalMin = getDailyGoal(userIdRef.current);
+      const newTodayMin = recap.minutes + Math.round(focusMinRef.current);
+      if (goalMin > 0 && newTodayMin >= goalMin) {
+        setRecapOpen(true);
+      }
+
       if (autoStartRef.current) {
         setPhase(next);
         beginCountdown({ next, remaining: nextDur });
@@ -560,7 +575,7 @@ export function PomodoroTimer() {
         clearState(userIdRef.current);
       }
     },
-    [beginCountdown],
+    [beginCountdown, recap],
   );
 
   const start = useCallback(() => {
@@ -1217,6 +1232,58 @@ export function PomodoroTimer() {
           </div>,
           document.body,
         )}
+        {recapOpen &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+              onClick={() => setRecapOpen(false)}
+            >
+              <div
+                className="w-[min(24rem,_calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-2 border-b border-border/50 bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-3">
+                  <Trophy className="h-5 w-5 text-white" />
+                  <h3 className="text-sm font-bold text-white">Daily Goal Reached!</h3>
+                </div>
+                <div className="px-4 py-4">
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    You reached your focus goal for today. Nice work!
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-xl border border-border/60 bg-background/60 p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 text-xl font-bold text-foreground">
+                        <Clock className="h-4 w-4 text-violet-500" />
+                        {recap.minutes}
+                      </div>
+                      <div className="mt-1 text-[10px] text-muted-foreground">min focused</div>
+                    </div>
+                    <div className="rounded-xl border border-border/60 bg-background/60 p-3 text-center">
+                      <div className="text-xl font-bold text-foreground">{recap.sessions}</div>
+                      <div className="mt-1 text-[10px] text-muted-foreground">sessions</div>
+                    </div>
+                    <div className="rounded-xl border border-border/60 bg-background/60 p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 text-xl font-bold text-emerald-500">
+                        <CheckCircle2 className="h-4 w-4" />
+                        {getDailyGoal(userId)}m
+                      </div>
+                      <div className="mt-1 text-[10px] text-muted-foreground">goal</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end border-t border-border/50 px-4 py-3">
+                  <Button
+                    onClick={() => setRecapOpen(false)}
+                    className="bg-foreground text-primary-foreground hover:bg-foreground/90"
+                  >
+                    <Check className="mr-2 h-4 w-4" />
+                    Got it
+                  </Button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
     </div>
   );
 }
