@@ -108,24 +108,6 @@ const PHASE_SESSION_LABEL: Record<TimerPhase, string> = {
   "long-break": "Long break",
 };
 
-const PHASE_ACCENT: Record<TimerPhase, string> = {
-  focus: "text-rose-600 dark:text-rose-400",
-  "short-break": "text-sky-600 dark:text-sky-400",
-  "long-break": "text-indigo-600 dark:text-indigo-400",
-};
-
-const PHASE_RING: Record<TimerPhase, string> = {
-  focus: "stroke-rose-500",
-  "short-break": "stroke-sky-600 dark:stroke-sky-400",
-  "long-break": "stroke-indigo-600 dark:stroke-indigo-400",
-};
-
-const PHASE_SURFACE: Record<TimerPhase, string> = {
-  focus: "from-rose-500/15 via-orange-400/10 to-transparent",
-  "short-break": "from-sky-500/15 via-cyan-400/10 to-transparent",
-  "long-break": "from-indigo-500/15 via-violet-400/10 to-transparent",
-};
-
 type AudioCtx = AudioContext & {
   webkitAudioContext?: typeof AudioContext;
 };
@@ -145,7 +127,6 @@ function getAudioCtx(): AudioContext | null {
   return _audioCtx;
 }
 
-/** Unlock / resume the AudioContext from within a user gesture so the browser allows audio. */
 function unlockAudio(): Promise<void> {
   try {
     const ctx = getAudioCtx();
@@ -197,16 +178,16 @@ function SegmentedControl({
   suffix?: string;
 }) {
   return (
-    <div className="grid grid-flow-col auto-cols-fr gap-1 rounded-lg border border-border/60 bg-muted/40 p-1">
+    <div className="flex gap-1">
       {options.map((opt) => (
         <button
           key={opt}
           type="button"
           onClick={() => onChange(opt)}
-          className={`rounded-md px-1 py-1.5 text-center text-xs font-medium tabular-nums transition-all ${
+          className={`h-7 min-w-[2.25rem] rounded-md px-2 text-center text-xs font-medium tabular-nums transition-colors ${
             value === opt
-              ? "bg-card text-foreground shadow-sm ring-1 ring-border/60"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? "bg-foreground text-primary-foreground"
+              : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
           }`}
         >
           {opt}
@@ -235,42 +216,44 @@ function DurationSetting({
   suffix?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-card/60 p-3">
-      <div className="mb-2.5 flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-foreground">{label}</span>
-        <div className="flex items-center gap-0.5">
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-foreground/80">{label}</span>
+        <div className="flex items-center text-foreground/50">
           <button
             type="button"
             onClick={() => cycle(-1)}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex h-5 w-5 items-center justify-center rounded hover:bg-foreground/5"
             aria-label={`Decrease ${label.toLowerCase()}`}
           >
-            <ChevronLeft className="h-3.5 w-3.5" />
+            <ChevronLeft className="h-3 w-3" />
           </button>
-          <span className="min-w-11 text-center font-mono text-sm font-semibold tabular-nums text-foreground">
+          <span className="min-w-8 text-center text-xs font-medium tabular-nums text-foreground/80">
             {value}
             {suffix}
           </span>
           <button
             type="button"
             onClick={() => cycle(1)}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex h-5 w-5 items-center justify-center rounded hover:bg-foreground/5"
             aria-label={`Increase ${label.toLowerCase()}`}
           >
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onCustom}
-            className="ml-1 flex h-7 w-7 items-center justify-center rounded-md border border-border/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label={`Custom ${label.toLowerCase()}`}
-            title="Custom"
-          >
-            <Edit3 className="h-3 w-3" />
+            <ChevronRight className="h-3 w-3" />
           </button>
         </div>
       </div>
-      <SegmentedControl options={options} value={value} onChange={onChange} suffix={suffix} />
+      <div className="flex items-center gap-1">
+        <SegmentedControl options={options} value={value} onChange={onChange} suffix={suffix} />
+        <button
+          type="button"
+          onClick={onCustom}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-foreground/40 transition-colors hover:bg-foreground/5 hover:text-foreground"
+          aria-label={`Custom ${label.toLowerCase()}`}
+          title="Custom"
+        >
+          <Edit3 className="h-3 w-3" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -290,21 +273,21 @@ function ToggleRow({
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="group flex w-full items-center justify-between gap-4 py-2.5 text-left transition-colors"
+      className="group flex w-full items-center justify-between gap-4 py-2 text-left"
     >
       <div className="min-w-0">
-        <div className="text-sm font-medium text-foreground">{title}</div>
-        <div className="text-xs text-muted-foreground">{description}</div>
+        <div className="text-xs font-medium text-foreground/90">{title}</div>
+        <div className="text-[11px] text-foreground/50">{description}</div>
       </div>
       <span
         role="switch"
         aria-checked={checked}
-        className={`relative inline-flex h-[22px] w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-          checked ? "bg-foreground" : "bg-muted dark:bg-secondary"
+        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+          checked ? "bg-foreground" : "bg-foreground/15"
         }`}
       >
         <span
-          className={`pointer-events-none absolute h-4 w-4 rounded-full bg-background shadow transition-all duration-200 ${
+          className={`pointer-events-none absolute h-3.5 w-3.5 rounded-full bg-background shadow-sm transition-all duration-200 ${
             checked ? "right-[3px]" : "left-[3px]"
           }`}
         />
@@ -313,7 +296,80 @@ function ToggleRow({
   );
 }
 
-function IconButton({
+function SessionIndicator({ count }: { count: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      {[0, 1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className={`h-2 w-2 rounded-full transition-colors duration-300 ${
+            i < count ? "bg-foreground" : "bg-foreground/15"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TimerDisplay({
+  secondsLeft,
+  duration,
+  phase,
+  running,
+}: {
+  secondsLeft: number;
+  duration: number;
+  phase: TimerPhase;
+  running: boolean;
+}) {
+  const progress = duration > 0 ? Math.min(1, Math.max(0, secondsLeft / duration)) : 0;
+  const radius = 120;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - progress);
+
+  const statusText = running ? "Running" : secondsLeft === duration ? "Ready" : "Paused";
+
+  return (
+    <div className="relative flex items-center justify-center">
+      <svg viewBox="0 0 260 260" className="h-60 w-60 -rotate-90 sm:h-64 sm:w-64">
+        <circle
+          cx="130"
+          cy="130"
+          r={radius}
+          fill="none"
+          strokeWidth="1"
+          className="stroke-border"
+        />
+        <circle
+          cx="130"
+          cy="130"
+          r={radius}
+          fill="none"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          className={`transition-[stroke-dashoffset] duration-700 ease-in-out ${
+            phase === "focus" ? "stroke-indigo-600" : "stroke-foreground/25"
+          }`}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/50">
+          {PHASE_SESSION_LABEL[phase]}
+        </span>
+        <span className="mt-2 font-sans text-6xl font-semibold tracking-tight tabular-nums text-foreground sm:text-7xl">
+          {formatTime(secondsLeft)}
+        </span>
+        <span className="mt-2 text-xs font-medium text-foreground/40">
+          {statusText}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SecondaryButton({
   onClick,
   icon,
   label,
@@ -328,33 +384,10 @@ function IconButton({
       onClick={onClick}
       title={label}
       aria-label={label}
-      className="flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground transition-all hover:border-border hover:text-foreground active:scale-95"
+      className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5 hover:text-foreground"
     >
       {icon}
-    </button>
-  );
-}
-
-function PlayButton({
-  onClick,
-  running,
-}: {
-  onClick: () => void;
-  running: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={running ? "Pause" : "Start"}
-      aria-label={running ? "Pause" : "Start"}
-      className="flex h-16 w-16 items-center justify-center rounded-full bg-foreground text-primary-foreground shadow-md shadow-black/10 transition-all hover:scale-[1.03] hover:shadow-lg active:scale-95"
-    >
-      {running ? (
-        <Pause className="h-7 w-7 fill-current" />
-      ) : (
-        <Play className="ml-1 h-7 w-7 fill-current" />
-      )}
+      {label}
     </button>
   );
 }
@@ -398,7 +431,6 @@ export function PomodoroTimer() {
   const [running, setRunning] = useState(false);
   const [pomoCount, setPomoCount] = useState(0);
 
-  // Mirror state into refs so timer intervals always read the latest values.
   const phaseRef = useRef(phase);
   const pomoCountRef = useRef(pomoCount);
   const focusMinRef = useRef(focusMin);
@@ -409,7 +441,6 @@ export function PomodoroTimer() {
   const selectedNoteIdRef = useRef<number | null>(null);
   const userIdRef = useRef(userId);
 
-  // Custom duration modal states
   const [customFocusOpen, setCustomFocusOpen] = useState(false);
   const [customFocusVal, setCustomFocusVal] = useState("");
   const [customBreakOpen, setCustomBreakOpen] = useState(false);
@@ -417,17 +448,14 @@ export function PomodoroTimer() {
   const [customLongBreakOpen, setCustomLongBreakOpen] = useState(false);
   const [customLongBreakVal, setCustomLongBreakVal] = useState("");
 
-  // Note picker state
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
   const [noteOptions, setNoteOptions] = useState<{ id: number; text: string }[]>([]);
 
-  // Today's recap modal
   const [recapOpen, setRecapOpen] = useState(false);
   const { stats: pomoStats } = usePomodoroStats(userId);
   const recap = useMemo(() => todaysFocus(pomoStats), [pomoStats]);
 
-  // Settings scroll target
   const settingsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -495,16 +523,16 @@ export function PomodoroTimer() {
         const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
         secondsLeftRef.current = left;
         setSecondsLeft(left);
-          if (left === 0) {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            intervalRef.current = null;
-            endAtRef.current = null;
-            if (soundRef.current) {
-              playChime();
-              notify(PHASE_LABEL[next], "Time's up! 🍅");
-            }
-            handleCompleteRef.current(next);
+        if (left === 0) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          intervalRef.current = null;
+          endAtRef.current = null;
+          if (soundRef.current) {
+            playChime();
+            notify(PHASE_LABEL[next], "Time's up!");
           }
+          handleCompleteRef.current(next);
+        }
       }, 250);
       saveState(userIdRef.current, {
         focusMin: focusMinRef.current,
@@ -520,15 +548,12 @@ export function PomodoroTimer() {
     [notify],
   );
 
-  // Advance to the next phase after a completion. Uses refs for fresh values.
   const handleComplete = useCallback(
     (completedPhase: TimerPhase) => {
       if (completedPhase === "focus") {
-        // Focus finished -> note association first, then advance to a break.
         setNotePickerOpen(true);
         return;
       }
-      // Break finished -> back to focus.
       setPhase("focus");
       setSelectedNoteId(null);
       const focusDur = focusMinRef.current * 60;
@@ -551,7 +576,6 @@ export function PomodoroTimer() {
     handleCompleteRef.current = handleComplete;
   }, [handleComplete]);
 
-  // Advance after a focus completion, given an associated note (or none).
   const finishFocus = useCallback(
     (noteId: number | null) => {
       const count = pomoCountRef.current;
@@ -562,7 +586,6 @@ export function PomodoroTimer() {
       setSelectedNoteId(null);
       setPomoCount(count + 1);
 
-      // Show the "today recap" once today's focus goal is reached.
       const goalMin = getDailyGoal(userIdRef.current);
       const newTodayMin = recap.minutes + Math.round(focusMinRef.current);
       if (goalMin > 0 && newTodayMin >= goalMin) {
@@ -587,7 +610,6 @@ export function PomodoroTimer() {
   const start = useCallback(() => {
     unlockAudio();
     if (runningRef.current) {
-      // Pause
       if (intervalRef.current) clearInterval(intervalRef.current);
       intervalRef.current = null;
       endAtRef.current = null;
@@ -707,7 +729,6 @@ export function PomodoroTimer() {
 
   useEffect(() => {
     if (notePickerOpen) {
-      // Fetch notes when the picker opens.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void onNotes();
     }
@@ -715,13 +736,11 @@ export function PomodoroTimer() {
 
   const beginCountdownRef = useRef(beginCountdown);
 
-  // Restore state on mount
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
     const saved = loadState(userId);
     if (!saved) return;
-    // One-time hydration from persisted state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFocusMin(saved.focusMin);
     setBreakMin(saved.breakMin);
@@ -746,19 +765,16 @@ export function PomodoroTimer() {
     }
   }, [userId]);
 
-  // Keep a ref to the latest beginCountdown for the restore path.
   useEffect(() => {
     beginCountdownRef.current = beginCountdown;
   }, [beginCountdown]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
 
-  // Show the countdown in the browser tab title while the timer is active.
   useEffect(() => {
     const originalTitle = document.title;
     if (open) {
@@ -777,7 +793,7 @@ export function PomodoroTimer() {
   }, []);
 
   const scrollToSettings = useCallback(() => {
-    settingsRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    settingsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
   const handleClearNotes = useCallback(() => {
@@ -786,8 +802,6 @@ export function PomodoroTimer() {
   }, []);
 
   const duration = durFor(phase, focusMin, breakMin, longBreakMin);
-  const progress = duration > 0 ? Math.min(1, Math.max(0, secondsLeft / duration)) : 0;
-  const CENTER = Math.PI * 172; // circumference for r=86
 
   const isValidNumber = (val: string, max = 180) => {
     const num = parseInt(val, 10);
@@ -849,244 +863,169 @@ export function PomodoroTimer() {
 
   return (
     <div className="relative">
-      {/* Toggle Button */}
       <Button
         variant="ghost"
         size="icon"
         onClick={() => setOpen((v) => !v)}
-        className={`h-8 w-8 rounded-full transition-all ${
+        className={`h-8 w-8 rounded-full transition-colors ${
           open
-            ? "bg-primary/10 text-primary shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+            ? "bg-foreground/10 text-foreground"
+            : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
         }`}
         title="Pomodoro timer"
       >
         <Clock className="h-[18px] w-[18px]" />
       </Button>
 
-      {/* Popup Panel (anchored dropdown, like Pomodoro analytics) */}
       {open && (
-        <div className="fixed inset-x-2 top-14 z-50 mx-auto w-auto max-w-lg overflow-hidden rounded-3xl border border-border/70 bg-background/95 shadow-2xl shadow-black/15 backdrop-blur-xl sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-[28rem]">
-          {/* ── Top Bar ─────────────────────────────────────────────── */}
-          <header className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-5">
+        <div className="fixed inset-x-3 top-14 z-50 mx-auto flex max-h-[calc(100svh-5rem)] max-w-sm flex-col overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-[22rem]">
+          <header className="flex shrink-0 items-center justify-between border-b border-border/50 px-4 py-3">
             <div className="flex items-center gap-2.5">
-              <span className={`flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br ${PHASE_SURFACE[phase]} text-foreground ring-1 ring-border/70`}>
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-foreground/5 text-foreground/70">
                 <Clock className="h-3.5 w-3.5" />
-              </span>
-              <div>
-                <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Focus flow</span>
-                <span className="block text-sm font-semibold text-foreground">Pomodoro</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-medium leading-none text-foreground/50">Focus Flow</span>
+                <span className="text-xs font-semibold leading-tight text-foreground">Pomodoro</span>
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <span className="mr-1 hidden text-xs text-muted-foreground sm:inline">
-                Session {pomoCount + 1}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
+              <span className="mr-1 text-xs text-foreground/50">Session {pomoCount + 1}</span>
+              <button
+                type="button"
                 onClick={scrollToSettings}
-                className="text-muted-foreground hover:text-foreground"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-foreground/5 hover:text-foreground"
                 title="Settings"
                 aria-label="Settings"
               >
-                <Settings className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
+                <Settings className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
                 onClick={() => setOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-foreground/5 hover:text-foreground"
                 title="Close"
                 aria-label="Close"
               >
-                <X className="h-4 w-4" />
-              </Button>
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
           </header>
 
-          {/* ── Scrollable body ─────────────────────────────────────── */}
-          <div className="flex max-h-[calc(100svh-4.5rem)] flex-col overflow-y-auto">
-            {/* Main Timer Area */}
-            <div className={`flex flex-col items-center bg-gradient-to-b ${PHASE_SURFACE[phase]} px-4 pt-6 pb-6 sm:px-6 sm:pt-7`}>
-              <span
-                className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${
-                  PHASE_ACCENT[phase]
-                }`}
-              >
-                {PHASE_SESSION_LABEL[phase]}
-              </span>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="flex flex-col items-center px-5 pt-8 pb-8">
+              <TimerDisplay secondsLeft={secondsLeft} duration={duration} phase={phase} running={running} />
 
-              <div className="relative mt-5 flex h-56 w-56 items-center justify-center sm:h-64 sm:w-64">
-                <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
-                  <circle
-                    cx="100"
-                    cy="100"
-                    r="86"
-                    fill="none"
-                    strokeWidth="5"
-                    className="stroke-border/50"
-                  />
-                  <circle
-                    cx="100"
-                    cy="100"
-                    r="86"
-                    fill="none"
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                    className={`transition-[stroke-dashoffset] duration-500 ${PHASE_RING[phase]}`}
-                    strokeDasharray={CENTER}
-                    strokeDashoffset={CENTER * (1 - progress)}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="font-mono text-5xl font-semibold leading-none tracking-tight tabular-nums text-foreground sm:text-6xl">
-                    {formatTime(secondsLeft)}
-                  </span>
-                  <span
-                    className={`mt-3 text-xs font-medium ${
-                      running ? "text-foreground" : "text-muted-foreground"
-                    }`}
-                  >
-                    {running ? "Running" : secondsLeft === duration ? "Ready" : "Paused"}
-                  </span>
-                </div>
-              </div>
+              <div className="mt-6 flex flex-col items-center gap-6">
+                <button
+                  type="button"
+                  onClick={start}
+                  title={running ? "Pause" : "Start"}
+                  aria-label={running ? "Pause" : "Start"}
+                  className="flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-primary-foreground transition-all hover:bg-foreground/90 active:scale-95"
+                >
+                  {running ? (
+                    <Pause className="h-6 w-6 fill-current" />
+                  ) : (
+                    <Play className="ml-0.5 h-6 w-6 fill-current" />
+                  )}
+                </button>
 
-              {/* Session + Controls */}
-              <div className="mt-6 flex w-full flex-col items-center sm:mt-8">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">Session {pomoCount + 1}</span>
-                  <span className="text-muted-foreground/60">·</span>
-                  <span>{pomoCount} completed</span>
+                <div className="flex flex-col items-center gap-2">
+                  <SessionIndicator count={cycleInCycle} />
+                  <div className="flex items-center gap-1.5 text-xs text-foreground/50">
+                    <span>Session {pomoCount + 1}</span>
+                    <span>·</span>
+                    <span>{cycleInCycle} of 4 completed</span>
+                    <button
+                      type="button"
+                      onClick={resetCycle}
+                      title="Reset cycle"
+                      aria-label="Reset cycle count"
+                      className="ml-0.5 flex h-4 w-4 items-center justify-center rounded text-foreground/40 transition-colors hover:bg-foreground/5 hover:text-foreground"
+                    >
+                      <RotateCcw className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="mt-4 flex items-center gap-4 sm:mt-5 sm:gap-5">
-                  <IconButton onClick={reset} icon={<RotateCcw className="h-[18px] w-[18px]" />} label="Reset" />
-                  <PlayButton onClick={start} running={running} />
-                  <IconButton onClick={skipPhase} icon={<SkipForward className="h-[18px] w-[18px]" />} label="Skip" />
-                </div>
-              </div>
-
-              {/* Cycle indicator */}
-              <div className="mt-6 flex flex-col items-center gap-2 sm:mt-7">
-                <div className="flex items-center gap-1.5">
-                  {[0, 1, 2, 3].map((i) => (
-                    <span
-                      key={i}
-                      className={`h-1 rounded-full transition-colors duration-300 ${
-                        i < cycleInCycle ? "w-6 bg-foreground" : "w-6 bg-border"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-muted-foreground">
-                    {cycleInCycle} of 4 in this cycle
-                  </span>
-                  <button
-                    type="button"
-                    onClick={resetCycle}
-                    title="Reset cycle"
-                    aria-label="Reset cycle count"
-                    className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                  </button>
+                <div className="flex items-center gap-1">
+                  <SecondaryButton onClick={reset} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset" />
+                  <SecondaryButton onClick={skipPhase} icon={<SkipForward className="h-3.5 w-3.5" />} label="Skip" />
                 </div>
               </div>
             </div>
 
-            {/* Settings */}
-            <footer
-              ref={settingsRef}
-              className="border-t border-border/60 bg-card/40 px-4 py-5 sm:px-5"
-            >
-              <div className="mx-auto max-w-md">
-                <div className="mb-4 flex items-center gap-2">
-                  <Settings className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Settings
-                  </span>
+            <footer ref={settingsRef} className="border-t border-border/50 bg-foreground/[0.02] px-5 py-4">
+              <div className="space-y-4">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
+                  <Settings className="h-3 w-3" />
+                  Settings
                 </div>
 
-                <div className="space-y-6">
-                  {/* Durations */}
-                  <div className="space-y-3">
-                    <span className="text-xs font-medium text-muted-foreground">Durations</span>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <DurationSetting
-                        label="Focus"
-                        options={FOCUS_OPTIONS}
-                        value={focusMin}
-                        onChange={changeFocus}
-                        onCustom={() => setCustomFocusOpen(true)}
-                        cycle={cycleFocus}
-                      />
-                      <DurationSetting
-                        label="Short break"
-                        options={BREAK_OPTIONS}
-                        value={breakMin}
-                        onChange={changeBreak}
-                        onCustom={() => setCustomBreakOpen(true)}
-                        cycle={cycleBreak}
-                      />
-                      <DurationSetting
-                        label="Long break"
-                        options={LONG_BREAK_OPTIONS}
-                        value={longBreakMin}
-                        onChange={changeLongBreak}
-                        onCustom={() => setCustomLongBreakOpen(true)}
-                        cycle={cycleLongBreak}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Behavior */}
-                  <div className="space-y-3">
-                    <span className="text-xs font-medium text-muted-foreground">Behavior</span>
-                    <div className="rounded-xl border border-border/60 bg-card/60 p-3">
-                      <ToggleRow
-                        title="Auto-start next session"
-                        description="Begin the next phase automatically"
-                        checked={autoStart}
-                        onChange={setAutoStart}
-                      />
-                      <div className="my-0.5 h-px bg-border/60" />
-                      <ToggleRow
-                        title="Sound alerts"
-                        description={sound ? "Chime and notification on" : "Muted"}
-                        checked={sound}
-                        onChange={setSound}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Notifications */}
-                  {!("Notification" in window) || Notification.permission === "denied" ? (
-                    <button
-                      type="button"
-                      onClick={requestNotification}
-                      className="flex w-full items-center justify-between rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-card"
-                    >
-                      Enable browser notifications
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  ) : null}
+                <div className="space-y-3">
+                  <DurationSetting
+                    label="Focus"
+                    options={FOCUS_OPTIONS}
+                    value={focusMin}
+                    onChange={changeFocus}
+                    onCustom={() => setCustomFocusOpen(true)}
+                    cycle={cycleFocus}
+                  />
+                  <DurationSetting
+                    label="Short break"
+                    options={BREAK_OPTIONS}
+                    value={breakMin}
+                    onChange={changeBreak}
+                    onCustom={() => setCustomBreakOpen(true)}
+                    cycle={cycleBreak}
+                  />
+                  <DurationSetting
+                    label="Long break"
+                    options={LONG_BREAK_OPTIONS}
+                    value={longBreakMin}
+                    onChange={changeLongBreak}
+                    onCustom={() => setCustomLongBreakOpen(true)}
+                    cycle={cycleLongBreak}
+                  />
                 </div>
+
+                <div className="space-y-0.5">
+                  <ToggleRow
+                    title="Auto-start next session"
+                    description="Begin the next phase automatically"
+                    checked={autoStart}
+                    onChange={setAutoStart}
+                  />
+                  <ToggleRow
+                    title="Sound alerts"
+                    description={sound ? "Chime and notification on" : "Muted"}
+                    checked={sound}
+                    onChange={setSound}
+                  />
+                </div>
+
+                {!("Notification" in window) || Notification.permission === "denied" ? (
+                  <button
+                    type="button"
+                    onClick={requestNotification}
+                    className="flex w-full items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-left text-xs font-medium text-foreground/80 transition-colors hover:bg-foreground/5"
+                  >
+                    Enable browser notifications
+                    <ChevronRight className="h-3.5 w-3.5 text-foreground/40" />
+                  </button>
+                ) : null}
               </div>
             </footer>
           </div>
         </div>
       )}
 
-
-      {/* Custom Focus Duration Modal */}
       {customFocusOpen &&
         createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-[22rem]">
-              <h3 className="mb-3 text-sm font-semibold">Custom Focus Duration</h3>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-xl border border-border/60 bg-background p-4 shadow-sm sm:w-[22rem]">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">Custom Focus Duration</h3>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -1102,7 +1041,7 @@ export function PomodoroTimer() {
                   <Check className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="mt-2 text-[10px] text-muted-foreground">Enter minutes between 1 and 180</p>
+              <p className="mt-2 text-[10px] text-foreground/50">Enter minutes between 1 and 180</p>
               <Button
                 variant="ghost"
                 size="sm"
@@ -1110,7 +1049,7 @@ export function PomodoroTimer() {
                   setCustomFocusOpen(false);
                   setCustomFocusVal("");
                 }}
-                className="mt-3 w-full text-xs"
+                className="mt-3 w-full text-xs text-foreground/60 hover:text-foreground"
               >
                 Cancel
               </Button>
@@ -1119,12 +1058,11 @@ export function PomodoroTimer() {
           document.body,
         )}
 
-      {/* Custom Break Duration Modal */}
       {customBreakOpen &&
         createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-[22rem]">
-              <h3 className="mb-3 text-sm font-semibold">Custom Short Break Duration</h3>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-xl border border-border/60 bg-background p-4 shadow-sm sm:w-[22rem]">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">Custom Short Break Duration</h3>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -1140,7 +1078,7 @@ export function PomodoroTimer() {
                   <Check className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="mt-2 text-[10px] text-muted-foreground">Enter minutes between 1 and 60</p>
+              <p className="mt-2 text-[10px] text-foreground/50">Enter minutes between 1 and 60</p>
               <Button
                 variant="ghost"
                 size="sm"
@@ -1148,7 +1086,7 @@ export function PomodoroTimer() {
                   setCustomBreakOpen(false);
                   setCustomBreakVal("");
                 }}
-                className="mt-3 w-full text-xs"
+                className="mt-3 w-full text-xs text-foreground/60 hover:text-foreground"
               >
                 Cancel
               </Button>
@@ -1157,12 +1095,11 @@ export function PomodoroTimer() {
           document.body,
         )}
 
-      {/* Custom Long Break Duration Modal */}
       {customLongBreakOpen &&
         createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:w-[22rem]">
-              <h3 className="mb-3 text-sm font-semibold">Custom Long Break Duration</h3>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-xl border border-border/60 bg-background p-4 shadow-sm sm:w-[22rem]">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">Custom Long Break Duration</h3>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -1178,7 +1115,7 @@ export function PomodoroTimer() {
                   <Check className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="mt-2 text-[10px] text-muted-foreground">Enter minutes between 1 and 60</p>
+              <p className="mt-2 text-[10px] text-foreground/50">Enter minutes between 1 and 60</p>
               <Button
                 variant="ghost"
                 size="sm"
@@ -1186,7 +1123,7 @@ export function PomodoroTimer() {
                   setCustomLongBreakOpen(false);
                   setCustomLongBreakVal("");
                 }}
-                className="mt-3 w-full text-xs"
+                className="mt-3 w-full text-xs text-foreground/60 hover:text-foreground"
               >
                 Cancel
               </Button>
@@ -1195,28 +1132,18 @@ export function PomodoroTimer() {
           document.body,
         )}
 
-      {/* Note Selection Modal */}
       {notePickerOpen &&
         createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-[min(24rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl sm:w-[26rem]">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+            <div className="w-[min(24rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm sm:w-[26rem]">
               <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
-                <h3 className="text-sm font-semibold">Associate with Note</h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleClearNotes}
-                  className="h-6 w-6 text-muted-foreground"
-                >
+                <h3 className="text-sm font-semibold text-foreground">Associate with Note</h3>
+                <Button variant="ghost" size="icon" onClick={handleClearNotes} className="h-6 w-6 text-foreground/50 hover:text-foreground">
                   <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
               <div className="max-h-[20rem] overflow-y-auto p-4">
-                <NoteSelect
-                  notes={noteOptions}
-                  value={selectedNoteId}
-                  onChange={(id) => setSelectedNoteId(id)}
-                />
+                <NoteSelect notes={noteOptions} value={selectedNoteId} onChange={(id) => setSelectedNoteId(id)} />
               </div>
               <div className="flex gap-2 border-t border-border/50 px-4 py-3">
                 <Button
@@ -1239,58 +1166,51 @@ export function PomodoroTimer() {
           </div>,
           document.body,
         )}
-        {recapOpen &&
-          createPortal(
+
+      {recapOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" onClick={() => setRecapOpen(false)}>
             <div
-              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-              onClick={() => setRecapOpen(false)}
+              className="w-[min(24rem,_calc(100vw-2rem))] overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm"
+              onClick={(e) => e.stopPropagation()}
             >
-              <div
-                className="w-[min(24rem,_calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center gap-2 border-b border-border/50 bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-3">
-                  <Trophy className="h-5 w-5 text-white" />
-                  <h3 className="text-sm font-bold text-white">Daily Goal Reached!</h3>
-                </div>
-                <div className="px-4 py-4">
-                  <p className="mb-3 text-sm text-muted-foreground">
-                    You reached your focus goal for today. Nice work!
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-xl border border-border/60 bg-background/60 p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 text-xl font-bold text-foreground">
-                        <Clock className="h-4 w-4 text-violet-500" />
-                        {recap.minutes}
-                      </div>
-                      <div className="mt-1 text-[10px] text-muted-foreground">min focused</div>
+              <div className="flex items-center gap-2 border-b border-border/50 bg-foreground px-4 py-3">
+                <Trophy className="h-4 w-4 text-primary-foreground" />
+                <h3 className="text-sm font-semibold text-primary-foreground">Daily Goal Reached</h3>
+              </div>
+              <div className="px-4 py-4">
+                <p className="mb-4 text-sm text-foreground/70">You reached your focus goal for today. Nice work.</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg border border-border/50 bg-foreground/[0.02] p-3 text-center">
+                    <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
+                      <Clock className="h-3.5 w-3.5 text-foreground/50" />
+                      {recap.minutes}
                     </div>
-                    <div className="rounded-xl border border-border/60 bg-background/60 p-3 text-center">
-                      <div className="text-xl font-bold text-foreground">{recap.sessions}</div>
-                      <div className="mt-1 text-[10px] text-muted-foreground">sessions</div>
+                    <div className="mt-1 text-[10px] text-foreground/50">min focused</div>
+                  </div>
+                  <div className="rounded-lg border border-border/50 bg-foreground/[0.02] p-3 text-center">
+                    <div className="text-lg font-semibold text-foreground">{recap.sessions}</div>
+                    <div className="mt-1 text-[10px] text-foreground/50">sessions</div>
+                  </div>
+                  <div className="rounded-lg border border-border/50 bg-foreground/[0.02] p-3 text-center">
+                    <div className="flex items-center justify-center gap-1 text-lg font-semibold text-indigo-600">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {getDailyGoal(userId)}m
                     </div>
-                    <div className="rounded-xl border border-border/60 bg-background/60 p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 text-xl font-bold text-emerald-500">
-                        <CheckCircle2 className="h-4 w-4" />
-                        {getDailyGoal(userId)}m
-                      </div>
-                      <div className="mt-1 text-[10px] text-muted-foreground">goal</div>
-                    </div>
+                    <div className="mt-1 text-[10px] text-foreground/50">goal</div>
                   </div>
                 </div>
-                <div className="flex justify-end border-t border-border/50 px-4 py-3">
-                  <Button
-                    onClick={() => setRecapOpen(false)}
-                    className="bg-foreground text-primary-foreground hover:bg-foreground/90"
-                  >
-                    <Check className="mr-2 h-4 w-4" />
-                    Got it
-                  </Button>
-                </div>
               </div>
-            </div>,
-            document.body,
-          )}
+              <div className="flex justify-end border-t border-border/50 px-4 py-3">
+                <Button onClick={() => setRecapOpen(false)} className="bg-foreground text-primary-foreground hover:bg-foreground/90">
+                  <Check className="mr-2 h-4 w-4" />
+                  Got it
+                </Button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
