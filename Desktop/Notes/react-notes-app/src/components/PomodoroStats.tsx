@@ -138,32 +138,40 @@ export default function PomodoroStats() {
 
   const totals = useMemo(() => {
     const all = allStats;
-    const now = Date.now();
-    const dayMs = 24 * 60 * 60 * 1000;
-    const weekMs = 7 * dayMs;
-    const yearMs = 365 * dayMs;
-    const monthMs = 30 * dayMs;
     const totalCompleted = all.filter((s) => s.phase === "focus").length;
     const totalMinutes = Math.round(all.reduce((acc, s) => acc + s.duration, 0) / 60);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayMs = today.getTime();
-    const todayCompleted = all.filter((s) => s.phase === "focus" && s.ts >= todayMs).length;
-    const weekCompleted = all.filter((s) => s.phase === "focus" && s.ts >= now - weekMs).length;
-    const monthCompleted = all.filter((s) => s.phase === "focus" && s.ts >= now - monthMs).length;
-    const yearCompleted = all.filter((s) => s.phase === "focus" && s.ts >= now - yearMs).length;
-    const dayMinutes = Math.round(
-      all.filter((s) => s.phase === "focus" && s.ts >= now - dayMs).reduce((acc, s) => acc + s.duration, 0) / 60,
-    );
-    const weekMinutes = Math.round(
-      all.filter((s) => s.phase === "focus" && s.ts >= now - weekMs).reduce((acc, s) => acc + s.duration, 0) / 60,
-    );
-    const monthMinutes = Math.round(
-      all.filter((s) => s.phase === "focus" && s.ts >= now - monthMs).reduce((acc, s) => acc + s.duration, 0) / 60,
-    );
-    const yearMinutes = Math.round(
-      all.filter((s) => s.phase === "focus" && s.ts >= now - yearMs).reduce((acc, s) => acc + s.duration, 0) / 60,
-    );
+
+    const now = new Date();
+
+    // Calendar-day start (local time).
+    const dayStart = new Date(now);
+    dayStart.setHours(0, 0, 0, 0);
+
+    // Calendar-week start (Monday, local time).
+    const weekStart = new Date(dayStart);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+
+    // Calendar-month start (1st of the month, local time).
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Calendar-year start (Jan 1, local time).
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+
+    const minuteSum = (inRange: (s: PomoStat) => boolean) =>
+      Math.round(
+        all.filter((s) => s.phase === "focus" && inRange(s)).reduce((acc, s) => acc + s.duration, 0) / 60,
+      );
+
+    const todayCompleted = all.filter((s) => s.phase === "focus" && s.ts >= dayStart.getTime()).length;
+    const weekCompleted = all.filter((s) => s.phase === "focus" && s.ts >= weekStart.getTime()).length;
+    const monthCompleted = all.filter((s) => s.phase === "focus" && s.ts >= monthStart.getTime()).length;
+    const yearCompleted = all.filter((s) => s.phase === "focus" && s.ts >= yearStart.getTime()).length;
+
+    const dayMinutes = minuteSum((s) => s.ts >= dayStart.getTime());
+    const weekMinutes = minuteSum((s) => s.ts >= weekStart.getTime());
+    const monthMinutes = minuteSum((s) => s.ts >= monthStart.getTime());
+    const yearMinutes = minuteSum((s) => s.ts >= yearStart.getTime());
+
     return { totalCompleted, totalMinutes, todayCompleted, weekCompleted, monthCompleted, yearCompleted, dayMinutes, weekMinutes, monthMinutes, yearMinutes };
   }, [allStats]);
 
