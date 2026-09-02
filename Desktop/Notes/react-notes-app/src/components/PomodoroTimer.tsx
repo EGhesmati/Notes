@@ -3,10 +3,8 @@ import { createPortal } from "react-dom";
 import {
   X,
   Check,
-  ChevronLeft,
   ChevronRight,
   Clock,
-  Edit3,
   Play,
   Pause,
   RotateCcw,
@@ -16,7 +14,6 @@ import {
   Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus } from "@/hooks/use-pomodoro-stats";
 import { NoteSelect } from "./NoteSelect";
@@ -166,72 +163,30 @@ function playChime(): void {
   }
 }
 
-function SegmentedControl({
-  options,
+function DurationSelect({
   value,
-  onChange,
+  options,
   suffix = "m",
+  onChange,
 }: {
-  options: number[];
   value: number;
-  onChange: (v: number) => void;
+  options: number[];
   suffix?: string;
+  onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <select
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="h-8 cursor-pointer rounded-lg border border-border/60 bg-background px-3 text-sm font-semibold tabular-nums text-foreground/90 outline-none transition-colors hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-foreground/10"
+    >
       {options.map((opt) => (
-        <button
-          key={opt}
-          type="button"
-          onClick={() => onChange(opt)}
-          className={`h-8 min-w-[2.5rem] rounded-lg px-2.5 text-center text-xs font-medium tabular-nums transition-colors ${
-            value === opt
-              ? "bg-foreground text-primary-foreground"
-              : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-          }`}
-        >
+        <option key={opt} value={opt}>
           {opt}
           {suffix}
-        </button>
+        </option>
       ))}
-    </div>
-  );
-}
-
-function Stepper({
-  value,
-  suffix = "m",
-  onDecrease,
-  onIncrease,
-}: {
-  value: number;
-  suffix?: string;
-  onDecrease: () => void;
-  onIncrease: () => void;
-}) {
-  return (
-    <div className="flex items-center">
-      <button
-        type="button"
-        onClick={onDecrease}
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/50 transition-colors hover:bg-foreground/5 hover:text-foreground"
-        aria-label="Decrease"
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </button>
-      <span className="min-w-[3rem] text-center text-sm font-semibold tabular-nums text-foreground/90">
-        {value}
-        {suffix}
-      </span>
-      <button
-        type="button"
-        onClick={onIncrease}
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/50 transition-colors hover:bg-foreground/5 hover:text-foreground"
-        aria-label="Increase"
-      >
-        <ChevronRight className="h-4 w-4" />
-      </button>
-    </div>
+    </select>
   );
 }
 
@@ -240,53 +195,18 @@ function DurationSetting({
   options,
   value,
   onChange,
-  onCustom,
-  cycle,
   suffix = "m",
 }: {
   label: string;
   options: number[];
   value: number;
   onChange: (v: number) => void;
-  onCustom: () => void;
-  cycle: (delta: number) => void;
   suffix?: string;
 }) {
   return (
-    <div className="grid gap-2 py-3 sm:grid-cols-[96px_100px_1fr_32px] sm:items-center sm:gap-3">
+    <div className="flex items-center justify-between gap-4 py-3">
       <span className="text-sm font-semibold text-foreground/90">{label}</span>
-
-      <div className="flex items-center justify-between sm:justify-start">
-        <Stepper
-          value={value}
-          suffix={suffix}
-          onDecrease={() => cycle(-1)}
-          onIncrease={() => cycle(1)}
-        />
-        <button
-          type="button"
-          onClick={onCustom}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/40 transition-colors hover:bg-foreground/5 hover:text-foreground sm:hidden"
-          aria-label={`Custom ${label.toLowerCase()}`}
-          title="Custom"
-        >
-          <Edit3 className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      <SegmentedControl options={options} value={value} onChange={onChange} suffix={suffix} />
-
-      <div className="hidden sm:flex sm:justify-end">
-        <button
-          type="button"
-          onClick={onCustom}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/40 transition-colors hover:bg-foreground/5 hover:text-foreground"
-          aria-label={`Custom ${label.toLowerCase()}`}
-          title="Custom"
-        >
-          <Edit3 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      <DurationSelect value={value} options={options} suffix={suffix} onChange={onChange} />
     </div>
   );
 }
@@ -479,13 +399,6 @@ export function PomodoroTimer() {
   const runningRef = useRef(running);
   const selectedNoteIdRef = useRef<number | null>(null);
   const userIdRef = useRef(userId);
-
-  const [customFocusOpen, setCustomFocusOpen] = useState(false);
-  const [customFocusVal, setCustomFocusVal] = useState("");
-  const [customBreakOpen, setCustomBreakOpen] = useState(false);
-  const [customBreakVal, setCustomBreakVal] = useState("");
-  const [customLongBreakOpen, setCustomLongBreakOpen] = useState(false);
-  const [customLongBreakVal, setCustomLongBreakVal] = useState("");
 
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
@@ -842,62 +755,6 @@ export function PomodoroTimer() {
 
   const duration = durFor(phase, focusMin, breakMin, longBreakMin);
 
-  const isValidNumber = (val: string, max = 180) => {
-    const num = parseInt(val, 10);
-    return !isNaN(num) && num > 0 && num <= max;
-  };
-
-  const confirmCustomFocus = useCallback(() => {
-    if (isValidNumber(customFocusVal)) {
-      changeFocus(parseInt(customFocusVal, 10));
-      setCustomFocusOpen(false);
-      setCustomFocusVal("");
-    }
-  }, [customFocusVal, changeFocus]);
-
-  const confirmCustomBreak = useCallback(() => {
-    if (isValidNumber(customBreakVal, 60)) {
-      changeBreak(parseInt(customBreakVal, 10));
-      setCustomBreakOpen(false);
-      setCustomBreakVal("");
-    }
-  }, [customBreakVal, changeBreak]);
-
-  const confirmCustomLongBreak = useCallback(() => {
-    if (isValidNumber(customLongBreakVal, 60)) {
-      changeLongBreak(parseInt(customLongBreakVal, 10));
-      setCustomLongBreakOpen(false);
-      setCustomLongBreakVal("");
-    }
-  }, [customLongBreakVal, changeLongBreak]);
-
-  const cycleFocus = useCallback(
-    (delta: number) => {
-      const idx = FOCUS_OPTIONS.indexOf(focusMin);
-      const next = Math.max(0, Math.min(FOCUS_OPTIONS.length - 1, idx + delta));
-      changeFocus(FOCUS_OPTIONS[next]);
-    },
-    [focusMin, changeFocus],
-  );
-
-  const cycleBreak = useCallback(
-    (delta: number) => {
-      const idx = BREAK_OPTIONS.indexOf(breakMin);
-      const next = Math.max(0, Math.min(BREAK_OPTIONS.length - 1, idx + delta));
-      changeBreak(BREAK_OPTIONS[next]);
-    },
-    [breakMin, changeBreak],
-  );
-
-  const cycleLongBreak = useCallback(
-    (delta: number) => {
-      const idx = LONG_BREAK_OPTIONS.indexOf(longBreakMin);
-      const next = Math.max(0, Math.min(LONG_BREAK_OPTIONS.length - 1, idx + delta));
-      changeLongBreak(LONG_BREAK_OPTIONS[next]);
-    },
-    [longBreakMin, changeLongBreak],
-  );
-
   const cycleInCycle = pomoCount % 4;
 
   return (
@@ -1008,24 +865,18 @@ export function PomodoroTimer() {
                     options={FOCUS_OPTIONS}
                     value={focusMin}
                     onChange={changeFocus}
-                    onCustom={() => setCustomFocusOpen(true)}
-                    cycle={cycleFocus}
                   />
                   <DurationSetting
                     label="Short break"
                     options={BREAK_OPTIONS}
                     value={breakMin}
                     onChange={changeBreak}
-                    onCustom={() => setCustomBreakOpen(true)}
-                    cycle={cycleBreak}
                   />
                   <DurationSetting
                     label="Long break"
                     options={LONG_BREAK_OPTIONS}
                     value={longBreakMin}
                     onChange={changeLongBreak}
-                    onCustom={() => setCustomLongBreakOpen(true)}
-                    cycle={cycleLongBreak}
                   />
                 </div>
 
@@ -1059,117 +910,6 @@ export function PomodoroTimer() {
           </div>
         </div>
       )}
-
-      {customFocusOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-xl border border-border/60 bg-background p-4 shadow-sm sm:w-[22rem]">
-              <h3 className="mb-3 text-sm font-semibold text-foreground">Custom Focus Duration</h3>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  max={180}
-                  value={customFocusVal}
-                  onChange={(e) => setCustomFocusVal(e.target.value)}
-                  placeholder="Minutes (1-180)"
-                  className="flex-1"
-                  onKeyDown={(e) => e.key === "Enter" && confirmCustomFocus()}
-                />
-                <Button onClick={confirmCustomFocus} className="shrink-0">
-                  <Check className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="mt-2 text-[10px] text-foreground/50">Enter minutes between 1 and 180</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setCustomFocusOpen(false);
-                  setCustomFocusVal("");
-                }}
-                className="mt-3 w-full text-xs text-foreground/60 hover:text-foreground"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>,
-          document.body,
-        )}
-
-      {customBreakOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-xl border border-border/60 bg-background p-4 shadow-sm sm:w-[22rem]">
-              <h3 className="mb-3 text-sm font-semibold text-foreground">Custom Short Break Duration</h3>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={customBreakVal}
-                  onChange={(e) => setCustomBreakVal(e.target.value)}
-                  placeholder="Minutes (1-60)"
-                  className="flex-1"
-                  onKeyDown={(e) => e.key === "Enter" && confirmCustomBreak()}
-                />
-                <Button onClick={confirmCustomBreak} className="shrink-0">
-                  <Check className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="mt-2 text-[10px] text-foreground/50">Enter minutes between 1 and 60</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setCustomBreakOpen(false);
-                  setCustomBreakVal("");
-                }}
-                className="mt-3 w-full text-xs text-foreground/60 hover:text-foreground"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>,
-          document.body,
-        )}
-
-      {customLongBreakOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-            <div className="w-[min(20rem,_calc(100vw-2rem))] rounded-xl border border-border/60 bg-background p-4 shadow-sm sm:w-[22rem]">
-              <h3 className="mb-3 text-sm font-semibold text-foreground">Custom Long Break Duration</h3>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={customLongBreakVal}
-                  onChange={(e) => setCustomLongBreakVal(e.target.value)}
-                  placeholder="Minutes (1-60)"
-                  className="flex-1"
-                  onKeyDown={(e) => e.key === "Enter" && confirmCustomLongBreak()}
-                />
-                <Button onClick={confirmCustomLongBreak} className="shrink-0">
-                  <Check className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="mt-2 text-[10px] text-foreground/50">Enter minutes between 1 and 60</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setCustomLongBreakOpen(false);
-                  setCustomLongBreakVal("");
-                }}
-                className="mt-3 w-full text-xs text-foreground/60 hover:text-foreground"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>,
-          document.body,
-        )}
 
       {notePickerOpen &&
         createPortal(
