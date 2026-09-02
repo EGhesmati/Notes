@@ -14,6 +14,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus } from "@/hooks/use-pomodoro-stats";
 import { NoteSelect } from "./NoteSelect";
@@ -163,50 +164,62 @@ function playChime(): void {
   }
 }
 
-function DurationSelect({
-  value,
-  options,
-  suffix = "m",
-  onChange,
-}: {
-  value: number;
-  options: number[];
-  suffix?: string;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="h-8 cursor-pointer rounded-lg border border-border/60 bg-background px-3 text-sm font-semibold tabular-nums text-foreground/90 outline-none transition-colors hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-foreground/10"
-    >
-      {options.map((opt) => (
-        <option key={opt} value={opt}>
-          {opt}
-          {suffix}
-        </option>
-      ))}
-    </select>
-  );
-}
-
 function DurationSetting({
   label,
   options,
   value,
+  customInput,
   onChange,
+  onCustomInputChange,
+  onCustomInputBlur,
+  max = 180,
   suffix = "m",
 }: {
   label: string;
   options: number[];
   value: number;
-  onChange: (v: number) => void;
+  customInput: string;
+  onChange: (v: number | "custom") => void;
+  onCustomInputChange: (v: string) => void;
+  onCustomInputBlur: () => void;
+  max?: number;
   suffix?: string;
 }) {
+  const isCustom = !options.includes(value);
+
   return (
     <div className="flex items-center justify-between gap-4 py-3">
       <span className="text-sm font-semibold text-foreground/90">{label}</span>
-      <DurationSelect value={value} options={options} suffix={suffix} onChange={onChange} />
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <select
+          value={isCustom ? "custom" : value}
+          onChange={(e) => onChange(e.target.value === "custom" ? "custom" : Number(e.target.value))}
+          className="h-8 cursor-pointer rounded-lg border border-border/60 bg-background px-3 text-sm font-semibold tabular-nums text-foreground/90 outline-none transition-colors hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-foreground/10"
+        >
+          {options.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+              {suffix}
+            </option>
+          ))}
+          <option value="custom">Custom</option>
+        </select>
+        {isCustom && (
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              min={1}
+              max={max}
+              value={customInput}
+              onChange={(e) => onCustomInputChange(e.target.value)}
+              onBlur={onCustomInputBlur}
+              placeholder="Min"
+              className="h-8 w-20 text-sm"
+            />
+            <span className="text-xs font-medium text-foreground/50">{suffix}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -385,6 +398,9 @@ export function PomodoroTimer() {
   const [focusMin, setFocusMin] = useState(25);
   const [breakMin, setBreakMin] = useState(5);
   const [longBreakMin, setLongBreakMin] = useState(15);
+  const [customFocusInput, setCustomFocusInput] = useState("25");
+  const [customBreakInput, setCustomBreakInput] = useState("5");
+  const [customLongBreakInput, setCustomLongBreakInput] = useState("15");
   const [phase, setPhase] = useState<TimerPhase>("focus");
   const [secondsLeft, setSecondsLeft] = useState(focusMin * 60);
   const [running, setRunning] = useState(false);
@@ -665,6 +681,102 @@ export function PomodoroTimer() {
     }
   }, []);
 
+  const validateCustom = (val: string, max: number): number | null => {
+    const num = parseInt(val, 10);
+    if (isNaN(num) || num <= 0 || num > max) return null;
+    return num;
+  };
+
+  const handleFocusChange = useCallback(
+    (val: number | "custom") => {
+      if (val === "custom") {
+        const num = validateCustom(customFocusInput, 180);
+        if (num !== null) changeFocus(num);
+      } else {
+        changeFocus(val);
+      }
+    },
+    [customFocusInput, changeFocus],
+  );
+
+  const handleCustomFocusChange = useCallback(
+    (val: string) => {
+      setCustomFocusInput(val);
+      const num = validateCustom(val, 180);
+      if (num !== null) changeFocus(num);
+    },
+    [changeFocus],
+  );
+
+  const handleCustomFocusBlur = useCallback(() => {
+    const num = validateCustom(customFocusInput, 180);
+    if (num === null) {
+      setCustomFocusInput(String(focusMin));
+    } else {
+      changeFocus(num);
+    }
+  }, [customFocusInput, focusMin, changeFocus]);
+
+  const handleBreakChange = useCallback(
+    (val: number | "custom") => {
+      if (val === "custom") {
+        const num = validateCustom(customBreakInput, 60);
+        if (num !== null) changeBreak(num);
+      } else {
+        changeBreak(val);
+      }
+    },
+    [customBreakInput, changeBreak],
+  );
+
+  const handleCustomBreakChange = useCallback(
+    (val: string) => {
+      setCustomBreakInput(val);
+      const num = validateCustom(val, 60);
+      if (num !== null) changeBreak(num);
+    },
+    [changeBreak],
+  );
+
+  const handleCustomBreakBlur = useCallback(() => {
+    const num = validateCustom(customBreakInput, 60);
+    if (num === null) {
+      setCustomBreakInput(String(breakMin));
+    } else {
+      changeBreak(num);
+    }
+  }, [customBreakInput, breakMin, changeBreak]);
+
+  const handleLongBreakChange = useCallback(
+    (val: number | "custom") => {
+      if (val === "custom") {
+        const num = validateCustom(customLongBreakInput, 60);
+        if (num !== null) changeLongBreak(num);
+      } else {
+        changeLongBreak(val);
+      }
+    },
+    [customLongBreakInput, changeLongBreak],
+  );
+
+  const handleCustomLongBreakChange = useCallback(
+    (val: string) => {
+      setCustomLongBreakInput(val);
+      const num = validateCustom(val, 60);
+      if (num !== null) changeLongBreak(num);
+    },
+    [changeLongBreak],
+  );
+
+  const handleCustomLongBreakBlur = useCallback(() => {
+    const num = validateCustom(customLongBreakInput, 60);
+    if (num === null) {
+      setCustomLongBreakInput(String(longBreakMin));
+    } else {
+      changeLongBreak(num);
+    }
+  }, [customLongBreakInput, longBreakMin, changeLongBreak]);
+
   const onNotes = useCallback(async () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -697,6 +809,9 @@ export function PomodoroTimer() {
     setFocusMin(saved.focusMin);
     setBreakMin(saved.breakMin);
     setLongBreakMin(saved.longBreakMin);
+    setCustomFocusInput(String(saved.focusMin));
+    setCustomBreakInput(String(saved.breakMin));
+    setCustomLongBreakInput(String(saved.longBreakMin));
     setPhase(saved.phase);
     setSecondsLeft(saved.secondsLeft);
     setPomoCount(saved.pomoCount);
@@ -864,19 +979,31 @@ export function PomodoroTimer() {
                     label="Focus"
                     options={FOCUS_OPTIONS}
                     value={focusMin}
-                    onChange={changeFocus}
+                    customInput={customFocusInput}
+                    onChange={handleFocusChange}
+                    onCustomInputChange={handleCustomFocusChange}
+                    onCustomInputBlur={handleCustomFocusBlur}
+                    max={180}
                   />
                   <DurationSetting
                     label="Short break"
                     options={BREAK_OPTIONS}
                     value={breakMin}
-                    onChange={changeBreak}
+                    customInput={customBreakInput}
+                    onChange={handleBreakChange}
+                    onCustomInputChange={handleCustomBreakChange}
+                    onCustomInputBlur={handleCustomBreakBlur}
+                    max={60}
                   />
                   <DurationSetting
                     label="Long break"
                     options={LONG_BREAK_OPTIONS}
                     value={longBreakMin}
-                    onChange={changeLongBreak}
+                    customInput={customLongBreakInput}
+                    onChange={handleLongBreakChange}
+                    onCustomInputChange={handleCustomLongBreakChange}
+                    onCustomInputBlur={handleCustomLongBreakBlur}
+                    max={60}
                   />
                 </div>
 
