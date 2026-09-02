@@ -139,10 +139,10 @@ body {
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
   min-height: 100svh;
+  overflow-x: clip;
 }
 
 @layer base {

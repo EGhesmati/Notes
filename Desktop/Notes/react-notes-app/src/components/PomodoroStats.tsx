@@ -196,16 +196,16 @@ export default function PomodoroStats() {
       </Button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-[min(24rem,_calc(100vw-1rem))] max-h-[calc(100vh-4rem)] origin-top-right overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-2xl backdrop-blur-xl sm:w-[26rem]">
+        <div className="fixed inset-x-2 top-14 z-50 mx-auto w-auto max-w-md origin-top overflow-hidden rounded-3xl border border-border/70 bg-card/95 shadow-2xl shadow-black/15 backdrop-blur-xl sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-[26rem] sm:origin-top-right">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
             <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-primary/10 p-1.5 text-primary">
+              <div className="rounded-xl bg-violet-500/10 p-2 text-violet-600 dark:text-violet-400">
                 <Sparkles className="h-3.5 w-3.5" />
               </div>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pomodoro Analytics</p>
-                <p className="text-sm font-medium text-foreground">Your focus performance</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Focus insights</p>
+                <p className="text-sm font-semibold text-foreground">Your momentum</p>
               </div>
             </div>
             <Button
@@ -240,7 +240,7 @@ export default function PomodoroStats() {
           </div>
 
           {/* Content */}
-          <div className="max-h-[calc(100vh-12rem)] overflow-y-auto sm:max-h-[28rem]">
+          <div className="max-h-[calc(100svh-11rem)] overflow-y-auto sm:max-h-[28rem]">
             {/* Overview Tab */}
             {activeTab === "overview" && (
               <div className="p-4 space-y-4">

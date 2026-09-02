@@ -109,15 +109,21 @@ const PHASE_SESSION_LABEL: Record<TimerPhase, string> = {
 };
 
 const PHASE_ACCENT: Record<TimerPhase, string> = {
-  focus: "text-foreground",
+  focus: "text-rose-600 dark:text-rose-400",
   "short-break": "text-sky-600 dark:text-sky-400",
   "long-break": "text-indigo-600 dark:text-indigo-400",
 };
 
 const PHASE_RING: Record<TimerPhase, string> = {
-  focus: "stroke-foreground",
+  focus: "stroke-rose-500",
   "short-break": "stroke-sky-600 dark:stroke-sky-400",
   "long-break": "stroke-indigo-600 dark:stroke-indigo-400",
+};
+
+const PHASE_SURFACE: Record<TimerPhase, string> = {
+  focus: "from-rose-500/15 via-orange-400/10 to-transparent",
+  "short-break": "from-sky-500/15 via-cyan-400/10 to-transparent",
+  "long-break": "from-indigo-500/15 via-violet-400/10 to-transparent",
 };
 
 type AudioCtx = AudioContext & {
@@ -860,16 +866,17 @@ export function PomodoroTimer() {
 
       {/* Popup Panel (anchored dropdown, like Pomodoro analytics) */}
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-[min(26rem,_calc(100vw-1rem))] overflow-hidden rounded-xl border border-border/70 bg-background shadow-2xl backdrop-blur-xl sm:w-[28rem]">
+        <div className="fixed inset-x-2 top-14 z-50 mx-auto w-auto max-w-lg overflow-hidden rounded-3xl border border-border/70 bg-background/95 shadow-2xl shadow-black/15 backdrop-blur-xl sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-[28rem]">
           {/* ── Top Bar ─────────────────────────────────────────────── */}
-          <header className="flex items-center justify-between border-b border-border/60 px-5 py-3">
+          <header className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-5">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-primary-foreground">
+              <span className={`flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br ${PHASE_SURFACE[phase]} text-foreground ring-1 ring-border/70`}>
                 <Clock className="h-3.5 w-3.5" />
               </span>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Pomodoro
-              </span>
+              <div>
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Focus flow</span>
+                <span className="block text-sm font-semibold text-foreground">Pomodoro</span>
+              </div>
             </div>
             <div className="flex items-center gap-1">
               <span className="mr-1 hidden text-xs text-muted-foreground sm:inline">
@@ -899,9 +906,9 @@ export function PomodoroTimer() {
           </header>
 
           {/* ── Scrollable body ─────────────────────────────────────── */}
-          <div className="flex max-h-[calc(100vh-6rem)] flex-col overflow-y-auto">
+          <div className="flex max-h-[calc(100svh-4.5rem)] flex-col overflow-y-auto">
             {/* Main Timer Area */}
-            <div className="flex flex-col items-center px-6 pt-7 pb-6">
+            <div className={`flex flex-col items-center bg-gradient-to-b ${PHASE_SURFACE[phase]} px-4 pt-6 pb-6 sm:px-6 sm:pt-7`}>
               <span
                 className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${
                   PHASE_ACCENT[phase]
@@ -910,14 +917,14 @@ export function PomodoroTimer() {
                 {PHASE_SESSION_LABEL[phase]}
               </span>
 
-              <div className="relative mt-5 flex h-64 w-64 items-center justify-center">
+              <div className="relative mt-5 flex h-56 w-56 items-center justify-center sm:h-64 sm:w-64">
                 <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
                   <circle
                     cx="100"
                     cy="100"
                     r="86"
                     fill="none"
-                    strokeWidth="6"
+                    strokeWidth="5"
                     className="stroke-border/50"
                   />
                   <circle
@@ -925,7 +932,7 @@ export function PomodoroTimer() {
                     cy="100"
                     r="86"
                     fill="none"
-                    strokeWidth="6"
+                    strokeWidth="5"
                     strokeLinecap="round"
                     className={`transition-[stroke-dashoffset] duration-500 ${PHASE_RING[phase]}`}
                     strokeDasharray={CENTER}
@@ -933,7 +940,7 @@ export function PomodoroTimer() {
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="font-mono text-6xl font-medium leading-none tracking-tight tabular-nums text-foreground">
+                  <span className="font-mono text-5xl font-semibold leading-none tracking-tight tabular-nums text-foreground sm:text-6xl">
                     {formatTime(secondsLeft)}
                   </span>
                   <span
@@ -947,14 +954,14 @@ export function PomodoroTimer() {
               </div>
 
               {/* Session + Controls */}
-              <div className="mt-8 flex w-full flex-col items-center">
+              <div className="mt-6 flex w-full flex-col items-center sm:mt-8">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span className="font-medium text-foreground">Session {pomoCount + 1}</span>
                   <span className="text-muted-foreground/60">·</span>
                   <span>{pomoCount} completed</span>
                 </div>
 
-                <div className="mt-5 flex items-center gap-5">
+                <div className="mt-4 flex items-center gap-4 sm:mt-5 sm:gap-5">
                   <IconButton onClick={reset} icon={<RotateCcw className="h-[18px] w-[18px]" />} label="Reset" />
                   <PlayButton onClick={start} running={running} />
                   <IconButton onClick={skipPhase} icon={<SkipForward className="h-[18px] w-[18px]" />} label="Skip" />
@@ -962,7 +969,7 @@ export function PomodoroTimer() {
               </div>
 
               {/* Cycle indicator */}
-              <div className="mt-7 flex flex-col items-center gap-2">
+              <div className="mt-6 flex flex-col items-center gap-2 sm:mt-7">
                 <div className="flex items-center gap-1.5">
                   {[0, 1, 2, 3].map((i) => (
                     <span
@@ -993,7 +1000,7 @@ export function PomodoroTimer() {
             {/* Settings */}
             <footer
               ref={settingsRef}
-              className="border-t border-border/60 bg-card/40 px-5 py-5"
+              className="border-t border-border/60 bg-card/40 px-4 py-5 sm:px-5"
             >
               <div className="mx-auto max-w-md">
                 <div className="mb-4 flex items-center gap-2">

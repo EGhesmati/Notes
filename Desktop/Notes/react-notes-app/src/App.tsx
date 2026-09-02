@@ -164,14 +164,14 @@ function AppShell({ signOut }: { signOut: () => void }) {
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/70 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-6">
+          <div className="min-w-0 flex items-center gap-2">
             <AppIcon className="h-5 w-5" />
-            <span className="text-sm font-semibold tracking-tight text-foreground">
+            <span className="truncate text-sm font-semibold tracking-tight text-foreground">
               Hello, {user?.name ?? "there"}
             </span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
             <Button
               variant="ghost"
               size="icon"
@@ -227,7 +227,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
         </div>
       </nav>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-6 sm:px-6 sm:py-8">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
             <AppIcon className="mr-2 inline-block h-8 w-8 align-middle" />
@@ -236,7 +236,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
           <p className="mt-2 text-sm text-muted-foreground">write it down, keep it safe</p>
         </div>
 
-        <div className="mb-2 flex gap-3">
+        <div className="mb-2 flex gap-2 sm:gap-3">
           <Input
             placeholder="Write a note..."
             value={text}
