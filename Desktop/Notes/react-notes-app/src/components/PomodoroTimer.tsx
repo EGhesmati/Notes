@@ -168,6 +168,7 @@ function DurationSetting({
   label,
   options,
   value,
+  isCustom,
   customInput,
   onChange,
   onCustomInputChange,
@@ -178,6 +179,7 @@ function DurationSetting({
   label: string;
   options: number[];
   value: number;
+  isCustom: boolean;
   customInput: string;
   onChange: (v: number | "custom") => void;
   onCustomInputChange: (v: string) => void;
@@ -185,16 +187,14 @@ function DurationSetting({
   max?: number;
   suffix?: string;
 }) {
-  const isCustom = !options.includes(value);
-
   return (
     <div className="flex items-center justify-between gap-4 py-3">
-      <span className="text-sm font-semibold text-foreground/90">{label}</span>
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      <div className="flex items-center justify-end gap-2">
         <select
           value={isCustom ? "custom" : value}
           onChange={(e) => onChange(e.target.value === "custom" ? "custom" : Number(e.target.value))}
-          className="h-8 cursor-pointer rounded-lg border border-border/60 bg-background px-3 text-sm font-semibold tabular-nums text-foreground/90 outline-none transition-colors hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-foreground/10"
+          className="h-8 cursor-pointer rounded-md border border-border bg-card px-2.5 text-sm font-medium tabular-nums text-foreground outline-none transition-colors hover:border-foreground/25 focus:border-foreground/40 focus:ring-2 focus:ring-ring"
         >
           {options.map((opt) => (
             <option key={opt} value={opt}>
@@ -214,7 +214,7 @@ function DurationSetting({
               onChange={(e) => onCustomInputChange(e.target.value)}
               onBlur={onCustomInputBlur}
               placeholder="Min"
-              className="h-8 w-20 text-sm"
+              className="h-8 w-20 border-border bg-card text-sm"
             />
             <span className="text-xs font-medium text-foreground/50">{suffix}</span>
           </div>
@@ -401,6 +401,9 @@ export function PomodoroTimer() {
   const [customFocusInput, setCustomFocusInput] = useState("25");
   const [customBreakInput, setCustomBreakInput] = useState("5");
   const [customLongBreakInput, setCustomLongBreakInput] = useState("15");
+  const [isCustomFocus, setIsCustomFocus] = useState(false);
+  const [isCustomBreak, setIsCustomBreak] = useState(false);
+  const [isCustomLongBreak, setIsCustomLongBreak] = useState(false);
   const [phase, setPhase] = useState<TimerPhase>("focus");
   const [secondsLeft, setSecondsLeft] = useState(focusMin * 60);
   const [running, setRunning] = useState(false);
@@ -682,17 +685,19 @@ export function PomodoroTimer() {
   }, []);
 
   const validateCustom = (val: string, max: number): number | null => {
-    const num = parseInt(val, 10);
-    if (isNaN(num) || num <= 0 || num > max) return null;
+    const num = Number(val);
+    if (!Number.isInteger(num) || num <= 0 || num > max) return null;
     return num;
   };
 
   const handleFocusChange = useCallback(
     (val: number | "custom") => {
       if (val === "custom") {
+        setIsCustomFocus(true);
         const num = validateCustom(customFocusInput, 180);
         if (num !== null) changeFocus(num);
       } else {
+        setIsCustomFocus(false);
         changeFocus(val);
       }
     },
@@ -720,9 +725,11 @@ export function PomodoroTimer() {
   const handleBreakChange = useCallback(
     (val: number | "custom") => {
       if (val === "custom") {
+        setIsCustomBreak(true);
         const num = validateCustom(customBreakInput, 60);
         if (num !== null) changeBreak(num);
       } else {
+        setIsCustomBreak(false);
         changeBreak(val);
       }
     },
@@ -750,9 +757,11 @@ export function PomodoroTimer() {
   const handleLongBreakChange = useCallback(
     (val: number | "custom") => {
       if (val === "custom") {
+        setIsCustomLongBreak(true);
         const num = validateCustom(customLongBreakInput, 60);
         if (num !== null) changeLongBreak(num);
       } else {
+        setIsCustomLongBreak(false);
         changeLongBreak(val);
       }
     },
@@ -812,6 +821,9 @@ export function PomodoroTimer() {
     setCustomFocusInput(String(saved.focusMin));
     setCustomBreakInput(String(saved.breakMin));
     setCustomLongBreakInput(String(saved.longBreakMin));
+    setIsCustomFocus(!FOCUS_OPTIONS.includes(saved.focusMin));
+    setIsCustomBreak(!BREAK_OPTIONS.includes(saved.breakMin));
+    setIsCustomLongBreak(!LONG_BREAK_OPTIONS.includes(saved.longBreakMin));
     setPhase(saved.phase);
     setSecondsLeft(saved.secondsLeft);
     setPomoCount(saved.pomoCount);
@@ -889,7 +901,7 @@ export function PomodoroTimer() {
       </Button>
 
       {open && (
-        <div className="fixed inset-x-3 top-14 z-50 mx-auto flex max-h-[calc(100svh-5rem)] max-w-sm flex-col overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-[22rem]">
+        <div className="fixed inset-x-3 top-14 z-50 mx-auto flex max-h-[calc(100svh-5rem)] max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card shadow-lg shadow-foreground/5 sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-[22rem]">
           <header className="flex shrink-0 items-center justify-between border-b border-border/50 px-4 py-3">
             <div className="flex items-center gap-2.5">
               <div className="flex h-6 w-6 items-center justify-center rounded-md bg-foreground/5 text-foreground/70">
@@ -979,6 +991,7 @@ export function PomodoroTimer() {
                     label="Focus"
                     options={FOCUS_OPTIONS}
                     value={focusMin}
+                    isCustom={isCustomFocus}
                     customInput={customFocusInput}
                     onChange={handleFocusChange}
                     onCustomInputChange={handleCustomFocusChange}
@@ -989,6 +1002,7 @@ export function PomodoroTimer() {
                     label="Short break"
                     options={BREAK_OPTIONS}
                     value={breakMin}
+                    isCustom={isCustomBreak}
                     customInput={customBreakInput}
                     onChange={handleBreakChange}
                     onCustomInputChange={handleCustomBreakChange}
@@ -999,6 +1013,7 @@ export function PomodoroTimer() {
                     label="Long break"
                     options={LONG_BREAK_OPTIONS}
                     value={longBreakMin}
+                    isCustom={isCustomLongBreak}
                     customInput={customLongBreakInput}
                     onChange={handleLongBreakChange}
                     onCustomInputChange={handleCustomLongBreakChange}
