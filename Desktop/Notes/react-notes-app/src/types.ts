@@ -8,6 +8,7 @@ export interface NoteItem {
   priority?: Priority;
   dueDate?: string;
   pinned?: boolean;
+  tags: string[];
   deletedAt?: string;
 }
 
