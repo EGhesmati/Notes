@@ -12,7 +12,6 @@ interface RawNote {
   due_date: string | null;
   // server returns pinned as a boolean (true/false); coerce with !! when reading
   pinned: boolean | number | null;
-  tags?: string[];
   deleted_at?: string | null;
 }
 
@@ -61,7 +60,6 @@ function mapRaw(n: RawNote): NoteItem {
     priority: (n.priority as NoteItem["priority"]) || undefined,
     dueDate: n.due_date || undefined,
     pinned: !!n.pinned,
-    tags: Array.isArray(n.tags) ? n.tags : [],
     deletedAt: n.deleted_at || undefined,
   };
 }
@@ -123,7 +121,7 @@ export function useUserNotes() {
     return () => window.removeEventListener("focus", onFocus);
   }, [fetchAndApply]);
 
-  const addNote = useCallback(async (note: { text: string; color: string; priority?: string; dueDate?: string; pinned?: boolean; tags?: string[] }) => {
+  const addNote = useCallback(async (note: { text: string; color: string; priority?: string; dueDate?: string; pinned?: boolean }) => {
     try {
       const n = await apiCreate(note);
       const item: NoteItem = {
@@ -134,7 +132,6 @@ export function useUserNotes() {
         priority: (n.priority as NoteItem["priority"]) || undefined,
         dueDate: n.due_date || undefined,
         pinned: n.pinned === 1,
-        tags: Array.isArray(n.tags) ? n.tags : note.tags ?? [],
       };
       setNotes((prev) => {
         const next = [...prev, item];
@@ -151,7 +148,6 @@ export function useUserNotes() {
         priority: note.priority as NoteItem["priority"],
         dueDate: note.dueDate,
         pinned: note.pinned,
-        tags: note.tags ?? [],
       };
       setNotes((prev) => {
         const next = [...prev, item];
@@ -161,7 +157,7 @@ export function useUserNotes() {
     }
   }, [userId]);
 
-  const editNote = useCallback(async (id: number, updates: { text?: string; priority?: string | null; dueDate?: string | null; pinned?: boolean; tags?: string[] }) => {
+  const editNote = useCallback(async (id: number, updates: { text?: string; priority?: string | null; dueDate?: string | null; pinned?: boolean }) => {
     try {
       await apiUpdate(id, updates);
     } catch {
@@ -169,15 +165,7 @@ export function useUserNotes() {
     }
     setNotes((prev) => {
       const next = prev.map((n) =>
-        n.id === id
-          ? {
-              ...n,
-              ...updates,
-              priority: (updates.priority as NoteItem["priority"]) || undefined,
-              dueDate: updates.dueDate ?? undefined,
-              tags: updates.tags ?? n.tags,
-            }
-          : n,
+        n.id === id ? { ...n, ...updates, priority: (updates.priority as NoteItem["priority"]) || undefined, dueDate: updates.dueDate ?? undefined } : n,
       );
       saveLocal(userId, next);
       return next;

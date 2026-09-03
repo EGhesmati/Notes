@@ -31,7 +31,6 @@ import { AppLoadingScreen } from "@/components/AppLoadingScreen";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import PomodoroStats from "@/components/PomodoroStats";
 import { TimeChips } from "@/components/TimeChips";
-import { TagInput, tagColor } from "@/components/TagInput";
 import { useAuth } from "@/lib/auth-context";
 import { LoginPage } from "@/pages/LoginPage";
 import { NOTE_COLORS, PRIORITY_BADGE } from "@/types";
@@ -66,8 +65,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
   const { stats: pomoStats } = usePomodoroStats(userId);
   const timeOnNote = useMemo(() => timePerNoteMap(pomoStats), [pomoStats]);
   const [search, setSearch] = useState("");
-  const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [newTags, setNewTags] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
   const [showSignOut, setShowSignOut] = useState(false);
@@ -109,22 +106,19 @@ function AppShell({ signOut }: { signOut: () => void }) {
       color,
       priority,
       dueDate: toISO(dueDate, dueTime),
-      tags: newTags,
     });
     setText("");
     setPriority(undefined);
     setDueDate("");
     setDueTime("");
-    setNewTags([]);
-  }, [text, priority, dueDate, dueTime, newTags, addNoteApi]);
+  }, [text, priority, dueDate, dueTime, addNoteApi]);
 
   const editNote = useCallback(
-    (id: number, newText: string, newPriority?: Priority, newDueDate?: string, newDueTime?: string, newTags?: string[]) => {
+    (id: number, newText: string, newPriority?: Priority, newDueDate?: string, newDueTime?: string) => {
       editNoteApi(id, {
         text: newText,
         priority: newPriority || null,
         dueDate: toISO(newDueDate, newDueTime) || null,
-        tags: newTags,
       });
     },
     [editNoteApi],
@@ -152,28 +146,18 @@ function AppShell({ signOut }: { signOut: () => void }) {
     [reorderNotesApi],
   );
 
-  const allTags = useMemo(() => {
-    const set = new Set<string>();
-    for (const n of notes) for (const t of n.tags) set.add(t);
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [notes]);
-
   const filtered = useMemo(() => {
-    let matches = notes;
-    if (debouncedSearch) {
-      matches = matches.filter((n) =>
-        n.text.toLowerCase().includes(debouncedSearch.toLowerCase()),
-      );
-    }
-    if (activeTag) {
-      matches = matches.filter((n) => n.tags.includes(activeTag));
-    }
+    const matches = debouncedSearch
+      ? notes.filter((n) =>
+          n.text.toLowerCase().includes(debouncedSearch.toLowerCase()),
+        )
+      : notes;
     return [...matches].sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
       return 0; // stable: preserve custom drag order within groups
     });
-  }, [notes, debouncedSearch, activeTag]);
+  }, [notes, debouncedSearch]);
 
   if (!hydrated) return <AppLoadingScreen />;
 
@@ -292,9 +276,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
             className="h-7 w-32 rounded-md border border-border bg-card/80 px-2 text-[11px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
           {dueDate && <TimeChips value={dueTime} onChange={setDueTime} />}
-          <span className="text-[10px] text-muted-foreground/60">|</span>
-          <span className="text-[11px] font-medium text-muted-foreground">Tags</span>
-          <TagInput value={newTags} onChange={setNewTags} suggestions={allTags} />
         </div>
         <p className="mb-5 ml-1 mt-1 text-xs text-muted-foreground">
           {text.length} character{text.length !== 1 && "s"}
@@ -309,38 +290,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
             className="h-11 border-border bg-card/80 pl-10 backdrop-blur-xl focus-visible:ring-ring"
           />
         </div>
-
-        {allTags.length > 0 && (
-          <div className="mb-5 flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-medium text-muted-foreground">Filter:</span>
-            <button
-              type="button"
-              onClick={() => setActiveTag(null)}
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all ${
-                activeTag === null
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              }`}
-            >
-              All
-            </button>
-            {allTags.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setActiveTag((prev) => (prev === t ? null : t))}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all ${
-                  activeTag === t
-                    ? `ring-2 ring-offset-1 ring-offset-background ${tagColor(t)}`
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" />
-                {t}
-              </button>
-            ))}
-          </div>
-        )}
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -386,7 +335,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
           </p>
         ) : (
           <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
-            <NotesGrid notes={filtered} onDelete={deleteNote} onEdit={editNote} onTogglePin={togglePin} onReorder={handleReorder} timeOnNote={timeOnNote} view={view} allTags={allTags} />
+            <NotesGrid notes={filtered} onDelete={deleteNote} onEdit={editNote} onTogglePin={togglePin} onReorder={handleReorder} timeOnNote={timeOnNote} view={view} />
           </Suspense>
         )}
       </main>

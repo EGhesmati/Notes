@@ -51,9 +51,6 @@ await pool.query(`
   -- token_version is bumped on password change to invalidate all previously issued JWTs
   ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;
 
-  -- tags: JSON array of strings stored as text (e.g. '["work","urgent"]')
-  ALTER TABLE notes ADD COLUMN IF NOT EXISTS tags TEXT NOT NULL DEFAULT '[]';
-
   CREATE TABLE IF NOT EXISTS pomodoros (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
@@ -151,39 +148,6 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
-// Regex to validate a single tag name (no leading/trailing/duplicate spaces, no commas)
-const TAG_RE = /^[A-Za-z0-9 _-]+$/;
-
-function parseTags(raw: unknown): string[] | null {
-  if (raw === undefined || raw === null) return null;
-  const arr = Array.isArray(raw) ? raw : [raw];
-  const out: string[] = [];
-  for (const t of arr) {
-    const s = String(t).trim();
-    if (!s) continue;
-    if (s.length > 30) return null;
-    if (!TAG_RE.test(s)) return null;
-    if (out.includes(s)) continue;
-    out.push(s);
-  }
-  return out;
-}
-
-function mapNote(n: any) {
-  let tags: string[] = [];
-  try {
-    tags = JSON.parse(n.tags || "[]");
-  } catch {
-    tags = [];
-  }
-  return {
-    ...n,
-    dueDate: n.due_date || undefined,
-    pinned: !!n.pinned,
-    tags,
-  };
-}
-
 // Returns the current user's fresh profile (used by the client to sync isAdmin).
 app.get("/api/auth/me", authMiddleware, async (req, res) => {
   const { rows } = await pool.query("SELECT id, name, is_admin FROM users WHERE id = $1", [(req as any).userId]);
@@ -255,7 +219,11 @@ app.get("/api/notes", authMiddleware, async (req, res) => {
     "SELECT * FROM notes WHERE user_id = $1 AND deleted_at IS NULL ORDER BY pinned DESC, sort_order ASC, created_at DESC",
     [(req as any).userId],
   );
-  res.json(rows.map(mapNote));
+  res.json(rows.map((n: any) => ({
+    ...n,
+    dueDate: n.due_date || undefined,
+    pinned: !!n.pinned,
+  })));
 });
 
 // List trashed (soft-deleted) notes, most recently deleted first.
@@ -264,7 +232,11 @@ app.get("/api/notes/trash", authMiddleware, async (req, res) => {
     "SELECT * FROM notes WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC",
     [(req as any).userId],
   );
-  res.json(rows.map(mapNote));
+  res.json(rows.map((n: any) => ({
+    ...n,
+    dueDate: n.due_date || undefined,
+    pinned: !!n.pinned,
+  })));
 });
 
 // Restore a soft-deleted note back to the active list.
@@ -278,31 +250,19 @@ app.post("/api/notes/:id/restore", authMiddleware, async (req, res) => {
 
 app.post("/api/notes", authMiddleware, async (req, res) => {
   const { text, color, priority, dueDate, pinned } = req.body;
-  const tags = parseTags(req.body.tags);
-  if (!text) return res.status(400).json({ error: "text required" });
-  if (tags === null) return res.status(400).json({ error: "invalid tags" });
   const { rows } = await pool.query(
-    "INSERT INTO notes (user_id, text, color, priority, due_date, pinned, tags) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
-    [(req as any).userId, text, color, priority || null, dueDate || null, pinned ? 1 : 0, JSON.stringify(tags)],
+    "INSERT INTO notes (user_id, text, color, priority, due_date, pinned) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+    [(req as any).userId, text, color, priority || null, dueDate || null, pinned ? 1 : 0],
   );
   const note = rows[0];
-  res.json(mapNote(note));
+  res.json({ ...note, dueDate: note.due_date || undefined, pinned: !!note.pinned });
 });
 
 app.put("/api/notes/:id", authMiddleware, async (req, res) => {
   const { text, color, priority, dueDate, pinned } = req.body;
-  const tags = parseTags(req.body.tags);
-  if (tags === null) return res.status(400).json({ error: "invalid tags" });
   await pool.query(
-    `UPDATE notes SET
-      text = COALESCE($1, text),
-      priority = $2,
-      due_date = $3,
-      pinned = COALESCE($4, pinned),
-      tags = CASE WHEN $5 IS NULL THEN tags ELSE $5 END,
-      updated_at = NOW()
-     WHERE id = $6 AND user_id = $7`,
-    [text, priority || null, dueDate || null, pinned != null ? (pinned ? 1 : 0) : null, tags !== null ? JSON.stringify(tags) : null, req.params.id, (req as any).userId],
+    "UPDATE notes SET text = COALESCE($1, text), priority = $2, due_date = $3, pinned = COALESCE($4, pinned), updated_at = NOW() WHERE id = $5 AND user_id = $6",
+    [text, priority || null, dueDate || null, pinned != null ? (pinned ? 1 : 0) : null, req.params.id, (req as any).userId],
   );
   res.json({ ok: true });
 });

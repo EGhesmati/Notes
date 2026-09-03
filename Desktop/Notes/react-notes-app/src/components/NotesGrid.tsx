@@ -2,12 +2,11 @@ import { memo, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Pencil, Check, X, Calendar, Pin, Timer, GripVertical, Tag } from "lucide-react";
+import { Trash2, Pencil, Check, X, Calendar, Pin, Timer, GripVertical } from "lucide-react";
 import { PRIORITY_BADGE, noteColor } from "@/types";
 import type { NotesState, Priority } from "@/types";
 import { formatDuration } from "@/hooks/use-pomodoro-stats";
 import { TimeChips } from "@/components/TimeChips";
-import { TagInput, tagColor } from "@/components/TagInput";
 import { renderMarkdown } from "@/lib/markdown";
 
 interface NotesGridProps {
@@ -19,15 +18,12 @@ interface NotesGridProps {
     priority?: Priority,
     dueDate?: string,
     dueTime?: string,
-    tags?: string[],
   ) => void;
   readonly onTogglePin: (id: number) => void;
   readonly onReorder: (orderedIds: number[]) => void;
   /** total focus seconds worked per note id */
   readonly timeOnNote: Map<number, number>;
   readonly view: "grid" | "list" | "kanban";
-  /** all tags across notes, used for suggestions when editing */
-  readonly allTags: string[];
 }
 
 type CardVariant = "grid" | "list" | "kanban";
@@ -90,7 +86,6 @@ const NotesGrid = memo(function NotesGrid({
   onReorder,
   timeOnNote,
   view,
-  allTags,
 }: NotesGridProps) {
   const [dragId, setDragId] = useState<number | null>(null);
   const [overId, setOverId] = useState<number | null>(null);
@@ -158,7 +153,6 @@ const NotesGrid = memo(function NotesGrid({
         onEdit={onEdit}
         onTogglePin={onTogglePin}
         timeOnNote={timeOnNote}
-        allTags={allTags}
         dragEnabled={dragEnabled}
         isDragging={dragId === item.id}
         isOver={overId === item.id && dragId !== item.id}
@@ -169,7 +163,7 @@ const NotesGrid = memo(function NotesGrid({
         onDragEndItem={clearDrag}
       />
     ),
-    [onDelete, onEdit, onTogglePin, timeOnNote, allTags, dragEnabled, dragId, overId, handleDragStart, handleDragOver, handleDrop, clearDrag],
+    [onDelete, onEdit, onTogglePin, timeOnNote, dragEnabled, dragId, overId, handleDragStart, handleDragOver, handleDrop, clearDrag],
   );
 
   if (notes.length === 0) {
@@ -233,7 +227,6 @@ const NoteCard = memo(function NoteCard({
   onEdit,
   onTogglePin,
   timeOnNote,
-  allTags,
   variant,
   dragEnabled,
   isDragging,
@@ -253,11 +246,9 @@ const NoteCard = memo(function NoteCard({
     priority?: Priority,
     dueDate?: string,
     dueTime?: string,
-    tags?: string[],
   ) => void;
   readonly onTogglePin: (id: number) => void;
   readonly timeOnNote: Map<number, number>;
-  readonly allTags: string[];
   readonly dragEnabled: boolean;
   readonly isDragging: boolean;
   readonly isOver: boolean;
@@ -273,7 +264,6 @@ const NoteCard = memo(function NoteCard({
   const [editPriority, setEditPriority] = useState<Priority | undefined>(item.priority);
   const [editDueDate, setEditDueDate] = useState(defaultDates.date);
   const [editDueTime, setEditDueTime] = useState(defaultDates.time);
-  const [editTags, setEditTags] = useState<string[]>(item.tags);
 
   const startEdit = useCallback(() => {
     setEditText(item.text);
@@ -281,18 +271,17 @@ const NoteCard = memo(function NoteCard({
     const d = fromISO(item.dueDate);
     setEditDueDate(d.date);
     setEditDueTime(d.time);
-    setEditTags(item.tags);
     setEditing(true);
-  }, [item.text, item.priority, item.dueDate, item.tags]);
+  }, [item.text, item.priority, item.dueDate]);
 
   const cancelEdit = useCallback(() => setEditing(false), []);
 
   const saveEdit = useCallback(() => {
     const trimmed = editText.trim();
     if (!trimmed) return;
-    onEdit(item.id, trimmed, editPriority, editDueDate, editDueTime, editTags);
+    onEdit(item.id, trimmed, editPriority, editDueDate, editDueTime);
     setEditing(false);
-  }, [editText, editPriority, editDueDate, editDueTime, editTags, item.id, onEdit]);
+  }, [editText, editPriority, editDueDate, editDueTime, item.id, onEdit]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -374,10 +363,6 @@ const NoteCard = memo(function NoteCard({
               />
               <TimeChips value={editDueTime} onChange={setEditDueTime} />
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-              <TagInput value={editTags} onChange={setEditTags} suggestions={allTags} placeholder="Add tag..." />
-            </div>
             <div className="flex justify-end gap-1">
               <Button variant="ghost" size="icon" onClick={cancelEdit} className="h-7 w-7 text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
@@ -422,19 +407,6 @@ const NoteCard = memo(function NoteCard({
               <div className={`${compact ? "text-[13px]" : "text-sm"} leading-relaxed text-foreground`}>
                 {renderMarkdown(item.text)}
               </div>
-              {item.tags.length > 0 && (
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                  {item.tags.map((t) => (
-                    <span
-                      key={t}
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${tagColor(t)}`}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" />
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
               {(due?.dateLabel || focusedLabel) && (
                 <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
                   {due?.dateLabel && (
