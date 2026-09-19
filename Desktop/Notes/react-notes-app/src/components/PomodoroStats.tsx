@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BarChart3, CalendarDays, CheckCircle2, Flame, Sparkles, TrendingUp, Trophy, X, Clock, Target, Check, Pencil } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { usePomodoroStats, todaysFocus, getDailyGoal, setDailyGoal } from "@/hooks/use-pomodoro-stats";
+import { usePomodoroStats, todaysFocus, getDailyGoal, setDailyGoal, getWeeklyGoal, setWeeklyGoal, getMonthlyGoal, setMonthlyGoal, getYearlyGoal, setYearlyGoal } from "@/hooks/use-pomodoro-stats";
 import type { PomoStat } from "@/hooks/use-pomodoro-stats";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -109,6 +109,86 @@ function getTopNotes(stats: PomoStat[], limit: number = 5): NoteBreakdown[] {
     }));
 }
 
+// ─── Goal card (editable target progress bar) ─────────────────────────────────
+
+function GoalCard({
+  label,
+  value,
+  goal,
+  color,
+  editing,
+  input,
+  setInput,
+  onEdit,
+  onSave,
+}: {
+  label: string;
+  value: number;
+  goal: number;
+  color: string;
+  editing: boolean;
+  input: string;
+  setInput: (v: string) => void;
+  onEdit: () => void;
+  onSave: () => void;
+}) {
+  const pct = goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : 0;
+  return (
+    <div className="rounded-xl border border-border/60 bg-background/60 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        {editing ? (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium">{label}</span>
+            <Input
+              type="number"
+              min={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onSave()}
+              className="h-7 w-24 text-xs"
+              autoFocus
+            />
+            <span className="text-[10px] text-muted-foreground">min</span>
+            <Button size="icon" variant="outline" className="h-7 w-7" onClick={onSave} aria-label={`Save ${label}`}>
+              <Check className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ) : (
+          <>
+            <span className="text-xs font-medium">{label}</span>
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex items-center gap-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Pencil className="h-3 w-3" />
+              Edit
+            </button>
+          </>
+        )}
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-foreground">{value} min</span>
+        <Badge variant={value >= goal ? "default" : "outline"} className="h-5 px-1.5 text-[10px]">
+          {pct}%
+        </Badge>
+      </div>
+      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted/80">
+        <div
+          className={`h-full rounded-full bg-gradient-to-r ${color} transition-all duration-700 ${
+            value >= goal ? "from-emerald-500 to-teal-500" : ""
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
+        <span>{value} min</span>
+        <span>target {goal} min</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function PomodoroStats() {
@@ -123,6 +203,18 @@ export default function PomodoroStats() {
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState(String(getDailyGoal(userId)));
 
+  const [weeklyGoal, setWeeklyGoalState] = useState<number>(() => getWeeklyGoal(userId));
+  const [editingWeeklyGoal, setEditingWeeklyGoal] = useState(false);
+  const [weeklyGoalInput, setWeeklyGoalInput] = useState(String(getWeeklyGoal(userId)));
+
+  const [monthlyGoal, setMonthlyGoalState] = useState<number>(() => getMonthlyGoal(userId));
+  const [editingMonthlyGoal, setEditingMonthlyGoal] = useState(false);
+  const [monthlyGoalInput, setMonthlyGoalInput] = useState(String(getMonthlyGoal(userId)));
+
+  const [yearlyGoal, setYearlyGoalState] = useState<number>(() => getYearlyGoal(userId));
+  const [editingYearlyGoal, setEditingYearlyGoal] = useState(false);
+  const [yearlyGoalInput, setYearlyGoalInput] = useState(String(getYearlyGoal(userId)));
+
   const today = useMemo(() => todaysFocus(allStats), [allStats]);
 
   const saveGoal = () => {
@@ -134,6 +226,39 @@ export default function PomodoroStats() {
       setGoalInput(String(goal));
     }
     setEditingGoal(false);
+  };
+
+  const saveWeeklyGoal = () => {
+    const n = parseInt(weeklyGoalInput, 10);
+    if (Number.isFinite(n) && n > 0) {
+      setWeeklyGoalState(n);
+      setWeeklyGoal(userId, n);
+    } else {
+      setWeeklyGoalInput(String(weeklyGoal));
+    }
+    setEditingWeeklyGoal(false);
+  };
+
+  const saveMonthlyGoal = () => {
+    const n = parseInt(monthlyGoalInput, 10);
+    if (Number.isFinite(n) && n > 0) {
+      setMonthlyGoalState(n);
+      setMonthlyGoal(userId, n);
+    } else {
+      setMonthlyGoalInput(String(monthlyGoal));
+    }
+    setEditingMonthlyGoal(false);
+  };
+
+  const saveYearlyGoal = () => {
+    const n = parseInt(yearlyGoalInput, 10);
+    if (Number.isFinite(n) && n > 0) {
+      setYearlyGoalState(n);
+      setYearlyGoal(userId, n);
+    } else {
+      setYearlyGoalInput(String(yearlyGoal));
+    }
+    setEditingYearlyGoal(false);
   };
 
   const totals = useMemo(() => {
@@ -364,33 +489,48 @@ export default function PomodoroStats() {
                     </div>
                   </div>
 
-                  {[
-                    { label: "Weekly Goal", value: totals.weekMinutes, target: 1680, color: "from-emerald-500 to-teal-500" },
-                    { label: "Monthly Goal", value: totals.monthMinutes, target: 7200, color: "from-indigo-500 to-violet-500" },
-                    { label: "Yearly Goal", value: totals.yearMinutes, target: 87600, color: "from-sky-500 to-blue-500" },
-                  ].map((bar) => {
-                    const pct = Math.min(100, (bar.value / bar.target) * 100);
-                    return (
-                      <div key={bar.label} className="rounded-xl border border-border/60 bg-background/60 p-3">
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="text-xs font-medium">{bar.label}</span>
-                          <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                            {Math.round(pct)}%
-                          </Badge>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted/80">
-                          <div
-                            className={`h-full rounded-full bg-gradient-to-r ${bar.color} transition-all duration-700`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
-                          <span>{bar.value} min</span>
-                          <span>of {bar.target} min</span>
-                        </div>
-                      </div>
-                    );
-                  })}
+<GoalCard
+                    label="Weekly Goal"
+                    value={totals.weekMinutes}
+                    goal={weeklyGoal}
+                    color="from-emerald-500 to-teal-500"
+                    editing={editingWeeklyGoal}
+                    input={weeklyGoalInput}
+                    setInput={setWeeklyGoalInput}
+                    onEdit={() => {
+                      setWeeklyGoalInput(String(weeklyGoal));
+                      setEditingWeeklyGoal(true);
+                    }}
+                    onSave={saveWeeklyGoal}
+                  />
+                  <GoalCard
+                    label="Monthly Goal"
+                    value={totals.monthMinutes}
+                    goal={monthlyGoal}
+                    color="from-indigo-500 to-violet-500"
+                    editing={editingMonthlyGoal}
+                    input={monthlyGoalInput}
+                    setInput={setMonthlyGoalInput}
+                    onEdit={() => {
+                      setMonthlyGoalInput(String(monthlyGoal));
+                      setEditingMonthlyGoal(true);
+                    }}
+                    onSave={saveMonthlyGoal}
+                  />
+                  <GoalCard
+                    label="Yearly Goal"
+                    value={totals.yearMinutes}
+                    goal={yearlyGoal}
+                    color="from-sky-500 to-blue-500"
+                    editing={editingYearlyGoal}
+                    input={yearlyGoalInput}
+                    setInput={setYearlyGoalInput}
+                    onEdit={() => {
+                      setYearlyGoalInput(String(yearlyGoal));
+                      setEditingYearlyGoal(true);
+                    }}
+                    onSave={saveYearlyGoal}
+                  />
                 </div>
 
                 {/* Total Summary */}

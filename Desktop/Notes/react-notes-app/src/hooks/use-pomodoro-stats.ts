@@ -67,6 +67,84 @@ export function setDailyGoal(userId: number, minutes: number): void {
   }
 }
 
+// Weekly goal (minutes per week, stored locally).
+const DEFAULT_WEEKLY_GOAL_MIN = 1680; // 28h
+
+export function weeklyGoalKey(userId: number): string {
+  return `pomodoro_weekly_goal_${userId}`;
+}
+
+export function getWeeklyGoal(userId: number): number {
+  try {
+    const raw = localStorage.getItem(weeklyGoalKey(userId));
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_WEEKLY_GOAL_MIN;
+  } catch {
+    return DEFAULT_WEEKLY_GOAL_MIN;
+  }
+}
+
+export function setWeeklyGoal(userId: number, minutes: number): void {
+  const safe = Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_WEEKLY_GOAL_MIN;
+  try {
+    localStorage.setItem(weeklyGoalKey(userId), String(safe));
+  } catch {
+    // ignore
+  }
+}
+
+// Monthly goal (minutes per month, stored locally).
+const DEFAULT_MONTHLY_GOAL_MIN = 7200; // 120h
+
+export function monthlyGoalKey(userId: number): string {
+  return `pomodoro_monthly_goal_${userId}`;
+}
+
+export function getMonthlyGoal(userId: number): number {
+  try {
+    const raw = localStorage.getItem(monthlyGoalKey(userId));
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_MONTHLY_GOAL_MIN;
+  } catch {
+    return DEFAULT_MONTHLY_GOAL_MIN;
+  }
+}
+
+export function setMonthlyGoal(userId: number, minutes: number): void {
+  const safe = Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_MONTHLY_GOAL_MIN;
+  try {
+    localStorage.setItem(monthlyGoalKey(userId), String(safe));
+  } catch {
+    // ignore
+  }
+}
+
+// Yearly goal (minutes per year, stored locally).
+const DEFAULT_YEARLY_GOAL_MIN = 87600; // 1460h ≈ 60.8d
+
+export function yearlyGoalKey(userId: number): string {
+  return `pomodoro_yearly_goal_${userId}`;
+}
+
+export function getYearlyGoal(userId: number): number {
+  try {
+    const raw = localStorage.getItem(yearlyGoalKey(userId));
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_YEARLY_GOAL_MIN;
+  } catch {
+    return DEFAULT_YEARLY_GOAL_MIN;
+  }
+}
+
+export function setYearlyGoal(userId: number, minutes: number): void {
+  const safe = Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_YEARLY_GOAL_MIN;
+  try {
+    localStorage.setItem(yearlyGoalKey(userId), String(safe));
+  } catch {
+    // ignore
+  }
+}
+
 /** Today's focus activity using calendar-day boundaries (local time). */
 export function todaysFocus(stats: PomoStat[]): { minutes: number; sessions: number } {
   const start = new Date();
