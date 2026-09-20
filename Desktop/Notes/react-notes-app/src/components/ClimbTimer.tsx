@@ -22,6 +22,7 @@ export function ClimbTimer({
   duration,
   phase,
   running,
+  pomodoroProgress,
   completedPoints,
   totalPoints,
 }: {
@@ -29,13 +30,15 @@ export function ClimbTimer({
   duration: number;
   phase: TimerPhase;
   running: boolean;
+  pomodoroProgress: number;
   completedPoints: number;
   totalPoints: number;
 }) {
   const isFocus = phase === "focus";
   const paused = !running && secondsLeft !== duration;
   const complete = isFocus && secondsLeft <= 0 && !running;
-  const waterLevel = Math.min(1, Math.max(0, completedPoints / Math.max(1, totalPoints)));
+  const visualPoints = completedPoints + (isFocus ? Math.min(1, Math.max(0, pomodoroProgress)) : 0);
+  const waterLevel = Math.min(1, Math.max(0, visualPoints / Math.max(1, totalPoints)));
   const status = isFocus && secondsLeft <= 0 && !running
     ? "Focus complete"
     : running ? PHASE_STATUS[phase] : paused ? "Paused" : "Ready";
