@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import type { TimerPhase } from "./PomodoroTimer";
 
 function formatTime(totalSeconds: number): string {
@@ -18,42 +17,32 @@ const PHASE_STATUS: Record<TimerPhase, string> = {
   "long-break": "Long break",
 };
 
-function StaticBeacon({
+function MoonPhases({
   completedPoints,
   totalPoints,
-  complete,
 }: {
   completedPoints: number;
   totalPoints: number;
-  complete: boolean;
 }) {
-  const sections = useMemo(
-    () => Array.from({ length: Math.max(1, totalPoints) }, (_, index) => index),
-    [totalPoints],
-  );
   const completed = Math.min(totalPoints, Math.max(0, Math.floor(completedPoints)));
 
   return (
-    <div className="absolute bottom-[5%] left-1/2 top-[59%] w-[72%] -translate-x-1/2" aria-hidden>
+    <div className="absolute bottom-[6%] left-1/2 top-[61%] w-[72%] -translate-x-1/2" aria-hidden>
       <div className="lighthouse-horizon absolute inset-x-[-38%] bottom-[8%] h-px bg-foreground/10" />
-      <div className="lighthouse-tower absolute bottom-0 left-1/2 h-[72%] w-[18%] min-w-6 -translate-x-1/2 rounded-t-[45%] border-x border-foreground/20 bg-card/90 shadow-[inset_-4px_0_7px_hsl(var(--foreground)/0.05)]">
-        {sections.map((index) => (
+      <div className="absolute bottom-[24%] left-1/2 h-20 w-20 -translate-x-1/2 rounded-full border border-indigo-400/15">
+        <div className="moon-orbit absolute -inset-3 rounded-full border border-foreground/[0.06]" />
+        <div className="absolute inset-1 overflow-hidden rounded-full bg-foreground/[0.07] shadow-[inset_-6px_-4px_10px_hsl(var(--foreground)/0.06)]">
           <div
-            key={index}
-            className={`border-t border-foreground/[0.08] ${index < completed ? "bg-foreground/[0.08]" : ""}`}
-            style={{ height: `${100 / Math.max(1, totalPoints)}%` }}
+            className="moon-light absolute inset-y-0 left-0 bg-indigo-300/75"
+            style={{ width: `${Math.max(12, (completed / Math.max(1, totalPoints)) * 100)}%` }}
           />
-        ))}
+          <div className="absolute inset-0 rounded-full border border-indigo-300/20" />
+        </div>
       </div>
-      <div className="lighthouse-base absolute bottom-0 left-1/2 h-2 w-[58%] -translate-x-1/2 rounded-sm border border-foreground/15 bg-foreground/[0.07]" />
-      <div className="absolute bottom-[69%] left-1/2 h-2.5 w-[32%] -translate-x-1/2 rounded-full border border-foreground/20 bg-foreground/[0.07]" />
-      <div className="absolute bottom-[76%] left-1/2 h-2 w-[24%] -translate-x-1/2 rounded-full bg-foreground/[0.08]" />
-      <div className="absolute bottom-[80%] left-1/2 h-px w-[48%] -translate-x-1/2 bg-foreground/15" />
-      <div className="absolute bottom-[83%] left-1/2 h-5 w-5 -translate-x-1/2 rounded-full border border-indigo-400/30 bg-indigo-400/[0.08]">
-        <div className={`lighthouse-lantern absolute inset-1 rounded-full ${complete ? "bg-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.65)]" : "bg-indigo-400/70"}`} />
-      </div>
-      <div className="lighthouse-beam absolute bottom-[84%] left-1/2 h-px w-36 origin-left -translate-y-1/2 bg-indigo-400/20" />
-      <div className="absolute bottom-[84%] left-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-indigo-400/10" />
+      <div className="absolute bottom-[20%] left-[25%] h-1 w-1 rounded-full bg-indigo-400/45" />
+      <div className="absolute bottom-[43%] right-[24%] h-1.5 w-1.5 rounded-full bg-foreground/20" />
+      <div className="absolute bottom-[53%] left-[38%] h-1 w-1 rounded-full bg-foreground/20" />
+      <div className="absolute bottom-[9%] left-1/2 h-2 w-[54%] -translate-x-1/2 rounded-full border border-foreground/15 bg-foreground/[0.05]" />
     </div>
   );
 }
@@ -75,16 +64,15 @@ export function ClimbTimer({
 }) {
   const isFocus = phase === "focus";
   const paused = !running && secondsLeft !== duration;
-  const complete = completedPoints >= totalPoints;
   const status = isFocus && secondsLeft <= 0 && !running
-    ? complete ? "Lighthouse complete" : "Focus complete"
+    ? "Focus complete"
     : running ? PHASE_STATUS[phase] : paused ? "Paused" : "Ready";
 
   return (
     <div className="relative aspect-square w-[13.5rem] max-w-full sm:w-[14.5rem]">
       <div className="absolute inset-0 overflow-hidden rounded-full border border-border/70 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.025),inset_0_-10px_24px_hsl(var(--foreground)/0.025)]">
         <div className="absolute inset-x-0 bottom-0 h-[31%] bg-foreground/[0.025]" />
-        <StaticBeacon completedPoints={completedPoints} totalPoints={totalPoints} complete={complete} />
+        <MoonPhases completedPoints={completedPoints} totalPoints={totalPoints} />
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-[9%] z-10 flex justify-center">
         <div className="flex flex-col items-center text-center">

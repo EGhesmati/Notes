@@ -55,10 +55,12 @@ body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform:
   0%, 100% { filter: brightness(.98); }
   50% { filter: brightness(1.03); }
 }
-.lighthouse-beam { animation: lighthouse-beam-sweep 5s ease-in-out infinite; }
-.lighthouse-lantern { animation: lighthouse-lantern-pulse 2.8s ease-in-out infinite; }
+@keyframes moon-orbit-drift {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.moon-orbit { animation: moon-orbit-drift 18s linear infinite; }
 .lighthouse-horizon { animation: lighthouse-horizon-drift 8s ease-in-out infinite; }
-.lighthouse-tower { animation: lighthouse-tower-breathe 6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .lighthouse-beam, .lighthouse-lantern, .lighthouse-horizon, .lighthouse-tower { animation: none; }
+  .moon-orbit, .lighthouse-horizon { animation: none; }
 }
