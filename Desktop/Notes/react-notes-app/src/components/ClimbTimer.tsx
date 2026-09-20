@@ -34,6 +34,7 @@ export function ClimbTimer({
 }) {
   const isFocus = phase === "focus";
   const paused = !running && secondsLeft !== duration;
+  const complete = isFocus && secondsLeft <= 0 && !running;
   const status = isFocus && secondsLeft <= 0 && !running
     ? "Focus complete"
     : running ? PHASE_STATUS[phase] : paused ? "Paused" : "Ready";
@@ -42,9 +43,12 @@ export function ClimbTimer({
     <div className="relative aspect-square w-[13.5rem] max-w-full sm:w-[14.5rem]">
       <div className="absolute inset-0 overflow-hidden rounded-full border border-border/70 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.025),inset_0_-10px_24px_hsl(var(--foreground)/0.025)]">
         <div className="absolute inset-x-0 bottom-0 h-[24%] bg-foreground/[0.018]" />
-        <div className={`sea-surface absolute inset-x-[-12%] bottom-[17%] h-[13%] ${running ? "sea-surface-active" : ""}`} aria-hidden>
+        <div className={`sea-surface absolute inset-x-[-12%] bottom-[17%] h-[13%] ${
+          running ? "sea-surface-active" : complete ? "sea-surface-complete" : paused ? "sea-surface-paused" : ""
+        }`} aria-hidden>
           <div className="sea-wave sea-wave-primary absolute inset-x-0 top-1/2 h-px bg-indigo-400/20" />
           <div className="sea-wave sea-wave-secondary absolute inset-x-[8%] top-[62%] h-px bg-foreground/10" />
+          <div className="sea-wave sea-wave-tertiary absolute inset-x-[18%] top-[76%] h-px bg-indigo-400/10" />
         </div>
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-[9%] z-10 flex justify-center">

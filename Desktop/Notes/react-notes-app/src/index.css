@@ -46,6 +46,9 @@ body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform:
 .sea-wave { opacity: .45; }
 .sea-surface-active .sea-wave-primary { animation: sea-wave-drift 2.8s ease-in-out infinite; }
 .sea-surface-active .sea-wave-secondary { animation: sea-wave-drift 3.6s ease-in-out -1s infinite reverse; }
+.sea-surface-active .sea-wave-tertiary { animation: sea-wave-drift 4.4s ease-in-out -1.6s infinite; }
+.sea-surface-paused .sea-wave { animation: sea-wave-drift 14s ease-out 1 forwards; }
+.sea-surface-complete .sea-wave { animation: sea-wave-drift 1.15s ease-out 1; }
 @media (prefers-reduced-motion: reduce) {
-  .sea-wave-primary, .sea-wave-secondary { animation: none; }
+  .sea-wave-primary, .sea-wave-secondary, .sea-wave-tertiary { animation: none; }
 }
