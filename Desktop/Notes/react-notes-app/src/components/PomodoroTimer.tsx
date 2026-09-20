@@ -275,6 +275,52 @@ function ToggleRow({
   );
 }
 
+function StepperButton({
+  label,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      disabled={disabled}
+      className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-sm font-semibold text-foreground/80 transition-colors hover:border-foreground/25 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
+    >
+      {label}
+    </button>
+  );
+}
+
+function CheckpointSetting({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3">
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-foreground/90">Rungs per checkpoint</div>
+        <div className="mt-0.5 text-xs text-foreground/50">
+          Checkpoint after {value} completed {value === 1 ? "session" : "sessions"}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <StepperButton label="−" disabled={value <= 1} onClick={() => onChange(value - 1)} />
+        <span className="w-7 text-center text-sm font-semibold tabular-nums text-foreground">{value}</span>
+        <StepperButton label="+" disabled={value >= 16} onClick={() => onChange(value + 1)} />
+      </div>
+    </div>
+  );
+}
+
 function SessionIndicator({ count }: { count: number }) {
   return (
     <div className="flex items-center gap-1.5">
@@ -346,6 +392,15 @@ export function PomodoroTimer() {
     }
   });
 
+  const [checkpointStep, setCheckpointStep] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(`pomodoro_checkpoint_step_${userId}`);
+      return saved === null ? 4 : Math.max(1, Math.min(16, Number(saved) || 4));
+    } catch {
+      return 4;
+    }
+  });
+
   const [focusMin, setFocusMin] = useState(25);
   const [breakMin, setBreakMin] = useState(5);
   const [longBreakMin, setLongBreakMin] = useState(15);
@@ -372,6 +427,7 @@ export function PomodoroTimer() {
 
   const [ascent, setAscent] = useState<number>(() => getAscent(userId));
   const ascentRef = useRef(ascent);
+  const checkpointStepRef = useRef(checkpointStep);
 
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
@@ -396,9 +452,11 @@ export function PomodoroTimer() {
     soundRef.current = sound;
     autoStartRef.current = autoStart;
     ascentRef.current = ascent;
+    checkpointStepRef.current = checkpointStep;
     try {
       localStorage.setItem(`pomodoro_sound_${userId}`, sound ? "1" : "0");
       localStorage.setItem(`pomodoro_autostart_${userId}`, autoStart ? "1" : "0");
+      localStorage.setItem(`pomodoro_checkpoint_step_${userId}`, String(checkpointStep));
     } catch {
       // ignore
     }
@@ -415,6 +473,7 @@ export function PomodoroTimer() {
     sound,
     autoStart,
     ascent,
+    checkpointStep,
   ]);
 
   const setSound = (v: boolean) => {
@@ -571,7 +630,7 @@ export function PomodoroTimer() {
     endAtRef.current = null;
     if (phaseRef.current === "focus" && runningRef.current) {
       // Abandoned a running focus session → roll the boulder back.
-      const back = rollbackAscent(userIdRef.current);
+      const back = rollbackAscent(userIdRef.current, checkpointStepRef.current);
       ascentRef.current = back;
       setAscent(back);
     }
@@ -607,7 +666,7 @@ export function PomodoroTimer() {
     setSelectedNoteId(null);
     if (p === "focus") {
       // Abandoned focus session → the boulder falls back to the last checkpoint.
-      const back = rollbackAscent(userIdRef.current);
+      const back = rollbackAscent(userIdRef.current, checkpointStepRef.current);
       ascentRef.current = back;
       setAscent(back);
       const next: TimerPhase = (count + 1) % 4 === 0 ? "long-break" : "short-break";
@@ -942,6 +1001,7 @@ export function PomodoroTimer() {
                 phase={phase}
                 running={running}
                 ascent={ascent}
+                checkpointStep={checkpointStep}
               />
             </div>
 
@@ -995,7 +1055,7 @@ export function PomodoroTimer() {
 
             {/* 3. Progression */}
             <div className="border-t border-border/50 px-8 py-5">
-              <JourneySummary height={ascent} />
+              <JourneySummary height={ascent} checkpointStep={checkpointStep} />
 
               <div className="mt-5 flex items-center justify-center gap-1">
                 <SecondaryButton onClick={reset} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset" />
@@ -1060,6 +1120,7 @@ export function PomodoroTimer() {
                     checked={sound}
                     onChange={setSound}
                   />
+                  <CheckpointSetting value={checkpointStep} onChange={setCheckpointStep} />
                 </div>
 
                 {!("Notification" in window) || Notification.permission === "denied" ? (

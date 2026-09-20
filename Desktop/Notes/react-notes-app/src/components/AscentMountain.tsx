@@ -1,5 +1,4 @@
 export const ASCENT_MAX = 16;
-export const ASCENT_CHECKPOINT = 4;
 
 const LEVELS: { min: number; title: string }[] = [
   { min: 16, title: "Summit" },
@@ -17,11 +16,12 @@ export function ascentLevel(height: number): { title: string } {
   return LEVELS[LEVELS.length - 1];
 }
 
-/** Steps until the next checkpoint, mirroring the checkpoint logic. */
-export function stepsToNextCheckpoint(height: number): number {
+/** Rungs until the next checkpoint, mirroring the rollback logic. */
+export function stepsToNextCheckpoint(height: number, step: number): number {
+  const s = Math.max(1, Math.min(ASCENT_MAX, Math.round(step)));
   const c = Math.min(ASCENT_MAX, Math.max(0, height));
-  const mod = c % ASCENT_CHECKPOINT;
-  return mod === 0 && c > 0 ? ASCENT_CHECKPOINT : ASCENT_CHECKPOINT - mod;
+  const mod = c % s;
+  return mod === 0 && c > 0 ? s : s - mod;
 }
 
 function MountainIcon({ className }: { className?: string }) {
@@ -37,9 +37,10 @@ function MountainIcon({ className }: { className?: string }) {
  * Quiet text-only progression readout — the climb itself lives inside the
  * timer; this is just the level/steps vocabulary.
  */
-export function JourneySummary({ height }: { height: number }) {
+export function JourneySummary({ height, checkpointStep }: { height: number; checkpointStep: number }) {
   const c = Math.min(ASCENT_MAX, Math.max(0, height));
-  const toNext = stepsToNextCheckpoint(c);
+  const s = Math.max(1, Math.min(ASCENT_MAX, Math.round(checkpointStep)));
+  const toNext = stepsToNextCheckpoint(c, s);
 
   return (
     <div className="w-full select-none">
@@ -59,7 +60,7 @@ export function JourneySummary({ height }: { height: number }) {
         {c >= ASCENT_MAX ? (
           <span className="font-medium text-amber-600 dark:text-amber-400">Peak reached</span>
         ) : (
-          <span>checkpoint every {ASCENT_CHECKPOINT}</span>
+          <span>every {s} completed</span>
         )}
       </div>
     </div>

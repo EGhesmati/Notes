@@ -8,9 +8,7 @@ import {
   useReducedMotion,
 } from "framer-motion";
 import type { TimerPhase } from "./PomodoroTimer";
-
-export const ASCENT_MAX = 16;
-export const ASCENT_CHECKPOINT = 4;
+import { ASCENT_MAX } from "@/hooks/use-pomodoro-stats";
 
 const SIZE = 320;
 const CENTER = SIZE / 2;
@@ -21,7 +19,6 @@ const RADIUS = 148;
 const CLIMB_PATH =
   "M 68 252 C 116 262, 150 232, 186 220 C 212 211, 228 202, 238 190";
 
-const CHECKPOINT_STEPS = [4, 8, 12, 16];
 const SUMMIT = { x: 238, y: 190 };
 
 function formatTime(totalSeconds: number): string {
@@ -47,7 +44,7 @@ const PHASE_STATUS: Record<TimerPhase, string> = {
  * The Pomodoro timer is a mountain: countdown in the foreground, a layered
  * landscape behind it, and a climber pushing a stone along the interior route.
  * Every finished focus session steps the climber one rung up the path; each
- * fourth session unlocks a checkpoint.
+ * `checkpointStep`-th session unlocks a checkpoint.
  */
 export function ClimbTimer({
   secondsLeft,
@@ -55,18 +52,21 @@ export function ClimbTimer({
   phase,
   running,
   ascent,
+  checkpointStep,
 }: {
   secondsLeft: number;
   duration: number;
   phase: TimerPhase;
   running: boolean;
   ascent: number;
+  checkpointStep: number;
 }) {
   const prefersReduced = useReducedMotion();
 
   const progress = duration > 0 ? Math.min(1, Math.max(0, secondsLeft / duration)) : 0;
   const elapsed = 1 - progress;
   const completed = Math.min(ASCENT_MAX, Math.max(0, ascent));
+  const step = Math.max(1, Math.min(ASCENT_MAX, Math.round(checkpointStep)));
 
   /* Position along the climb route. During a focus session the climber covers
      the next rung smoothly; during breaks he rests at the rung just reached. */
@@ -80,20 +80,12 @@ export function ClimbTimer({
   const ringSpring = useSpring(ringProgress, { stiffness: 80, damping: 26 });
   const dashOffset = useTransform(ringSpring, (p) => 2 * Math.PI * RADIUS * (1 - p));
 
-  const fracMV = useMotionValue(frac / ASCENT_MAX);
-  const fracSpring = useSpring(fracMV, { stiffness: 60, damping: 22 });
-  const stoneRot = useTransform(fracSpring, (f) => f * 720);
-
   useEffect(() => {
     ringProgress.set(progress);
   }, [progress, ringProgress]);
-  useEffect(() => {
-    fracMV.set(frac / ASCENT_MAX);
-  }, [frac, fracMV]);
 
-  /* Smooth position / lean along the path via SVG path sampling.
-     The route is static, so we measure it once on mount into a fixed-size
-     array of points and look up by index during render (no ref reads here). */
+  /* Position / lean along the path. Route is static, so measure it once on
+     mount into a fixed-size array and look up by index during render. */
   const SAMPLE_COUNT = 320;
   const pathRef = useRef<SVGPathElement>(null);
   const [samples, setSamples] = useState<{ x: number; y: number; deg: number }[]>([]);
@@ -121,15 +113,20 @@ export function ClimbTimer({
       deg: 0,
     };
 
-  /* Checkpoint positions (fractions of total path length). */
-  const checkpointPoints = CHECKPOINT_STEPS.map((step, i) => {
-    const pt =
-      samples[clampIndex(((i + 1) / CHECKPOINT_STEPS.length) * SAMPLE_COUNT)] ?? {
-        x: 0,
-        y: 0,
-      };
-    return { step, x: pt.x, y: pt.y };
-  });
+  /* Checkpoints at every `step` rungs; marker sits at that fraction of the path. */
+  const checkpointCount = Math.floor(ASCENT_MAX / step);
+  const checkpointPoints = Array.from(
+    { length: checkpointCount },
+    (_, i) => {
+      const level = step * (i + 1);
+      const pt =
+        samples[clampIndex((level / ASCENT_MAX) * SAMPLE_COUNT)] ?? {
+          x: 0,
+          y: 0,
+        };
+      return { level, x: pt.x, y: pt.y };
+    },
+  );
 
   /* Checkpoint unlock pulse. */
   const [pulseAt, setPulseAt] = useState<number | null>(null);
@@ -138,16 +135,16 @@ export function ClimbTimer({
     const prev = prevFracRef.current;
     prevFracRef.current = frac;
     if (frac > prev) {
-      const hit = CHECKPOINT_STEPS.find(
-        (s) => prev < s && frac >= s,
-      );
+      const hit = checkpointPoints
+        .filter((c) => prev < c.level && frac >= c.level)
+        .map((c) => c.level)[0];
       if (hit) {
         setPulseAt(hit);
         const id = window.setTimeout(() => setPulseAt(null), 950);
         return () => window.clearTimeout(id);
       }
     }
-  }, [frac]);
+  }, [frac, checkpointPoints]);
 
   const isActive = phase === "focus";
   const walking = running && isActive;
@@ -156,7 +153,11 @@ export function ClimbTimer({
     : secondsLeft === duration
       ? "Ready"
       : "Paused";
+
+  // Lean into the slope (clamped). Applied as a native SVG transform so the
+  // figure pivots around its feet, not the viewBox corner.
   const lean = isActive ? -Math.max(-24, Math.min(24, sample.deg)) : 0;
+  const stoneRot = (frac / ASCENT_MAX) * 720;
 
   return (
     <div className="relative flex items-center justify-center">
@@ -217,41 +218,36 @@ export function ClimbTimer({
             />
 
             {/* checkpoints */}
-            {checkpointPoints.map(({ step, x, y }) => {
-              const reached = frac >= step;
+            {checkpointPoints.map(({ level, x, y }) => {
+              const reached = frac >= level;
               return (
-                <g key={step} transform={`translate(${x}, ${y})`}>
-                  <AnimatePresence initial={false}>
-                    {reached ? (
-                      <motion.g
-                        key="reached"
-                        initial={{ scale: 0.3, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.5, opacity: 0 }}
-                        transition={{ type: "spring", stiffness: 420, damping: 20 }}
-                      >
-                        <circle r={3} className="fill-indigo-600" />
-                      </motion.g>
-                    ) : (
-                      <motion.g
-                        key="idle"
-                        initial={false}
-                        exit={{ scale: 0.5, opacity: 0 }}
-                      >
-                        <circle r={2.6} className="fill-background stroke-border" strokeWidth="1" />
-                      </motion.g>
-                    )}
-                  </AnimatePresence>
-                  {pulseAt === step && (
+                <g key={level} transform={`translate(${x}, ${y})`}>
+                  <motion.circle
+                    r={2.6}
+                    fill="none"
+                    strokeWidth="1"
+                    className="stroke-border"
+                    animate={{ r: reached ? 4 : 2.6, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                  />
+                  {reached && (
                     <motion.circle
                       r={3}
+                      className="fill-indigo-600"
+                      initial={{ r: 0.5, opacity: 0 }}
+                      animate={{ r: 5.5, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 260, damping: 14 }}
+                    />
+                  )}
+                  {pulseAt === level && (
+                    <motion.circle
+                      r={2.6}
                       fill="none"
                       strokeWidth="1.5"
                       className="stroke-indigo-500"
-                      initial={{ scale: 0.5, opacity: 0.9 }}
-                      animate={{ scale: 3.2, opacity: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.9, ease: "easeOut" }}
+                      initial={{ r: 2.6, opacity: 0.9 }}
+                      animate={prefersReduced ? { r: 8, opacity: 0.5 } : { r: 16, opacity: 0 }}
+                      transition={{ duration: 0.95, ease: "easeOut" }}
                     />
                   )}
                 </g>
@@ -269,46 +265,44 @@ export function ClimbTimer({
               />
             </g>
 
-            {/* the climber + stone */}
+            {/* the climber + stone — native SVG transforms, so rotation
+                pivots at the contact point instead of the viewBox corner */}
             <motion.g
               animate={{ x: sample.x, y: sample.y }}
               transition={{ type: "spring", stiffness: 70, damping: 20 }}
             >
-              <motion.g
-                animate={{ rotate: lean }}
-                style={{ transformOrigin: "0px 0px" }}
-                transition={{ type: "spring", stiffness: 70, damping: 20 }}
-              >
+              <g transform={`rotate(${lean})`}>
                 <motion.g
                   animate={walking ? { y: [0, -1.6, 0] } : { y: 0 }}
                   transition={walking ? { duration: 0.85, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
                 >
                   {/* stone */}
-                  <g transform="translate(14, -8)">
-                    <motion.g style={{ rotate: stoneRot, transformOrigin: "0px 0px" }}>
-                      <circle cx="0" cy="0" r="8" className="fill-indigo-600/90" />
-                      <circle cx="4" cy="-5" r="1.5" className="fill-background/70" />
-                    </motion.g>
+                  <g transform={`translate(12, -7) rotate(${stoneRot})`}>
+                    <circle cx="0" cy="0" r="5.2" className="fill-indigo-600/90" />
+                    <path
+                      d="M -3.5 -3.2 C -3.2 -4.6 -1.8 -5.2 -0.4 -5 L 0 -3.4 Z"
+                      className="fill-background/60"
+                    />
                   </g>
 
-                  {/* figure */}
+                  {/* figure — climber leaning in to push the boulder */}
                   <g
                     className="text-foreground/85"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth="1.6"
+                    strokeWidth="1.8"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <circle cx="-1.5" cy="-22" r="3.4" />
-                    <line x1="-2" y1="-18.5" x2="2.5" y2="-10.5" />
-                    <path d="M 2.5 -10.5 L 4.5 -7 L 5.5 -2" />
-                    <path d="M 2 -10.5 L 0.5 -2.5 L 1.5 -1" />
-                    <line x1="2" y1="-14" x2="11" y2="-9.5" />
-                    <line x1="2.5" y1="-12" x2="11" y2="-5.5" />
+                    <circle cx="2" cy="-19" r="2.2" />
+                    <path d="M 1.6 -16.6 L 2.2 -9.5" />
+                    <path d="M 2.2 -9.5 L 0.6 -4.8 L -1.4 -1" />
+                    <path d="M 2.2 -9.5 L 4.6 -5.4 L 5.6 -1" />
+                    <path d="M 2 -14.2 C 4.6 -13.4 6.8 -11.6 8.6 -9.2" />
+                    <path d="M 2.1 -13 C 4.8 -12.4 7 -10.6 8.8 -7.8" />
                   </g>
                 </motion.g>
-              </motion.g>
+              </g>
             </motion.g>
           </g>
         </svg>

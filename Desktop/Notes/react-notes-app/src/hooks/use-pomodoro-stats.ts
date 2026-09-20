@@ -69,10 +69,11 @@ export function setDailyGoal(userId: number, minutes: number): void {
 
 // ---- Sisyphus ascent (per user, stored locally) ----
 // Every completed focus session rolls the boulder one step up the mountain.
-// Abandoning a session rolls it back to the last checkpoint (every 4 steps).
+// Abandoning a session rolls it back to the last checkpoint (every N steps,
+// N is user-configurable with a default of 4).
 // The climb resets at the start of each calendar day.
 
-const ASCENT_CHECKPOINT_STEP = 4;
+export const ASCENT_MAX = 16;
 
 export function ascentKey(userId: number): string {
   return `pomodoro_ascent_${userId}`;
@@ -118,11 +119,12 @@ export function incrementAscent(userId: number): number {
 
 /**
  * Abandoned a focus session: the boulder falls back to the last checkpoint
- * (every 4 steps). At height 1 it falls all the way to the bottom.
+ * (every `step` steps, default 4). At height 1 it falls all the way down.
  */
-export function rollbackAscent(userId: number): number {
+export function rollbackAscent(userId: number, step: number = 4): number {
   const current = getAscent(userId);
-  const checkpoint = Math.floor(current / ASCENT_CHECKPOINT_STEP) * ASCENT_CHECKPOINT_STEP;
+  const clamped = Math.max(1, Math.min(ASCENT_MAX, Math.round(step)));
+  const checkpoint = Math.floor(current / clamped) * clamped;
   writeAscent(userId, checkpoint);
   return checkpoint;
 }
