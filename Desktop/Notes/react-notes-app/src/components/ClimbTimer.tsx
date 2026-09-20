@@ -169,14 +169,14 @@ export function ClimbTimer({
         complete={complete}
       />
       <div className="pointer-events-none absolute inset-x-0 top-5 flex justify-center sm:top-7">
-        <div className="flex flex-col items-center rounded-lg bg-card/90 px-5 py-3 text-center">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.28em] text-foreground/45">
+        <div className="flex flex-col items-center text-center">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-foreground/70 [text-shadow:0_1px_8px_hsl(var(--card))]">
             {PHASE_LABEL[phase]}
           </span>
-          <span className="mt-2 font-sans text-5xl font-extralight tracking-tight tabular-nums text-foreground sm:text-6xl">
+          <span className="mt-2 font-sans text-5xl font-light tracking-tight tabular-nums text-foreground [text-shadow:0_1px_10px_hsl(var(--card)),0_0_2px_hsl(var(--card))] sm:text-6xl">
             {formatTime(secondsLeft)}
           </span>
-          <span className="mt-2 flex items-center gap-1.5 text-[10px] font-medium text-foreground/50">
+          <span className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-foreground/65 [text-shadow:0_1px_8px_hsl(var(--card))]">
             {running && isFocus ? <span className="h-1 w-1 rounded-full bg-indigo-500" /> : null}
             {status}
           </span>
