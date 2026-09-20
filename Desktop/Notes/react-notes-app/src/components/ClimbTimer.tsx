@@ -38,7 +38,7 @@ function StaticLighthouse({
   const completed = Math.min(totalPoints, Math.max(0, Math.floor(completedPoints)));
 
   return (
-    <div className="absolute bottom-[9%] left-1/2 top-[36%] w-[42%] -translate-x-1/2" aria-hidden>
+    <div className="absolute bottom-[10%] left-1/2 top-[48%] w-[42%] -translate-x-1/2" aria-hidden>
       <div className="absolute bottom-0 left-1/2 flex h-full w-[42%] min-w-16 -translate-x-1/2 flex-col items-center justify-end">
         <div className="relative mb-1 h-7 w-[145%] rounded-t-md border border-foreground/25 bg-card shadow-[inset_0_-2px_0_hsl(var(--foreground)/0.04)]">
           <div className={`mx-auto mt-1.5 h-3.5 w-10 rounded-sm border ${
@@ -135,14 +135,14 @@ function RiveScene({
   ]);
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-background">
+    <div className="absolute inset-0 overflow-hidden rounded-full bg-background">
       {rive ? <RiveComponent className="h-full w-full" /> : null}
       {!rive ? (
         <div className="absolute inset-0">
-          <div className="absolute inset-x-0 top-[34%] h-px bg-foreground/10" />
+          <div className="absolute inset-x-0 top-[45%] h-px bg-foreground/10" />
           <div className="absolute inset-x-0 bottom-0 h-[22%] bg-foreground/[0.035]" />
           <div className="absolute bottom-[21%] left-0 right-0 h-px bg-foreground/10" />
-          <div className="absolute left-[30%] top-[27%] h-14 w-[40%] -skew-x-12 bg-indigo-500/[0.045]" />
+          <div className="absolute left-[28%] top-[34%] h-10 w-[44%] -skew-x-12 bg-indigo-500/[0.045]" />
           <StaticLighthouse completedPoints={completedPoints} totalPoints={totalPoints} complete={complete} />
         </div>
       ) : null}
@@ -175,7 +175,8 @@ export function ClimbTimer({
     : running ? PHASE_STATUS[phase] : paused ? "Paused" : "Ready";
 
   return (
-    <div className="relative h-[11.5rem] w-full max-w-[21rem] sm:h-[12.5rem] sm:max-w-[22rem]">
+    <div className="relative aspect-square w-[11.5rem] max-w-full sm:w-[12.5rem]">
+      <div className="absolute inset-0 rounded-full border border-border/60 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.02)]" />
       <RiveScene
         running={running}
         paused={paused}
@@ -184,7 +185,7 @@ export function ClimbTimer({
         totalPoints={totalPoints}
         complete={complete}
       />
-      <div className="pointer-events-none absolute inset-x-0 top-1 flex justify-center sm:top-2">
+      <div className="pointer-events-none absolute inset-x-0 top-[10%] flex justify-center">
         <div className="flex flex-col items-center text-center">
           <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-foreground/70">
             {PHASE_LABEL[phase]}
@@ -192,14 +193,13 @@ export function ClimbTimer({
           <span className="mt-0.5 font-sans text-4xl font-light tracking-tight tabular-nums text-foreground sm:text-5xl">
             {formatTime(secondsLeft)}
           </span>
-          <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium text-foreground/65">
+          <span className="mt-1 rounded-full bg-indigo-500/[0.08] px-2 py-0.5 text-[10px] font-medium text-foreground/65">
             {running && isFocus ? <span className="h-1 w-1 rounded-full bg-indigo-500" /> : null}
             {status}
           </span>
         </div>
       </div>
-      <div className="pointer-events-none absolute inset-x-[18%] bottom-1 h-px bg-foreground/10" />
-      <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] font-medium tabular-nums text-foreground/50">
+      <div className="pointer-events-none absolute bottom-[7%] left-1/2 -translate-x-1/2 text-[9px] font-medium tabular-nums text-foreground/50">
         {Math.min(totalPoints, Math.max(0, Math.floor(completedPoints)))} / {totalPoints}
       </div>
     </div>
