@@ -175,8 +175,8 @@ export function ClimbTimer({
     : running ? PHASE_STATUS[phase] : paused ? "Paused" : "Ready";
 
   return (
-    <div className="relative aspect-square w-[11.5rem] max-w-full sm:w-[12.5rem]">
-      <div className="absolute inset-0 rounded-full border border-border/60 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.02)]" />
+    <div className="relative aspect-square w-[13.5rem] max-w-full sm:w-[14.5rem]">
+      <div className="absolute inset-0 rounded-full border border-border/70 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.025),inset_0_-10px_24px_hsl(var(--foreground)/0.025)]" />
       <RiveScene
         running={running}
         paused={paused}
@@ -185,15 +185,15 @@ export function ClimbTimer({
         totalPoints={totalPoints}
         complete={complete}
       />
-      <div className="pointer-events-none absolute inset-x-0 top-[10%] flex justify-center">
+      <div className="pointer-events-none absolute inset-x-0 top-[11%] flex justify-center">
         <div className="flex flex-col items-center text-center">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-foreground/70">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.34em] text-foreground/70">
             {PHASE_LABEL[phase]}
           </span>
-          <span className="mt-0.5 font-sans text-4xl font-light tracking-tight tabular-nums text-foreground sm:text-5xl">
+          <span className="mt-1 font-sans text-5xl font-light tracking-tight tabular-nums text-foreground sm:text-[3.4rem]">
             {formatTime(secondsLeft)}
           </span>
-          <span className="mt-1 rounded-full bg-indigo-500/[0.08] px-2 py-0.5 text-[10px] font-medium text-foreground/65">
+          <span className="mt-1.5 rounded-full border border-indigo-500/15 bg-indigo-500/[0.07] px-2.5 py-0.5 text-[10px] font-medium text-foreground/65">
             {running && isFocus ? <span className="h-1 w-1 rounded-full bg-indigo-500" /> : null}
             {status}
           </span>
