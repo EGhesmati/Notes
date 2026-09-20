@@ -51,9 +51,11 @@ export function ClimbTimer({
           running ? "sea-surface-active" : complete ? "sea-surface-complete" : paused ? "sea-surface-paused" : ""
           }`} aria-hidden>
           <svg className="sea-wave sea-wave-primary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">
+            <path className="sea-surface-fill" d="M-10 17 C 12 5, 30 5, 52 17 S 92 29, 114 17 S 154 5, 176 17 S 216 29, 250 14 V32 H-10 Z" />
             <path d="M-10 17 C 12 5, 30 5, 52 17 S 92 29, 114 17 S 154 5, 176 17 S 216 29, 250 14" />
           </svg>
           <svg className="sea-wave sea-wave-secondary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">
+            <path className="sea-surface-fill secondary" d="M-10 21 C 15 11, 34 11, 58 21 S 101 31, 124 20 S 166 10, 190 20 S 220 30, 250 18 V32 H-10 Z" />
             <path d="M-10 21 C 15 11, 34 11, 58 21 S 101 31, 124 20 S 166 10, 190 20 S 220 30, 250 18" />
           </svg>
           <svg className="sea-wave sea-wave-tertiary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">

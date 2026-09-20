@@ -48,6 +48,8 @@ body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform:
   transition: height 900ms cubic-bezier(.22, 1, .36, 1);
 }
 .sea-wave { overflow: visible; fill: none; stroke-linecap: round; stroke-width: 1.6; opacity: .7; }
+.sea-surface-fill { fill: rgb(186 211 232 / .13); stroke: none; }
+.sea-surface-fill.secondary { fill: rgb(129 140 248 / .045); }
 .sea-wave-primary { stroke: rgb(129 140 248 / .5); }
 .sea-wave-secondary { stroke: rgb(71 85 105 / .32); stroke-width: 1.2; }
 .sea-wave-tertiary { stroke: rgb(129 140 248 / .24); stroke-width: 1; }
