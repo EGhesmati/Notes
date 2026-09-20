@@ -40,12 +40,13 @@ function StaticLighthouse({
   return (
     <div className="absolute bottom-[9%] left-1/2 top-[36%] w-[42%] -translate-x-1/2" aria-hidden>
       <div className="absolute bottom-0 left-1/2 flex h-full w-[42%] min-w-16 -translate-x-1/2 flex-col items-center justify-end">
-        <div className="mb-1 h-7 w-[145%] rounded-t-md border border-foreground/25 bg-card">
+        <div className="relative mb-1 h-7 w-[145%] rounded-t-md border border-foreground/25 bg-card shadow-[inset_0_-2px_0_hsl(var(--foreground)/0.04)]">
           <div className={`mx-auto mt-1.5 h-3.5 w-10 rounded-sm border ${
             complete ? "border-amber-400/80 bg-amber-300/80" : "border-indigo-500/40 bg-indigo-500/15"
           }`} />
+          <div className="absolute inset-x-1.5 bottom-0 h-px bg-foreground/15" />
         </div>
-        <div className="flex w-full flex-1 flex-col justify-end border-x border-foreground/20 bg-card/90">
+        <div className="relative flex w-full flex-1 flex-col justify-end [clip-path:polygon(14%_0,86%_0,100%_100%,0_100%)] border-x border-foreground/20 bg-card/90 shadow-[inset_-5px_0_8px_hsl(var(--foreground)/0.035)]">
           {sections.map((index) => (
             <div
               key={index}
@@ -54,17 +55,26 @@ function StaticLighthouse({
               }`}
             />
           ))}
+          <div className="pointer-events-none absolute inset-y-1 left-1/2 w-px -translate-x-1/2 bg-foreground/[0.08]" />
+          <div className="pointer-events-none absolute inset-y-2 left-[34%] w-px bg-indigo-500/[0.12]" />
+          <div className="pointer-events-none absolute inset-y-2 right-[34%] w-px bg-foreground/[0.07]" />
         </div>
-        <div className="h-3 w-[150%] rounded-sm border border-foreground/20 bg-foreground/[0.09]" />
+        <div className="relative h-3 w-[150%] rounded-sm border border-foreground/20 bg-foreground/[0.09]">
+          <div className="absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-foreground/15" />
+        </div>
       </div>
       <div className="absolute bottom-[calc(100%-2rem)] left-1/2 h-5 w-[175%] -translate-x-1/2 border-y border-foreground/25 bg-card/95">
         <div className="absolute inset-x-[12%] top-1/2 h-px -translate-y-1/2 bg-indigo-500/30" />
+        <div className="absolute inset-x-[18%] top-1 h-px bg-foreground/10" />
       </div>
-      <div className="absolute bottom-[calc(100%-0.5rem)] left-1/2 h-8 w-12 -translate-x-1/2 rounded-t-md border border-foreground/25 bg-card">
+      <div className="absolute bottom-[calc(100%-0.5rem)] left-1/2 h-8 w-12 -translate-x-1/2 rounded-t-md border border-foreground/25 bg-card shadow-[inset_0_-3px_0_hsl(var(--foreground)/0.04)]">
         <div className="absolute inset-x-2 bottom-1 h-4 rounded-sm border border-foreground/20 bg-foreground/[0.06]" />
       </div>
-      <div className="absolute bottom-[calc(100%+1.45rem)] left-1/2 h-4 w-16 -translate-x-1/2 border-x border-t border-foreground/25 bg-foreground/[0.08]" />
+      <div className="absolute bottom-[calc(100%+1.45rem)] left-1/2 h-4 w-16 -translate-x-1/2 border-x border-t border-foreground/25 bg-foreground/[0.08]">
+        <div className="absolute inset-x-1 top-1 h-px bg-foreground/20" />
+      </div>
       <div className="absolute bottom-[calc(100%+2.4rem)] left-1/2 h-0 w-0 -translate-x-1/2 border-x-[1.35rem] border-b-[0.8rem] border-x-transparent border-b-foreground/20" />
+      <div className="absolute bottom-[calc(100%+3.15rem)] left-1/2 h-5 w-24 -translate-x-1/2 -skew-y-6 bg-indigo-500/[0.045]" />
       <div className={`absolute bottom-[calc(100%+3rem)] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full ${
         complete ? "bg-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.75)]" : "bg-indigo-500/65"
       }`} />
