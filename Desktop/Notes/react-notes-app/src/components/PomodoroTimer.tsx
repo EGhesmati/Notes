@@ -23,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus, getAscent, incrementAscent, resetAscent, setAscent as setAscentPoints } from "@/hooks/use-pomodoro-stats";
 import { NoteSelect } from "./NoteSelect";
-import { JourneySummary } from "./AscentMountain";
 import { ClimbTimer } from "./ClimbTimer";
 
 export type TimerPhase = "focus" | "short-break" | "long-break";
@@ -747,20 +746,6 @@ export function PomodoroTimer() {
     }
   }, []);
 
-  const resetCycle = useCallback(() => {
-    resetPoints();
-    saveState(userIdRef.current, {
-      focusMin: focusMinRef.current,
-      breakMin: breakMinRef.current,
-      longBreakMin: longBreakMinRef.current,
-      phase: phaseRef.current,
-      secondsLeft: secondsLeftRef.current,
-      pomoCount: 0,
-      running: runningRef.current,
-      startedAt: endAtRef.current,
-    });
-  }, [resetPoints]);
-
   const skipPhase = useCallback(() => {
     const p = phaseRef.current;
     const count = pomoCountRef.current;
@@ -1097,7 +1082,7 @@ export function PomodoroTimer() {
 
           <div className="min-h-0 flex-1 overflow-y-auto">
             {/* 1. Timer */}
-            <div className="flex flex-col items-center px-8 pt-10 pb-2">
+            <div className="flex flex-col items-center px-6 pt-3 pb-1">
               <ClimbTimer
                 secondsLeft={secondsLeft}
                 duration={duration}
@@ -1110,7 +1095,7 @@ export function PomodoroTimer() {
             </div>
 
             {/* 2. Primary control */}
-            <div className="flex flex-col items-center px-8 pt-4 pb-5">
+            <div className="flex flex-col items-center px-6 pt-2 pb-2">
               <motion.button
                 type="button"
                 onClick={start}
@@ -1119,7 +1104,7 @@ export function PomodoroTimer() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
                 transition={{ type: "spring", stiffness: 500, damping: 28 }}
-                className="flex h-11 w-full max-w-[15rem] items-center justify-center overflow-hidden rounded-full bg-foreground text-sm font-medium text-primary-foreground shadow-sm"
+                className="flex h-14 w-full max-w-[15rem] items-center justify-center overflow-hidden rounded-full bg-foreground text-sm font-medium text-primary-foreground shadow-sm"
               >
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span
@@ -1140,7 +1125,7 @@ export function PomodoroTimer() {
                 </AnimatePresence>
               </motion.button>
 
-              <div className="mt-4 flex items-center gap-2 text-[10px] text-foreground/45">
+              <div className="mt-2 flex items-center gap-2 text-[10px] text-foreground/45">
                 <SessionIndicator
                   count={cycleInCycle}
                   total={totalPoints}
@@ -1150,26 +1135,13 @@ export function PomodoroTimer() {
                 <span className="tabular-nums">
                   {cycleInCycle} of {totalPoints} in cycle
                 </span>
-                <button
-                  type="button"
-                  onClick={resetCycle}
-                  title="Reset cycle"
-                  aria-label="Reset cycle count"
-                  className="ml-0.5 flex h-4 w-4 items-center justify-center rounded text-foreground/35 transition-colors hover:bg-foreground/5 hover:text-foreground"
-                >
-                  <RotateCcw className="h-2.5 w-2.5" />
-                </button>
               </div>
             </div>
 
-            {/* 3. Progression */}
-            <div className="border-t border-border/50 px-8 py-5">
-              <JourneySummary height={ascent} totalPoints={totalPoints} />
-
-              <div className="mt-5 flex items-center justify-center gap-1">
+            {/* 3. Compact actions */}
+            <div className="border-t border-border/50 px-6 py-1.5">
+              <div className="flex items-center justify-center gap-1">
                 <SecondaryButton onClick={reset} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset timer" />
-                <span className="mx-1 h-1 w-1 rounded-full bg-border" />
-                <SecondaryButton onClick={resetPoints} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset points" />
                 <span className="mx-1 h-1 w-1 rounded-full bg-border" />
                 <SecondaryButton onClick={skipPhase} icon={<SkipForward className="h-3.5 w-3.5" />} label="Skip" />
               </div>
@@ -1232,6 +1204,9 @@ export function PomodoroTimer() {
                     onChange={setSound}
                   />
                   <ProgressPointsSetting value={totalPoints} onChange={handleTotalPointsChange} />
+                  <div className="flex justify-end py-2">
+                    <SecondaryButton onClick={resetPoints} icon={<RotateCcw className="h-3 w-3.5" />} label="Reset points" />
+                  </div>
                 </div>
 
                 {!("Notification" in window) || Notification.permission === "denied" ? (

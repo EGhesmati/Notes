@@ -165,7 +165,7 @@ export function ClimbTimer({
     : running ? PHASE_STATUS[phase] : paused ? "Paused" : "Ready";
 
   return (
-    <div className="relative h-[22rem] w-full max-w-[22rem] sm:h-[25rem] sm:max-w-[24rem]">
+    <div className="relative h-[14rem] w-full max-w-[21rem] sm:h-[15rem] sm:max-w-[22rem]">
       <RiveScene
         running={running}
         paused={paused}
@@ -174,21 +174,24 @@ export function ClimbTimer({
         totalPoints={totalPoints}
         complete={complete}
       />
-      <div className="pointer-events-none absolute inset-x-0 top-5 flex justify-center sm:top-7">
+      <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center sm:top-3">
         <div className="flex flex-col items-center text-center">
           <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-foreground/70">
             {PHASE_LABEL[phase]}
           </span>
-          <span className="mt-2 font-sans text-5xl font-light tracking-tight tabular-nums text-foreground sm:text-6xl">
+          <span className="mt-1 font-sans text-4xl font-light tracking-tight tabular-nums text-foreground sm:text-5xl">
             {formatTime(secondsLeft)}
           </span>
-          <span className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-foreground/65">
+          <span className="mt-1 flex items-center gap-1.5 text-[10px] font-medium text-foreground/65">
             {running && isFocus ? <span className="h-1 w-1 rounded-full bg-indigo-500" /> : null}
             {status}
           </span>
         </div>
       </div>
-      <div className="pointer-events-none absolute inset-x-[18%] bottom-2 h-px bg-foreground/10" />
+      <div className="pointer-events-none absolute inset-x-[18%] bottom-1 h-px bg-foreground/10" />
+      <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] font-medium tabular-nums text-foreground/50">
+        {Math.min(totalPoints, Math.max(0, Math.floor(completedPoints)))} / {totalPoints}
+      </div>
     </div>
   );
 }
