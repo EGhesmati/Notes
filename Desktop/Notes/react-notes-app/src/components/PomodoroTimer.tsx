@@ -460,7 +460,7 @@ export function PomodoroTimer() {
   const [isCustomLongBreak, setIsCustomLongBreak] = useState(false);
   const [phase, setPhase] = useState<TimerPhase>("focus");
   const [secondsLeft, setSecondsLeft] = useState(focusMin * 60);
-  const [pomodoroProgress, setPomodoroProgress] = useState(0);
+  const [, setPomodoroProgress] = useState(0);
   const [running, setRunning] = useState(false);
   const [pomoCount, setPomoCount] = useState(0);
 
@@ -1088,7 +1088,6 @@ export function PomodoroTimer() {
                 duration={duration}
                 phase={phase}
                 running={running}
-                pomodoroProgress={pomodoroProgress}
                 completedPoints={ascent}
                 totalPoints={totalPoints}
               />
