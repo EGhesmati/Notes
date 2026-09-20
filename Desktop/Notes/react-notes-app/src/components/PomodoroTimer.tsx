@@ -16,8 +16,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
-import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus } from "@/hooks/use-pomodoro-stats";
+import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus, getAscent, incrementAscent, rollbackAscent } from "@/hooks/use-pomodoro-stats";
 import { NoteSelect } from "./NoteSelect";
+import { AscentMountain } from "./AscentMountain";
 
 type TimerPhase = "focus" | "short-break" | "long-break";
 
@@ -419,6 +420,9 @@ export function PomodoroTimer() {
   const selectedNoteIdRef = useRef<number | null>(null);
   const userIdRef = useRef(userId);
 
+  const [ascent, setAscent] = useState<number>(() => getAscent(userId));
+  const ascentRef = useRef(ascent);
+
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
   const [noteOptions, setNoteOptions] = useState<{ id: number; text: string }[]>([]);
@@ -441,6 +445,7 @@ export function PomodoroTimer() {
     userIdRef.current = userId;
     soundRef.current = sound;
     autoStartRef.current = autoStart;
+    ascentRef.current = ascent;
     try {
       localStorage.setItem(`pomodoro_sound_${userId}`, sound ? "1" : "0");
       localStorage.setItem(`pomodoro_autostart_${userId}`, autoStart ? "1" : "0");
@@ -459,6 +464,7 @@ export function PomodoroTimer() {
     userId,
     sound,
     autoStart,
+    ascent,
   ]);
 
   const setSound = (v: boolean) => {
@@ -553,6 +559,9 @@ export function PomodoroTimer() {
       const next: TimerPhase = (count + 1) % 4 === 0 ? "long-break" : "short-break";
       const nextDur = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
       recordCompletion(userIdRef.current, "focus", focusMinRef.current * 60, noteId);
+      const newAscent = incrementAscent(userIdRef.current);
+      ascentRef.current = newAscent;
+      setAscent(newAscent);
       setNotePickerOpen(false);
       setSelectedNoteId(null);
       setPomoCount(count + 1);
@@ -610,6 +619,12 @@ export function PomodoroTimer() {
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = null;
     endAtRef.current = null;
+    if (phaseRef.current === "focus" && runningRef.current) {
+      // Abandoned a running focus session → roll the boulder back.
+      const back = rollbackAscent(userIdRef.current);
+      ascentRef.current = back;
+      setAscent(back);
+    }
     runningRef.current = false;
     setRunning(false);
     const dur = durFor(phaseRef.current, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
@@ -641,6 +656,10 @@ export function PomodoroTimer() {
     endAtRef.current = null;
     setSelectedNoteId(null);
     if (p === "focus") {
+      // Abandoned focus session → the boulder falls back to the last checkpoint.
+      const back = rollbackAscent(userIdRef.current);
+      ascentRef.current = back;
+      setAscent(back);
       const next: TimerPhase = (count + 1) % 4 === 0 ? "long-break" : "short-break";
       const nextDur = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
       setPhase(next);
@@ -938,6 +957,8 @@ export function PomodoroTimer() {
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div className="flex flex-col items-center px-5 pt-8 pb-8">
               <TimerDisplay secondsLeft={secondsLeft} duration={duration} phase={phase} running={running} />
+
+              <AscentMountain height={ascent} />
 
               <div className="mt-6 flex flex-col items-center gap-6">
                 <button

@@ -67,6 +67,66 @@ export function setDailyGoal(userId: number, minutes: number): void {
   }
 }
 
+// ---- Sisyphus ascent (per user, stored locally) ----
+// Every completed focus session rolls the boulder one step up the mountain.
+// Abandoning a session rolls it back to the last checkpoint (every 4 steps).
+// The climb resets at the start of each calendar day.
+
+const ASCENT_CHECKPOINT_STEP = 4;
+
+export function ascentKey(userId: number): string {
+  return `pomodoro_ascent_${userId}`;
+}
+
+interface AscentState {
+  height: number;
+  date: string;
+}
+
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export function getAscent(userId: number): number {
+  try {
+    const raw = localStorage.getItem(ascentKey(userId));
+    if (!raw) return 0;
+    const state = JSON.parse(raw) as AscentState;
+    if (state.date !== todayStr() || !Number.isFinite(state.height)) return 0;
+    return Math.max(0, Math.floor(state.height));
+  } catch {
+    return 0;
+  }
+}
+
+function writeAscent(userId: number, height: number): void {
+  const state: AscentState = { height: Math.max(0, Math.floor(height)), date: todayStr() };
+  try {
+    localStorage.setItem(ascentKey(userId), JSON.stringify(state));
+  } catch {
+    // ignore
+  }
+}
+
+/** Roll the boulder one step up after a completed focus session. */
+export function incrementAscent(userId: number): number {
+  const next = getAscent(userId) + 1;
+  writeAscent(userId, next);
+  return next;
+}
+
+/**
+ * Abandoned a focus session: the boulder falls back to the last checkpoint
+ * (every 4 steps). At height 1 it falls all the way to the bottom.
+ */
+export function rollbackAscent(userId: number): number {
+  const current = getAscent(userId);
+  const checkpoint = Math.floor(current / ASCENT_CHECKPOINT_STEP) * ASCENT_CHECKPOINT_STEP;
+  writeAscent(userId, checkpoint);
+  return checkpoint;
+}
+
 // Weekly goal (minutes per week, stored locally).
 const DEFAULT_WEEKLY_GOAL_MIN = 1680; // 28h
 
