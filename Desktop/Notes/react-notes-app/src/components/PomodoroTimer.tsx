@@ -312,7 +312,7 @@ function ProgressPointsSetting({
       <div className="min-w-0">
         <div className="text-sm font-semibold text-foreground/90">Cycle number</div>
         <div className="mt-0.5 text-xs text-foreground/50">
-          {value} Pomodoros · {value} lighthouse sections
+          {value} Pomodoros
         </div>
       </div>
       <div className="flex items-center gap-2">
