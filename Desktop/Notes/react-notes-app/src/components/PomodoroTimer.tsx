@@ -537,6 +537,23 @@ export function PomodoroTimer() {
   const handleComplete = useCallback(
     (completedPhase: TimerPhase) => {
       if (completedPhase === "focus") {
+        // Freeze the completed scene at the checkpoint while the user
+        // optionally associates the session with a note.
+        const completedCount = pomoCountRef.current + 1;
+        pomoCountRef.current = completedCount;
+        setPomoCount(completedCount);
+        runningRef.current = false;
+        setRunning(false);
+        saveState(userIdRef.current, {
+          focusMin: focusMinRef.current,
+          breakMin: breakMinRef.current,
+          longBreakMin: longBreakMinRef.current,
+          phase: "focus",
+          secondsLeft: 0,
+          pomoCount: completedCount,
+          running: false,
+          startedAt: null,
+        });
         setNotePickerOpen(true);
         return;
       }
@@ -544,6 +561,10 @@ export function PomodoroTimer() {
       setSelectedNoteId(null);
       const focusDur = focusMinRef.current * 60;
       if (autoStartRef.current) {
+        if (pomoCountRef.current % 4 === 0 && ascentRef.current >= 4) {
+          ascentRef.current = 0;
+          setAscent(0);
+        }
         beginCountdown({ next: "focus", remaining: focusDur });
       } else {
         setSecondsLeft(focusDur);
@@ -565,7 +586,7 @@ export function PomodoroTimer() {
   const finishFocus = useCallback(
     (noteId: number | null) => {
       const count = pomoCountRef.current;
-      const next: TimerPhase = (count + 1) % 4 === 0 ? "long-break" : "short-break";
+      const next: TimerPhase = count % 4 === 0 ? "long-break" : "short-break";
       const nextDur = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
       recordCompletion(userIdRef.current, "focus", focusMinRef.current * 60, noteId);
       const newAscent = incrementAscent(userIdRef.current);
@@ -573,7 +594,7 @@ export function PomodoroTimer() {
       setAscent(newAscent);
       setNotePickerOpen(false);
       setSelectedNoteId(null);
-      setPomoCount(count + 1);
+      setPomoCount(count);
 
       const goalMin = getDailyGoal(userIdRef.current);
       const newTodayMin = recap.minutes + Math.round(focusMinRef.current);
@@ -615,6 +636,10 @@ export function PomodoroTimer() {
         startedAt: null,
       });
       return;
+    }
+    if (phaseRef.current === "focus" && pomoCountRef.current % 4 === 0 && ascentRef.current >= 4) {
+      ascentRef.current = 0;
+      setAscent(0);
     }
     const dur = durFor(phaseRef.current, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
     const remaining = Math.max(1, Math.min(secondsLeftRef.current > 0 ? secondsLeftRef.current : dur, dur));
@@ -1001,7 +1026,6 @@ export function PomodoroTimer() {
                 phase={phase}
                 running={running}
                 ascent={ascent}
-                checkpointStep={checkpointStep}
               />
             </div>
 

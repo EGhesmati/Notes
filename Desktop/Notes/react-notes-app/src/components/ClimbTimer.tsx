@@ -3,23 +3,22 @@ import {
   motion,
   AnimatePresence,
   useMotionValue,
-  useSpring,
   useTransform,
   useReducedMotion,
 } from "framer-motion";
 import type { TimerPhase } from "./PomodoroTimer";
-import { ASCENT_MAX } from "@/hooks/use-pomodoro-stats";
 
 const SIZE = 320;
 const CENTER = SIZE / 2;
 const RADIUS = 148;
 
-/* One unified climb path: from the base (bottom-left) up to the summit
-   checkpoint on the right, entirely inside the lower arc of the circle. */
-const CLIMB_PATH =
-  "M 68 252 C 116 262, 150 232, 186 220 C 212 211, 228 202, 238 190";
+const STAGES = 4;
 
-const SUMMIT = { x: 238, y: 190 };
+/* One unified climb path: every Pomodoro owns one quarter of this trajectory. */
+const CLIMB_PATH =
+  "M 54 258 C 76 268, 95 254, 112 242 C 132 228, 145 225, 158 220 C 180 211, 190 198, 202 190 C 218 180, 224 166, 238 154";
+
+const SUMMIT = { x: 238, y: 154 };
 
 function formatTime(totalSeconds: number): string {
   const safe = Math.max(0, Math.floor(totalSeconds));
@@ -43,8 +42,7 @@ const PHASE_STATUS: Record<TimerPhase, string> = {
 /**
  * The Pomodoro timer is a mountain: countdown in the foreground, a layered
  * landscape behind it, and a climber pushing a stone along the interior route.
- * Every finished focus session steps the climber one rung up the path; each
- * `checkpointStep`-th session unlocks a checkpoint.
+ * The four Pomodoros divide the route into four physical stages.
  */
 export function ClimbTimer({
   secondsLeft,
@@ -52,37 +50,29 @@ export function ClimbTimer({
   phase,
   running,
   ascent,
-  checkpointStep,
 }: {
   secondsLeft: number;
   duration: number;
   phase: TimerPhase;
   running: boolean;
   ascent: number;
-  checkpointStep: number;
 }) {
   const prefersReduced = useReducedMotion();
 
-  const progress = duration > 0 ? Math.min(1, Math.max(0, secondsLeft / duration)) : 0;
-  const elapsed = 1 - progress;
-  const completed = Math.min(ASCENT_MAX, Math.max(0, ascent));
-  const step = Math.max(1, Math.min(ASCENT_MAX, Math.round(checkpointStep)));
+  /* The countdown is the only clock. A completed focus session is represented
+     as elapsed=1 even for the brief completed state before the note is saved. */
+  const remainingProgress = duration > 0 ? Math.min(1, Math.max(0, secondsLeft / duration)) : 0;
+  const completed = Math.min(STAGES, Math.max(0, Math.floor(ascent)));
+  const elapsed = phase === "focus" ? 1 - remainingProgress : 0;
+  const journeyProgress = Math.min(1, Math.max(0, (completed + elapsed) / STAGES));
 
-  /* Position along the climb route. During a focus session the climber covers
-     the next rung smoothly; during breaks he rests at the rung just reached. */
-  const frac = Math.min(
-    ASCENT_MAX,
-    Math.max(0, completed + (phase === "focus" ? elapsed : 0)),
-  );
-
-  /* Ring + smoothed progression, keeps the arc and the climber in lockstep. */
-  const ringProgress = useMotionValue(progress);
-  const ringSpring = useSpring(ringProgress, { stiffness: 80, damping: 26 });
-  const dashOffset = useTransform(ringSpring, (p) => 2 * Math.PI * RADIUS * (1 - p));
+  /* The ring reads the same elapsed fraction that drives the route. */
+  const ringProgress = useMotionValue(phase === "focus" ? elapsed : 0);
+  const dashOffset = useTransform(ringProgress, (p) => 2 * Math.PI * RADIUS * (1 - p));
 
   useEffect(() => {
-    ringProgress.set(progress);
-  }, [progress, ringProgress]);
+    ringProgress.set(phase === "focus" ? elapsed : 0);
+  }, [elapsed, phase, ringProgress]);
 
   /* Position / lean along the path. Route is static, so measure it once on
      mount into a fixed-size array and look up by index during render. */
@@ -107,20 +97,19 @@ export function ClimbTimer({
 
   const clampIndex = (v: number) => Math.max(0, Math.min(SAMPLE_COUNT, Math.round(v)));
   const sample =
-    samples[clampIndex((frac / ASCENT_MAX) * SAMPLE_COUNT)] ?? {
-      x: 68,
+    samples[clampIndex(journeyProgress * SAMPLE_COUNT)] ?? {
+      x: 54,
       y: 252,
       deg: 0,
     };
 
-  /* Checkpoints at every `step` rungs; marker sits at that fraction of the path. */
-  const checkpointCount = Math.floor(ASCENT_MAX / step);
+  /* Four fixed checkpoints keep the visual journey aligned with four Pomodoros. */
   const checkpointPoints = Array.from(
-    { length: checkpointCount },
+    { length: STAGES },
     (_, i) => {
-      const level = step * (i + 1);
+      const level = i + 1;
       const pt =
-        samples[clampIndex((level / ASCENT_MAX) * SAMPLE_COUNT)] ?? {
+        samples[clampIndex((level / STAGES) * SAMPLE_COUNT)] ?? {
           x: 0,
           y: 0,
         };
@@ -130,13 +119,13 @@ export function ClimbTimer({
 
   /* Checkpoint unlock pulse. */
   const [pulseAt, setPulseAt] = useState<number | null>(null);
-  const prevFracRef = useRef(frac);
+  const prevProgressRef = useRef(journeyProgress);
   useEffect(() => {
-    const prev = prevFracRef.current;
-    prevFracRef.current = frac;
-    if (frac > prev) {
+    const prev = prevProgressRef.current;
+    prevProgressRef.current = journeyProgress;
+    if (journeyProgress > prev) {
       const hit = checkpointPoints
-        .filter((c) => prev < c.level && frac >= c.level)
+        .filter((c) => prev * STAGES < c.level && journeyProgress * STAGES >= c.level)
         .map((c) => c.level)[0];
       if (hit) {
         setPulseAt(hit);
@@ -144,20 +133,23 @@ export function ClimbTimer({
         return () => window.clearTimeout(id);
       }
     }
-  }, [frac, checkpointPoints]);
+  }, [journeyProgress, checkpointPoints]);
 
   const isActive = phase === "focus";
   const walking = running && isActive;
-  const statusText = running
-    ? PHASE_STATUS[phase]
-    : secondsLeft === duration
-      ? "Ready"
-      : "Paused";
+  const completedState = isActive && secondsLeft <= 0 && !running;
+  const statusText = completedState
+    ? "Focus complete"
+    : running
+      ? PHASE_STATUS[phase]
+      : secondsLeft === duration
+        ? "Ready"
+        : "Paused";
 
   // Lean into the slope (clamped). Applied as a native SVG transform so the
   // figure pivots around its feet, not the viewBox corner.
   const lean = isActive ? -Math.max(-24, Math.min(24, sample.deg)) : 0;
-  const stoneRot = (frac / ASCENT_MAX) * 720;
+  const stoneRot = journeyProgress * 24;
 
   return (
     <div className="relative flex items-center justify-center">
@@ -196,14 +188,14 @@ export function ClimbTimer({
             <motion.path
               d="M 8 306 C 46 244 76 264 112 238 C 148 212 176 242 212 228 C 246 215 286 250 312 238 L 312 312 L 8 312 Z"
               className="fill-indigo-600/[0.05]"
-              animate={{ x: prefersReduced ? 0 : -frac * 0.5 }}
+              animate={{ x: prefersReduced ? 0 : -journeyProgress * 3 }}
               transition={{ type: "spring", stiffness: 90, damping: 24 }}
             />
             {/* near ridge — tighter landscape */}
             <motion.path
               d="M 8 320 L 8 292 C 40 274 64 282 92 264 C 122 246 148 264 176 250 C 210 232 244 258 280 242 C 296 234 306 240 312 238 L 312 320 Z"
               className="fill-indigo-600/[0.09]"
-              animate={{ x: prefersReduced ? 0 : -frac * 0.18 }}
+              animate={{ x: prefersReduced ? 0 : -journeyProgress * 1.2 }}
               transition={{ type: "spring", stiffness: 90, damping: 24 }}
             />
 
@@ -219,7 +211,7 @@ export function ClimbTimer({
 
             {/* checkpoints */}
             {checkpointPoints.map(({ level, x, y }) => {
-              const reached = frac >= level;
+              const reached = journeyProgress * STAGES >= level;
               return (
                 <g key={level} transform={`translate(${x}, ${y})`}>
                   <motion.circle
@@ -261,7 +253,7 @@ export function ClimbTimer({
                 d="M 0 -7 L 4.5 -5.5 L 0 -4 Z"
                 fill="none"
                 strokeWidth="1"
-                className={frac >= ASCENT_MAX ? "stroke-foreground" : "stroke-foreground/25"}
+                className={journeyProgress >= 1 ? "stroke-foreground" : "stroke-foreground/25"}
               />
             </g>
 
@@ -269,12 +261,16 @@ export function ClimbTimer({
                 pivots at the contact point instead of the viewBox corner */}
             <motion.g
               animate={{ x: sample.x, y: sample.y }}
-              transition={{ type: "spring", stiffness: 70, damping: 20 }}
+              transition={
+                running
+                  ? { type: "spring", stiffness: 120, damping: 24 }
+                  : { duration: 0 }
+              }
             >
               <g transform={`rotate(${lean})`}>
                 <motion.g
                   animate={walking ? { y: [0, -1.6, 0] } : { y: 0 }}
-                  transition={walking ? { duration: 0.85, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
+                  transition={walking ? { duration: 0.85, repeat: Infinity, ease: "easeInOut" } : { duration: 0 }}
                 >
                   {/* stone */}
                   <g transform={`translate(12, -7) rotate(${stoneRot})`}>
