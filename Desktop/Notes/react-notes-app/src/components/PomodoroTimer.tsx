@@ -1,6 +1,15 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
+  motion,
+  AnimatePresence,
+  MotionConfig,
+  useMotionValue,
+  useSpring,
+  useTransform,
+  useReducedMotion,
+} from "framer-motion";
+import {
   X,
   Check,
   ChevronRight,
@@ -18,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus, getAscent, incrementAscent, rollbackAscent } from "@/hooks/use-pomodoro-stats";
 import { NoteSelect } from "./NoteSelect";
-import { AscentMountain } from "./AscentMountain";
+import { MountainProgress } from "./AscentMountain";
 
 type TimerPhase = "focus" | "short-break" | "long-break";
 
@@ -271,18 +280,24 @@ function ToggleRow({
 
 function SessionIndicator({ count }: { count: number }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5">
       {[0, 1, 2, 3].map((i) => (
         <span
           key={i}
-          className={`h-2 w-2 rounded-full transition-colors duration-300 ${
-            i < count ? "bg-foreground" : "bg-foreground/15"
+          className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
+            i < count ? "bg-foreground/70" : "bg-foreground/15"
           }`}
         />
       ))}
     </div>
   );
 }
+
+const PHASE_STATUS: Record<TimerPhase, string> = {
+  focus: "Deep work",
+  "short-break": "Short break",
+  "long-break": "Long break",
+};
 
 function TimerDisplay({
   secondsLeft,
@@ -296,47 +311,84 @@ function TimerDisplay({
   running: boolean;
 }) {
   const progress = duration > 0 ? Math.min(1, Math.max(0, secondsLeft / duration)) : 0;
-  const radius = 120;
+  const radius = 122;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference * (1 - progress);
 
-  const statusText = running ? "Running" : secondsLeft === duration ? "Ready" : "Paused";
+  const ringProgress = useMotionValue(progress);
+  const ringSpring = useSpring(ringProgress, { stiffness: 80, damping: 26 });
+  const dashOffset = useTransform(ringSpring, (p) => circumference * (1 - p));
+  const prefersReduced = useReducedMotion();
+
+  useEffect(() => {
+    ringProgress.set(progress);
+  }, [progress, ringProgress]);
+
+  const isActive = phase === "focus";
+  const statusText = running
+    ? PHASE_STATUS[phase]
+    : secondsLeft === duration
+      ? "Ready"
+      : "Paused";
 
   return (
     <div className="relative flex items-center justify-center">
-      <svg viewBox="0 0 260 260" className="h-60 w-60 -rotate-90 sm:h-64 sm:w-64">
+      <svg viewBox="0 0 260 260" className="h-64 w-64 -rotate-90 sm:h-72 sm:w-72">
         <circle
           cx="130"
           cy="130"
           r={radius}
           fill="none"
           strokeWidth="1"
-          className="stroke-border"
+          className="stroke-border/50"
         />
-        <circle
+        <motion.circle
           cx="130"
           cy="130"
           r={radius}
           fill="none"
           strokeWidth="1.5"
           strokeLinecap="round"
-          className={`transition-[stroke-dashoffset] duration-700 ease-in-out ${
-            phase === "focus" ? "stroke-indigo-600" : "stroke-foreground/25"
-          }`}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
+          className={`${isActive ? "stroke-indigo-600" : "stroke-foreground/25"}`}
+          style={{ strokeDasharray: circumference, strokeDashoffset: dashOffset }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/50">
-          {PHASE_SESSION_LABEL[phase]}
-        </span>
-        <span className="mt-2 font-sans text-6xl font-semibold tracking-tight tabular-nums text-foreground sm:text-7xl">
-          {formatTime(secondsLeft)}
-        </span>
-        <span className="mt-2 text-xs font-medium text-foreground/40">
-          {statusText}
-        </span>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={phase}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="flex flex-col items-center"
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-[0.32em] text-foreground/45">
+              {PHASE_SESSION_LABEL[phase]}
+            </span>
+            <span className="mt-3 font-sans text-7xl font-extralight tracking-tight tabular-nums text-foreground sm:text-8xl">
+              {formatTime(secondsLeft)}
+            </span>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={statusText}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-foreground/50"
+              >
+                {running && isActive && (
+                  <motion.span
+                    className="h-1 w-1 rounded-full bg-indigo-500"
+                    animate={prefersReduced ? { opacity: 1 } : { opacity: [0.4, 1, 0.4] }}
+                    transition={prefersReduced ? {} : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                )}
+                {statusText}
+              </motion.span>
+            </AnimatePresence>
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -352,16 +404,18 @@ function SecondaryButton({
   label: string;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
       title={label}
       aria-label={label}
+      whileTap={{ scale: 0.93, opacity: 0.7 }}
+      transition={{ type: "spring", stiffness: 500, damping: 28 }}
       className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5 hover:text-foreground"
     >
       {icon}
       {label}
-    </button>
+    </motion.button>
   );
 }
 
@@ -904,7 +958,8 @@ export function PomodoroTimer() {
   const cycleInCycle = pomoCount % 4;
 
   return (
-    <div className="relative">
+    <MotionConfig reducedMotion="user">
+      <div className="relative">
       <Button
         variant="ghost"
         size="icon"
@@ -919,84 +974,131 @@ export function PomodoroTimer() {
         <Clock className="h-[18px] w-[18px]" />
       </Button>
 
+      <AnimatePresence>
       {open && (
-        <div className="fixed inset-x-3 top-14 z-50 mx-auto flex max-h-[calc(100svh-5rem)] max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card shadow-lg shadow-foreground/5 sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-[22rem]">
-          <header className="flex shrink-0 items-center justify-between border-b border-border/50 px-4 py-3">
+        <motion.div
+          initial={{ opacity: 0, y: 10, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 6, scale: 0.99 }}
+          transition={{
+            opacity: { duration: 0.18, ease: "easeOut" },
+            y: { type: "spring", stiffness: 380, damping: 32 },
+            scale: { type: "spring", stiffness: 380, damping: 32 },
+          }}
+          className="fixed inset-x-3 top-14 z-50 mx-auto flex max-h-[calc(100svh-5rem)] max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card shadow-lg shadow-foreground/5 sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-[22rem]"
+        >
+          <header className="flex shrink-0 items-center justify-between border-b border-border/50 px-5 py-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-foreground/5 text-foreground/70">
-                <Clock className="h-3.5 w-3.5" />
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-border/60 bg-card text-foreground/70">
+                <Clock className="h-3 w-3" />
               </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-medium leading-none text-foreground/50">Focus Flow</span>
-                <span className="text-xs font-semibold leading-tight text-foreground">Pomodoro</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xs font-semibold tracking-tight text-foreground">Focus Flow</span>
+                <span className="text-[11px] text-foreground/45">Pomodoro</span>
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="mr-1 text-xs text-foreground/50">Session {pomoCount + 1}</span>
-              <button
+            <div className="flex items-center gap-0.5">
+              <div className="mr-1.5 flex min-w-16 items-center justify-end text-[11px] font-medium tabular-nums text-foreground/50">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={pomoCount + 1}
+                    initial={{ y: 8, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -8, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: "easeOut" }}
+                    className="inline-block"
+                  >
+                    Session {pomoCount + 1}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
+              <motion.button
                 type="button"
                 onClick={scrollToSettings}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-foreground/5 hover:text-foreground"
+                whileTap={{ scale: 0.88 }}
+                transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-foreground/45 transition-colors hover:bg-foreground/5 hover:text-foreground"
                 title="Settings"
                 aria-label="Settings"
               >
                 <Settings className="h-3.5 w-3.5" />
-              </button>
-              <button
+              </motion.button>
+              <motion.button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-foreground/50 transition-colors hover:bg-foreground/5 hover:text-foreground"
+                whileTap={{ scale: 0.88 }}
+                transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-foreground/45 transition-colors hover:bg-foreground/5 hover:text-foreground"
                 title="Close"
                 aria-label="Close"
               >
                 <X className="h-3.5 w-3.5" />
-              </button>
+              </motion.button>
             </div>
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="flex flex-col items-center px-5 pt-8 pb-8">
+            {/* 1. Timer */}
+            <div className="flex flex-col items-center px-8 pt-10 pb-2">
               <TimerDisplay secondsLeft={secondsLeft} duration={duration} phase={phase} running={running} />
+            </div>
 
-              <AscentMountain height={ascent} />
+            {/* 2. Primary control */}
+            <div className="flex flex-col items-center px-8 pt-4 pb-5">
+              <motion.button
+                type="button"
+                onClick={start}
+                title={running ? "Pause" : "Start"}
+                aria-label={running ? "Pause" : "Start"}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                className="flex h-11 w-full max-w-[15rem] items-center justify-center overflow-hidden rounded-full bg-foreground text-sm font-medium text-primary-foreground shadow-sm"
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={running ? "running" : "idle"}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="flex items-center justify-center gap-2"
+                  >
+                    {running ? (
+                      <Pause className="h-4 w-4 fill-current" />
+                    ) : (
+                      <Play className="h-4 w-4 fill-current" />
+                    )}
+                    {running ? "Pause" : "Start"}
+                  </motion.span>
+                </AnimatePresence>
+              </motion.button>
 
-              <div className="mt-6 flex flex-col items-center gap-6">
+              <div className="mt-4 flex items-center gap-2 text-[10px] text-foreground/45">
+                <SessionIndicator count={cycleInCycle} />
+                <span className="tabular-nums">
+                  {cycleInCycle} of 4 in cycle
+                </span>
                 <button
                   type="button"
-                  onClick={start}
-                  title={running ? "Pause" : "Start"}
-                  aria-label={running ? "Pause" : "Start"}
-                  className="flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-primary-foreground transition-all hover:bg-foreground/90 active:scale-95"
+                  onClick={resetCycle}
+                  title="Reset cycle"
+                  aria-label="Reset cycle count"
+                  className="ml-0.5 flex h-4 w-4 items-center justify-center rounded text-foreground/35 transition-colors hover:bg-foreground/5 hover:text-foreground"
                 >
-                  {running ? (
-                    <Pause className="h-6 w-6 fill-current" />
-                  ) : (
-                    <Play className="ml-0.5 h-6 w-6 fill-current" />
-                  )}
+                  <RotateCcw className="h-2.5 w-2.5" />
                 </button>
+              </div>
+            </div>
 
-                <div className="flex flex-col items-center gap-2">
-                  <SessionIndicator count={cycleInCycle} />
-                  <div className="flex items-center gap-1.5 text-xs text-foreground/50">
-                    <span>Session {pomoCount + 1}</span>
-                    <span>·</span>
-                    <span>{cycleInCycle} of 4 completed</span>
-                    <button
-                      type="button"
-                      onClick={resetCycle}
-                      title="Reset cycle"
-                      aria-label="Reset cycle count"
-                      className="ml-0.5 flex h-4 w-4 items-center justify-center rounded text-foreground/40 transition-colors hover:bg-foreground/5 hover:text-foreground"
-                    >
-                      <RotateCcw className="h-2.5 w-2.5" />
-                    </button>
-                  </div>
-                </div>
+            {/* 3. Progression */}
+            <div className="border-t border-border/50 px-8 py-5">
+              <MountainProgress height={ascent} />
 
-                <div className="flex items-center gap-1">
-                  <SecondaryButton onClick={reset} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset" />
-                  <SecondaryButton onClick={skipPhase} icon={<SkipForward className="h-3.5 w-3.5" />} label="Skip" />
-                </div>
+              <div className="mt-5 flex items-center justify-center gap-1">
+                <SecondaryButton onClick={reset} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset" />
+                <span className="mx-1 h-1 w-1 rounded-full bg-border" />
+                <SecondaryButton onClick={skipPhase} icon={<SkipForward className="h-3.5 w-3.5" />} label="Skip" />
               </div>
             </div>
 
@@ -1071,88 +1173,129 @@ export function PomodoroTimer() {
               </div>
             </footer>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
-      {notePickerOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-            <div className="w-[min(24rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm sm:w-[26rem]">
-              <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
-                <h3 className="text-sm font-semibold text-foreground">Associate with Note</h3>
-                <Button variant="ghost" size="icon" onClick={handleClearNotes} className="h-6 w-6 text-foreground/50 hover:text-foreground">
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <div className="max-h-[20rem] overflow-y-auto p-4">
-                <NoteSelect notes={noteOptions} value={selectedNoteId} onChange={(id) => setSelectedNoteId(id)} />
-              </div>
-              <div className="flex gap-2 border-t border-border/50 px-4 py-3">
-                <Button
-                  onClick={() => {
-                    if (selectedNoteId !== null) {
-                      finishFocus(selectedNoteId);
-                    }
+      {createPortal(
+          <AnimatePresence>
+            {notePickerOpen && (
+              <motion.div
+                key="note-picker"
+                className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.16 }}
+              >
+                <motion.div
+                  className="w-[min(24rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm sm:w-[26rem]"
+                  initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  transition={{
+                    opacity: { duration: 0.16, ease: "easeOut" },
+                    y: { type: "spring", stiffness: 380, damping: 30 },
+                    scale: { type: "spring", stiffness: 380, damping: 30 },
                   }}
-                  disabled={selectedNoteId === null}
-                  className="flex-1 bg-foreground text-primary-foreground hover:bg-foreground/90"
                 >
-                  <Check className="mr-2 h-4 w-4" />
-                  Save with Note
-                </Button>
-                <Button onClick={() => finishFocus(null)} variant="outline" className="flex-1">
-                  Skip Note
-                </Button>
-              </div>
-            </div>
-          </div>,
+                  <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+                    <h3 className="text-sm font-semibold text-foreground">Associate with Note</h3>
+                    <Button variant="ghost" size="icon" onClick={handleClearNotes} className="h-6 w-6 text-foreground/50 hover:text-foreground">
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <div className="max-h-[20rem] overflow-y-auto p-4">
+                    <NoteSelect notes={noteOptions} value={selectedNoteId} onChange={(id) => setSelectedNoteId(id)} />
+                  </div>
+                  <div className="flex gap-2 border-t border-border/50 px-4 py-3">
+                    <Button
+                      onClick={() => {
+                        if (selectedNoteId !== null) {
+                          finishFocus(selectedNoteId);
+                        }
+                      }}
+                      disabled={selectedNoteId === null}
+                      className="flex-1 bg-foreground text-primary-foreground hover:bg-foreground/90"
+                    >
+                      <Check className="mr-2 h-4 w-4" />
+                      Save with Note
+                    </Button>
+                    <Button onClick={() => finishFocus(null)} variant="outline" className="flex-1">
+                      Skip Note
+                    </Button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
           document.body,
         )}
 
-      {recapOpen &&
-        createPortal(
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" onClick={() => setRecapOpen(false)}>
-            <div
-              className="w-[min(24rem,_calc(100vw-2rem))] overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-2 border-b border-border/50 bg-foreground px-4 py-3">
-                <Trophy className="h-4 w-4 text-primary-foreground" />
-                <h3 className="text-sm font-semibold text-primary-foreground">Daily Goal Reached</h3>
-              </div>
-              <div className="px-4 py-4">
-                <p className="mb-4 text-sm text-foreground/70">You reached your focus goal for today. Nice work.</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-lg border border-border/50 bg-foreground/[0.02] p-3 text-center">
-                    <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
-                      <Clock className="h-3.5 w-3.5 text-foreground/50" />
-                      {recap.minutes}
+      {createPortal(
+          <AnimatePresence>
+            {recapOpen && (
+              <motion.div
+                key="recap"
+                className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4"
+                onClick={() => setRecapOpen(false)}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.16 }}
+              >
+                <motion.div
+                  className="w-[min(24rem,_calc(100vw-2rem))] overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm"
+                  onClick={(e) => e.stopPropagation()}
+                  initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  transition={{
+                    opacity: { duration: 0.16, ease: "easeOut" },
+                    y: { type: "spring", stiffness: 380, damping: 30 },
+                    scale: { type: "spring", stiffness: 380, damping: 30 },
+                  }}
+                >
+                  <div className="flex items-center gap-2 border-b border-border/50 bg-foreground px-4 py-3">
+                    <Trophy className="h-4 w-4 text-primary-foreground" />
+                    <h3 className="text-sm font-semibold text-primary-foreground">Daily Goal Reached</h3>
+                  </div>
+                  <div className="px-4 py-4">
+                    <p className="mb-4 text-sm text-foreground/70">You reached your focus goal for today. Nice work.</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-lg border border-border/50 bg-foreground/[0.02] p-3 text-center">
+                        <div className="flex items-center justify-center gap-1 text-lg font-semibold text-foreground">
+                          <Clock className="h-3.5 w-3.5 text-foreground/50" />
+                          {recap.minutes}
+                        </div>
+                        <div className="mt-1 text-[10px] text-foreground/50">min focused</div>
+                      </div>
+                      <div className="rounded-lg border border-border/50 bg-foreground/[0.02] p-3 text-center">
+                        <div className="text-lg font-semibold text-foreground">{recap.sessions}</div>
+                        <div className="mt-1 text-[10px] text-foreground/50">sessions</div>
+                      </div>
+                      <div className="rounded-lg border border-border/50 bg-foreground/[0.02] p-3 text-center">
+                        <div className="flex items-center justify-center gap-1 text-lg font-semibold text-indigo-600">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {getDailyGoal(userId)}m
+                        </div>
+                        <div className="mt-1 text-[10px] text-foreground/50">goal</div>
+                      </div>
                     </div>
-                    <div className="mt-1 text-[10px] text-foreground/50">min focused</div>
                   </div>
-                  <div className="rounded-lg border border-border/50 bg-foreground/[0.02] p-3 text-center">
-                    <div className="text-lg font-semibold text-foreground">{recap.sessions}</div>
-                    <div className="mt-1 text-[10px] text-foreground/50">sessions</div>
+                  <div className="flex justify-end border-t border-border/50 px-4 py-3">
+                    <Button onClick={() => setRecapOpen(false)} className="bg-foreground text-primary-foreground hover:bg-foreground/90">
+                      <Check className="mr-2 h-4 w-4" />
+                      Got it
+                    </Button>
                   </div>
-                  <div className="rounded-lg border border-border/50 bg-foreground/[0.02] p-3 text-center">
-                    <div className="flex items-center justify-center gap-1 text-lg font-semibold text-indigo-600">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {getDailyGoal(userId)}m
-                    </div>
-                    <div className="mt-1 text-[10px] text-foreground/50">goal</div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end border-t border-border/50 px-4 py-3">
-                <Button onClick={() => setRecapOpen(false)} className="bg-foreground text-primary-foreground hover:bg-foreground/90">
-                  <Check className="mr-2 h-4 w-4" />
-                  Got it
-                </Button>
-              </div>
-            </div>
-          </div>,
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
           document.body,
         )}
     </div>
+    </MotionConfig>
   );
 }
