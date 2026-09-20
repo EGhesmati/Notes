@@ -36,21 +36,32 @@ function StaticLighthouse({
   const completed = Math.min(totalPoints, Math.max(0, Math.floor(completedPoints)));
 
   return (
-    <div className="absolute inset-x-[25%] bottom-[12%] top-[20%] flex flex-col items-center justify-end" aria-hidden>
-      <div className="mb-1 h-5 w-16 rounded-t-md border border-foreground/20 bg-card/90">
-        <div className="mx-auto mt-1 h-2.5 w-7 rounded-sm border border-indigo-500/35 bg-indigo-500/15" />
+    <div className="absolute bottom-[9%] left-1/2 top-[36%] w-[42%] -translate-x-1/2" aria-hidden>
+      <div className="absolute bottom-0 left-1/2 flex h-full w-[42%] min-w-16 -translate-x-1/2 flex-col items-center justify-end">
+        <div className="mb-1 h-7 w-[145%] rounded-t-md border border-foreground/25 bg-card">
+          <div className="mx-auto mt-1.5 h-3.5 w-10 rounded-sm border border-indigo-500/40 bg-indigo-500/15" />
+        </div>
+        <div className="flex w-full flex-1 flex-col justify-end border-x border-foreground/20 bg-card/90">
+          {sections.map((index) => (
+            <div
+              key={index}
+              className={`min-h-1 flex-1 border-t border-foreground/10 ${
+                index < completed ? "bg-foreground/15" : "bg-transparent"
+              }`}
+            />
+          ))}
+        </div>
+        <div className="h-3 w-[150%] rounded-sm border border-foreground/20 bg-foreground/[0.09]" />
       </div>
-      <div className="flex w-12 flex-1 flex-col justify-end border-x border-foreground/15 bg-card/80">
-        {sections.map((index) => (
-          <div
-            key={index}
-            className={`min-h-1 flex-1 border-t border-foreground/10 ${
-              index < completed ? "bg-foreground/15" : "bg-transparent"
-            }`}
-          />
-        ))}
+      <div className="absolute bottom-[calc(100%-2rem)] left-1/2 h-5 w-[175%] -translate-x-1/2 border-y border-foreground/25 bg-card/95">
+        <div className="absolute inset-x-[12%] top-1/2 h-px -translate-y-1/2 bg-indigo-500/30" />
       </div>
-      <div className="h-2 w-16 rounded-sm border border-foreground/15 bg-foreground/[0.08]" />
+      <div className="absolute bottom-[calc(100%-0.5rem)] left-1/2 h-8 w-12 -translate-x-1/2 rounded-t-md border border-foreground/25 bg-card">
+        <div className="absolute inset-x-2 bottom-1 h-4 rounded-sm border border-foreground/20 bg-foreground/[0.06]" />
+      </div>
+      <div className="absolute bottom-[calc(100%+1.45rem)] left-1/2 h-4 w-16 -translate-x-1/2 border-x border-t border-foreground/25 bg-foreground/[0.08]" />
+      <div className="absolute bottom-[calc(100%+2.4rem)] left-1/2 h-0 w-0 -translate-x-1/2 border-x-[1.35rem] border-b-[0.8rem] border-x-transparent border-b-foreground/20" />
+      <div className="absolute bottom-[calc(100%+3rem)] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-indigo-500/65" />
     </div>
   );
 }
@@ -108,12 +119,14 @@ function RiveScene({
   ]);
 
   return (
-    <div className="absolute inset-0 overflow-hidden rounded-full bg-background">
+    <div className="absolute inset-0 overflow-hidden bg-background">
       {rive ? <RiveComponent className="h-full w-full" /> : null}
       {!rive ? (
         <div className="absolute inset-0">
-          <div className="absolute inset-x-0 bottom-0 h-[34%] bg-foreground/[0.035]" />
-          <div className="absolute inset-x-0 bottom-[28%] h-px bg-foreground/10" />
+          <div className="absolute inset-x-0 top-[34%] h-px bg-foreground/10" />
+          <div className="absolute inset-x-0 bottom-0 h-[22%] bg-foreground/[0.035]" />
+          <div className="absolute bottom-[21%] left-0 right-0 h-px bg-foreground/10" />
+          <div className="absolute left-[30%] top-[27%] h-14 w-[40%] -skew-x-12 bg-indigo-500/[0.045]" />
           <StaticLighthouse completedPoints={completedPoints} totalPoints={totalPoints} />
         </div>
       ) : null}
@@ -144,11 +157,9 @@ export function ClimbTimer({
   const status = isFocus && secondsLeft <= 0 && !running
     ? complete ? "Lighthouse complete" : "Focus complete"
     : running ? PHASE_STATUS[phase] : paused ? "Paused" : "Ready";
-  const circumference = 2 * Math.PI * 46;
 
   return (
-    <div className="relative aspect-square w-64 sm:w-72">
-      <div className="absolute inset-0 rounded-full border border-border/50 bg-card" />
+    <div className="relative h-[22rem] w-full max-w-[22rem] sm:h-[25rem] sm:max-w-[24rem]">
       <RiveScene
         running={running}
         paused={paused}
@@ -157,8 +168,8 @@ export function ClimbTimer({
         totalPoints={totalPoints}
         complete={complete}
       />
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="flex flex-col items-center rounded-full bg-card/95 px-5 py-4 text-center">
+      <div className="pointer-events-none absolute inset-x-0 top-5 flex justify-center sm:top-7">
+        <div className="flex flex-col items-center rounded-lg bg-card/90 px-5 py-3 text-center">
           <span className="text-[9px] font-semibold uppercase tracking-[0.28em] text-foreground/45">
             {PHASE_LABEL[phase]}
           </span>
@@ -171,21 +182,7 @@ export function ClimbTimer({
           </span>
         </div>
       </div>
-      <svg className="pointer-events-none absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 100 100" aria-hidden>
-        <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="0.45" className="text-border/50" />
-        <circle
-          cx="50"
-          cy="50"
-          r="46"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="0.7"
-          strokeLinecap="round"
-          className={isFocus ? "text-indigo-600" : "text-foreground/25"}
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - (isFocus ? pomodoroProgress : 0))}
-        />
-      </svg>
+      <div className="pointer-events-none absolute inset-x-[18%] bottom-2 h-px bg-foreground/10" />
     </div>
   );
 }
