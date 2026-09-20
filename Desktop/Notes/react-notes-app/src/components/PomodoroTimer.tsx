@@ -336,14 +336,15 @@ function ProgressPointsSetting({
   );
 }
 
-function SessionIndicator({ count }: { count: number }) {
+function SessionIndicator({ count, total }: { count: number; total: number }) {
+  const filled = total > 0 ? Math.round((count / total) * 4) : 0;
   return (
     <div className="flex items-center gap-1.5">
       {[0, 1, 2, 3].map((i) => (
         <span
           key={i}
           className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
-            i < count ? "bg-foreground/70" : "bg-foreground/15"
+            i < filled ? "bg-foreground/70" : "bg-foreground/15"
           }`}
         />
       ))}
@@ -622,7 +623,7 @@ export function PomodoroTimer() {
   const finishFocus = useCallback(
     (noteId: number | null) => {
       const count = pomoCountRef.current;
-      const next: TimerPhase = count % 4 === 0 ? "long-break" : "short-break";
+      const next: TimerPhase = ascentRef.current >= totalPointsRef.current ? "long-break" : "short-break";
       const nextDur = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
       recordCompletion(userIdRef.current, "focus", focusMinRef.current * 60, noteId);
       setNotePickerOpen(false);
@@ -671,7 +672,7 @@ export function PomodoroTimer() {
       });
       return;
     }
-    if (phaseRef.current === "focus" && pomoCountRef.current % 4 === 0 && ascentRef.current >= totalPointsRef.current) {
+    if (phaseRef.current === "focus" && ascentRef.current >= totalPointsRef.current) {
       ascentRef.current = 0;
       setAscent(0);
     }
@@ -700,6 +701,8 @@ export function PomodoroTimer() {
     resetAscent(userIdRef.current);
     ascentRef.current = 0;
     setAscent(0);
+    pomoCountRef.current = 0;
+    setPomoCount(0);
   }, []);
 
   const handleTotalPointsChange = useCallback((value: number) => {
@@ -713,8 +716,7 @@ export function PomodoroTimer() {
   }, []);
 
   const resetCycle = useCallback(() => {
-    pomoCountRef.current = 0;
-    setPomoCount(0);
+    resetPoints();
     saveState(userIdRef.current, {
       focusMin: focusMinRef.current,
       breakMin: breakMinRef.current,
@@ -725,7 +727,7 @@ export function PomodoroTimer() {
       running: runningRef.current,
       startedAt: endAtRef.current,
     });
-  }, []);
+  }, [resetPoints]);
 
   const skipPhase = useCallback(() => {
     const p = phaseRef.current;
@@ -979,7 +981,7 @@ export function PomodoroTimer() {
 
   const duration = durFor(phase, focusMin, breakMin, longBreakMin);
 
-  const cycleInCycle = pomoCount % 4;
+  const cycleInCycle = Math.min(totalPoints, Math.max(0, ascent));
 
   return (
     <MotionConfig reducedMotion="user">
@@ -1025,14 +1027,14 @@ export function PomodoroTimer() {
               <div className="mr-1.5 flex min-w-16 items-center justify-end text-[11px] font-medium tabular-nums text-foreground/50">
                 <AnimatePresence mode="popLayout" initial={false}>
                   <motion.span
-                    key={pomoCount + 1}
+                    key={cycleInCycle + 1}
                     initial={{ y: 8, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: -8, opacity: 0 }}
                     transition={{ duration: 0.22, ease: "easeOut" }}
                     className="inline-block"
                   >
-                    Session {pomoCount + 1}
+                    Session {cycleInCycle + 1}
                   </motion.span>
                 </AnimatePresence>
               </div>
@@ -1107,9 +1109,9 @@ export function PomodoroTimer() {
               </motion.button>
 
               <div className="mt-4 flex items-center gap-2 text-[10px] text-foreground/45">
-                <SessionIndicator count={cycleInCycle} />
+                <SessionIndicator count={cycleInCycle} total={totalPoints} />
                 <span className="tabular-nums">
-                  {cycleInCycle} of 4 in cycle
+                  {cycleInCycle} of {totalPoints} in cycle
                 </span>
                 <button
                   type="button"
