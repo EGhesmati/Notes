@@ -23,6 +23,7 @@
     "framer-motion": "^13.4.0",
     "gsap": "^3.15.0",
     "lucide-react": "^1.28.0",
+    "pixi.js": "^8.21.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "shadcn": "^4.16.1",
