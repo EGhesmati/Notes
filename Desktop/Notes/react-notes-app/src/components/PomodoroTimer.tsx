@@ -54,7 +54,7 @@ function loadState(userId: number): PersistedState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     const savedPoints = localStorage.getItem(`pomodoro_total_points_${userId}`);
-    const configuredPoints = savedPoints === null ? 16 : Number(savedPoints);
+    const configuredPoints = savedPoints === null ? 4 : Number(savedPoints);
     return {
       focusMin: parsed.focusMin ?? 25,
       breakMin: parsed.breakMin ?? 5,
@@ -311,15 +311,15 @@ function ProgressPointsSetting({
   return (
     <div className="flex items-center justify-between gap-4 py-3">
       <div className="min-w-0">
-        <div className="text-sm font-semibold text-foreground/90">Cycle length</div>
+        <div className="text-sm font-semibold text-foreground/90">Cycle number</div>
         <div className="mt-0.5 text-xs text-foreground/50">
-          {value} Pomodoros · one lighthouse section each
+          {value} Pomodoros · {value} lighthouse sections
         </div>
       </div>
       <div className="flex items-center gap-2">
         <StepperButton label="−" disabled={value <= 1} onClick={() => onChange(value - 1)} />
         <input
-          aria-label="Progress points"
+          aria-label="Cycle number"
           type="number"
           min={1}
           max={64}
@@ -336,10 +336,31 @@ function ProgressPointsSetting({
   );
 }
 
-function SessionIndicator({ count, total }: { count: number; total: number }) {
+function SessionIndicator({
+  count,
+  total,
+  onDecrease,
+  onIncrease,
+}: {
+  count: number;
+  total: number;
+  onDecrease?: () => void;
+  onIncrease?: () => void;
+}) {
   const filled = Math.min(total, Math.max(0, count));
   return (
     <div className="flex items-center gap-1.5">
+      {onDecrease ? (
+        <button
+          type="button"
+          aria-label="Remove cycle"
+          onClick={onDecrease}
+          disabled={total <= 1}
+          className="flex h-4 w-4 items-center justify-center rounded text-[11px] text-foreground/40 transition-colors hover:bg-foreground/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          −
+        </button>
+      ) : null}
       {Array.from({ length: total }, (_, i) => i).map((i) => (
         <span
           key={i}
@@ -348,6 +369,17 @@ function SessionIndicator({ count, total }: { count: number; total: number }) {
           }`}
         />
       ))}
+      {onIncrease ? (
+        <button
+          type="button"
+          aria-label="Add cycle"
+          onClick={onIncrease}
+          disabled={total >= 64}
+          className="flex h-4 w-4 items-center justify-center rounded text-[11px] text-foreground/40 transition-colors hover:bg-foreground/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          +
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -1109,7 +1141,12 @@ export function PomodoroTimer() {
               </motion.button>
 
               <div className="mt-4 flex items-center gap-2 text-[10px] text-foreground/45">
-                <SessionIndicator count={cycleInCycle} total={totalPoints} />
+                <SessionIndicator
+                  count={cycleInCycle}
+                  total={totalPoints}
+                  onDecrease={() => handleTotalPointsChange(totalPoints - 1)}
+                  onIncrease={() => handleTotalPointsChange(totalPoints + 1)}
+                />
                 <span className="tabular-nums">
                   {cycleInCycle} of {totalPoints} in cycle
                 </span>
