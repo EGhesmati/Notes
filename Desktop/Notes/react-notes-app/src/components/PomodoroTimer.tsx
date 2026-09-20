@@ -4,10 +4,6 @@ import {
   motion,
   AnimatePresence,
   MotionConfig,
-  useMotionValue,
-  useSpring,
-  useTransform,
-  useReducedMotion,
 } from "framer-motion";
 import {
   X,
@@ -27,9 +23,10 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus, getAscent, incrementAscent, rollbackAscent } from "@/hooks/use-pomodoro-stats";
 import { NoteSelect } from "./NoteSelect";
-import { MountainProgress } from "./AscentMountain";
+import { JourneySummary } from "./AscentMountain";
+import { ClimbTimer } from "./ClimbTimer";
 
-type TimerPhase = "focus" | "short-break" | "long-break";
+export type TimerPhase = "focus" | "short-break" | "long-break";
 
 const FOCUS_OPTIONS = [15, 25, 45, 60];
 const BREAK_OPTIONS = [5, 10, 15];
@@ -289,107 +286,6 @@ function SessionIndicator({ count }: { count: number }) {
           }`}
         />
       ))}
-    </div>
-  );
-}
-
-const PHASE_STATUS: Record<TimerPhase, string> = {
-  focus: "Deep work",
-  "short-break": "Short break",
-  "long-break": "Long break",
-};
-
-function TimerDisplay({
-  secondsLeft,
-  duration,
-  phase,
-  running,
-}: {
-  secondsLeft: number;
-  duration: number;
-  phase: TimerPhase;
-  running: boolean;
-}) {
-  const progress = duration > 0 ? Math.min(1, Math.max(0, secondsLeft / duration)) : 0;
-  const radius = 122;
-  const circumference = 2 * Math.PI * radius;
-
-  const ringProgress = useMotionValue(progress);
-  const ringSpring = useSpring(ringProgress, { stiffness: 80, damping: 26 });
-  const dashOffset = useTransform(ringSpring, (p) => circumference * (1 - p));
-  const prefersReduced = useReducedMotion();
-
-  useEffect(() => {
-    ringProgress.set(progress);
-  }, [progress, ringProgress]);
-
-  const isActive = phase === "focus";
-  const statusText = running
-    ? PHASE_STATUS[phase]
-    : secondsLeft === duration
-      ? "Ready"
-      : "Paused";
-
-  return (
-    <div className="relative flex items-center justify-center">
-      <svg viewBox="0 0 260 260" className="h-64 w-64 -rotate-90 sm:h-72 sm:w-72">
-        <circle
-          cx="130"
-          cy="130"
-          r={radius}
-          fill="none"
-          strokeWidth="1"
-          className="stroke-border/50"
-        />
-        <motion.circle
-          cx="130"
-          cy="130"
-          r={radius}
-          fill="none"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          className={`${isActive ? "stroke-indigo-600" : "stroke-foreground/25"}`}
-          style={{ strokeDasharray: circumference, strokeDashoffset: dashOffset }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={phase}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="flex flex-col items-center"
-          >
-            <span className="text-[10px] font-semibold uppercase tracking-[0.32em] text-foreground/45">
-              {PHASE_SESSION_LABEL[phase]}
-            </span>
-            <span className="mt-3 font-sans text-7xl font-extralight tracking-tight tabular-nums text-foreground sm:text-8xl">
-              {formatTime(secondsLeft)}
-            </span>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={statusText}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.16, ease: "easeOut" }}
-                className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-foreground/50"
-              >
-                {running && isActive && (
-                  <motion.span
-                    className="h-1 w-1 rounded-full bg-indigo-500"
-                    animate={prefersReduced ? { opacity: 1 } : { opacity: [0.4, 1, 0.4] }}
-                    transition={prefersReduced ? {} : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-                  />
-                )}
-                {statusText}
-              </motion.span>
-            </AnimatePresence>
-          </motion.div>
-        </AnimatePresence>
-      </div>
     </div>
   );
 }
@@ -1040,7 +936,13 @@ export function PomodoroTimer() {
           <div className="min-h-0 flex-1 overflow-y-auto">
             {/* 1. Timer */}
             <div className="flex flex-col items-center px-8 pt-10 pb-2">
-              <TimerDisplay secondsLeft={secondsLeft} duration={duration} phase={phase} running={running} />
+              <ClimbTimer
+                secondsLeft={secondsLeft}
+                duration={duration}
+                phase={phase}
+                running={running}
+                ascent={ascent}
+              />
             </div>
 
             {/* 2. Primary control */}
@@ -1093,7 +995,7 @@ export function PomodoroTimer() {
 
             {/* 3. Progression */}
             <div className="border-t border-border/50 px-8 py-5">
-              <MountainProgress height={ascent} />
+              <JourneySummary height={ascent} />
 
               <div className="mt-5 flex items-center justify-center gap-1">
                 <SecondaryButton onClick={reset} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset" />
