@@ -64,7 +64,7 @@ function loadState(userId: number): PersistedState | null {
       pomoCount: parsed.pomoCount ?? 0,
       running: parsed.running ?? false,
       startedAt: parsed.startedAt ?? null,
-      totalPoints: Math.max(4, Math.min(64, parsed.totalPoints ?? (Number.isFinite(configuredPoints) ? configuredPoints : 16))),
+      totalPoints: Math.max(1, Math.min(64, parsed.totalPoints ?? (Number.isFinite(configuredPoints) ? configuredPoints : 4))),
     };
   } catch {
     return null;
@@ -311,36 +311,36 @@ function ProgressPointsSetting({
   return (
     <div className="flex items-center justify-between gap-4 py-3">
       <div className="min-w-0">
-        <div className="text-sm font-semibold text-foreground/90">Climb length</div>
+        <div className="text-sm font-semibold text-foreground/90">Cycle length</div>
         <div className="mt-0.5 text-xs text-foreground/50">
-          {value} points · one per completed Pomodoro
+          {value} Pomodoros · one lighthouse section each
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <StepperButton label="−" disabled={value <= 4} onClick={() => onChange(value - 4)} />
+        <StepperButton label="−" disabled={value <= 1} onClick={() => onChange(value - 1)} />
         <input
           aria-label="Progress points"
           type="number"
-          min={4}
+          min={1}
           max={64}
           value={value}
           onChange={(event) => {
             const next = Number(event.target.value);
-            if (Number.isFinite(next)) onChange(Math.max(4, Math.min(64, Math.round(next))));
+            if (Number.isFinite(next)) onChange(Math.max(1, Math.min(64, Math.round(next))));
           }}
           className="h-8 w-12 rounded-md border border-border bg-card text-center text-sm font-semibold tabular-nums text-foreground outline-none focus:border-foreground/40"
         />
-        <StepperButton label="+" disabled={value >= 64} onClick={() => onChange(value + 4)} />
+        <StepperButton label="+" disabled={value >= 64} onClick={() => onChange(value + 1)} />
       </div>
     </div>
   );
 }
 
 function SessionIndicator({ count, total }: { count: number; total: number }) {
-  const filled = total > 0 ? Math.round((count / total) * 4) : 0;
+  const filled = Math.min(total, Math.max(0, count));
   return (
     <div className="flex items-center gap-1.5">
-      {[0, 1, 2, 3].map((i) => (
+      {Array.from({ length: total }, (_, i) => i).map((i) => (
         <span
           key={i}
           className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
@@ -412,9 +412,9 @@ export function PomodoroTimer() {
   const [totalPoints, setTotalPoints] = useState<number>(() => {
     try {
       const saved = localStorage.getItem(`pomodoro_total_points_${userId}`);
-      return saved === null ? 16 : Math.max(4, Math.min(64, Number(saved) || 16));
+      return saved === null ? 4 : Math.max(1, Math.min(64, Number(saved) || 4));
     } catch {
-      return 16;
+      return 4;
     }
   });
 
@@ -706,7 +706,7 @@ export function PomodoroTimer() {
   }, []);
 
   const handleTotalPointsChange = useCallback((value: number) => {
-    const next = Math.max(4, Math.min(64, Math.round(value)));
+    const next = Math.max(1, Math.min(64, Math.round(value)));
     setTotalPoints(next);
     if (ascentRef.current > next) {
       const clamped = setAscentPoints(userIdRef.current, next);
@@ -916,7 +916,7 @@ export function PomodoroTimer() {
     setFocusMin(saved.focusMin);
     setBreakMin(saved.breakMin);
     setLongBreakMin(saved.longBreakMin);
-    setTotalPoints(saved.totalPoints ?? 16);
+    setTotalPoints(saved.totalPoints ?? 4);
     setCustomFocusInput(String(saved.focusMin));
     setCustomBreakInput(String(saved.breakMin));
     setCustomLongBreakInput(String(saved.longBreakMin));
