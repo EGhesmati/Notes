@@ -18,7 +18,7 @@ const PHASE_STATUS: Record<TimerPhase, string> = {
   "long-break": "Long break",
 };
 
-function StaticLighthouse({
+function StaticBeacon({
   completedPoints,
   totalPoints,
   complete,
@@ -34,9 +34,9 @@ function StaticLighthouse({
   const completed = Math.min(totalPoints, Math.max(0, Math.floor(completedPoints)));
 
   return (
-    <div className="absolute bottom-[3%] left-1/2 top-[57%] w-[86%] -translate-x-1/2" aria-hidden>
+    <div className="absolute bottom-[5%] left-1/2 top-[59%] w-[72%] -translate-x-1/2" aria-hidden>
       <div className="lighthouse-horizon absolute inset-x-[-38%] bottom-[8%] h-px bg-foreground/10" />
-      <div className="lighthouse-tower absolute bottom-0 left-1/2 h-[90%] w-[62%] min-w-14 -translate-x-1/2 [clip-path:polygon(22%_0,78%_0,100%_100%,0_100%)] border-x border-foreground/20 bg-card/90 shadow-[inset_-6px_0_10px_hsl(var(--foreground)/0.05)]">
+      <div className="lighthouse-tower absolute bottom-0 left-1/2 h-[78%] w-[34%] min-w-10 -translate-x-1/2 [clip-path:polygon(30%_0,70%_0,100%_100%,0_100%)] border-x border-foreground/20 bg-card/90 shadow-[inset_-5px_0_8px_hsl(var(--foreground)/0.05)]">
         {sections.map((index) => (
           <div
             key={index}
@@ -46,13 +46,13 @@ function StaticLighthouse({
         ))}
       </div>
       <div className="lighthouse-base absolute bottom-0 left-1/2 h-2 w-[58%] -translate-x-1/2 rounded-sm border border-foreground/15 bg-foreground/[0.07]" />
-      <div className="absolute bottom-[82%] left-1/2 h-7 w-[70%] -translate-x-1/2 rounded-sm border border-foreground/20 bg-card shadow-[inset_0_-2px_0_hsl(var(--foreground)/0.04)]" />
-      <div className="absolute bottom-[92%] left-1/2 h-px w-[88%] -translate-x-1/2 bg-foreground/20">
+      <div className="absolute bottom-[74%] left-1/2 h-5 w-[58%] -translate-x-1/2 rounded-sm border border-foreground/20 bg-card shadow-[inset_0_-2px_0_hsl(var(--foreground)/0.04)]" />
+      <div className="absolute bottom-[84%] left-1/2 h-px w-[70%] -translate-x-1/2 bg-foreground/20">
         <div className="absolute inset-x-[12%] top-1 h-px bg-foreground/10" />
       </div>
-      <div className="absolute bottom-[98%] left-1/2 h-0 w-0 -translate-x-1/2 border-x-[1.2rem] border-b-[0.7rem] border-x-transparent border-b-foreground/20" />
-      <div className={`lighthouse-lantern absolute bottom-[94%] left-1/2 h-3 w-3 -translate-x-1/2 rounded-full ${complete ? "bg-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.65)]" : "bg-indigo-500/60"}`} />
-      <div className="lighthouse-beam absolute bottom-[93%] left-1/2 h-2.5 w-44 origin-left -skew-y-[12deg] bg-indigo-400/[0.06]" />
+      <div className="absolute bottom-[90%] left-1/2 h-0 w-0 -translate-x-1/2 border-x-[0.85rem] border-b-[0.5rem] border-x-transparent border-b-foreground/20" />
+      <div className={`lighthouse-lantern absolute bottom-[86%] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full ${complete ? "bg-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.65)]" : "bg-indigo-500/60"}`} />
+      <div className="lighthouse-beam absolute bottom-[85%] left-1/2 h-2 w-32 origin-left -skew-y-[10deg] bg-indigo-400/[0.06]" />
     </div>
   );
 }
@@ -83,7 +83,7 @@ export function ClimbTimer({
     <div className="relative aspect-square w-[13.5rem] max-w-full sm:w-[14.5rem]">
       <div className="absolute inset-0 overflow-hidden rounded-full border border-border/70 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.025),inset_0_-10px_24px_hsl(var(--foreground)/0.025)]">
         <div className="absolute inset-x-0 bottom-0 h-[31%] bg-foreground/[0.025]" />
-        <StaticLighthouse completedPoints={completedPoints} totalPoints={totalPoints} complete={complete} />
+        <StaticBeacon completedPoints={completedPoints} totalPoints={totalPoints} complete={complete} />
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-[9%] z-10 flex justify-center">
         <div className="flex flex-col items-center text-center">
