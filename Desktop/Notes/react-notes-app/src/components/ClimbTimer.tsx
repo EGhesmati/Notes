@@ -34,7 +34,7 @@ function StaticLighthouse({
   const completed = Math.min(totalPoints, Math.max(0, Math.floor(completedPoints)));
 
   return (
-    <div className="absolute bottom-[12%] left-1/2 top-[52%] w-[46%] -translate-x-1/2" aria-hidden>
+    <div className="absolute bottom-[8%] left-1/2 top-[64%] w-[46%] -translate-x-1/2" aria-hidden>
       <div className="lighthouse-horizon absolute inset-x-[-38%] bottom-[8%] h-px bg-foreground/10" />
       <div className="lighthouse-tower absolute bottom-0 left-1/2 h-[72%] w-[38%] min-w-9 -translate-x-1/2 [clip-path:polygon(22%_0,78%_0,100%_100%,0_100%)] border-x border-foreground/20 bg-card/90 shadow-[inset_-5px_0_8px_hsl(var(--foreground)/0.04)]">
         {sections.map((index) => (
@@ -46,13 +46,13 @@ function StaticLighthouse({
         ))}
       </div>
       <div className="lighthouse-base absolute bottom-0 left-1/2 h-2 w-[58%] -translate-x-1/2 rounded-sm border border-foreground/15 bg-foreground/[0.07]" />
-      <div className="absolute bottom-[68%] left-1/2 h-5 w-[56%] -translate-x-1/2 rounded-t border border-foreground/20 bg-card shadow-[inset_0_-2px_0_hsl(var(--foreground)/0.04)]" />
-      <div className="absolute bottom-[78%] left-1/2 h-4 w-[42%] -translate-x-1/2 border-x border-t border-foreground/20 bg-foreground/[0.06]">
-        <div className="absolute inset-x-1 top-1 h-px bg-foreground/15" />
+      <div className="absolute bottom-[68%] left-1/2 h-4 w-[48%] -translate-x-1/2 rounded-sm border border-foreground/20 bg-card shadow-[inset_0_-2px_0_hsl(var(--foreground)/0.04)]" />
+      <div className="absolute bottom-[76%] left-1/2 h-px w-[64%] -translate-x-1/2 bg-foreground/20">
+        <div className="absolute inset-x-[12%] top-1 h-px bg-foreground/10" />
       </div>
       <div className="absolute bottom-[84%] left-1/2 h-0 w-0 -translate-x-1/2 border-x-[0.75rem] border-b-[0.45rem] border-x-transparent border-b-foreground/20" />
       <div className={`lighthouse-lantern absolute bottom-[80%] left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${complete ? "bg-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.65)]" : "bg-indigo-500/60"}`} />
-      <div className="lighthouse-beam absolute bottom-[72%] left-[57%] h-10 w-24 origin-left -skew-y-[18deg] bg-indigo-400/[0.07]" />
+      <div className="lighthouse-beam absolute bottom-[79%] left-1/2 h-2 w-24 origin-left -skew-y-[12deg] bg-indigo-400/[0.06]" />
     </div>
   );
 }
