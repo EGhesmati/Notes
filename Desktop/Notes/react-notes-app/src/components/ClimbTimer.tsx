@@ -17,7 +17,7 @@ const PHASE_STATUS: Record<TimerPhase, string> = {
   "long-break": "Long break",
 };
 
-function MoonPhases({
+function FocusCampfire({
   completedPoints,
   totalPoints,
 }: {
@@ -29,20 +29,18 @@ function MoonPhases({
   return (
     <div className="absolute bottom-[6%] left-1/2 top-[61%] w-[72%] -translate-x-1/2" aria-hidden>
       <div className="lighthouse-horizon absolute inset-x-[-38%] bottom-[8%] h-px bg-foreground/10" />
-      <div className="absolute bottom-[24%] left-1/2 h-20 w-20 -translate-x-1/2 rounded-full border border-indigo-400/15">
-        <div className="moon-orbit absolute -inset-3 rounded-full border border-foreground/[0.06]" />
-        <div className="absolute inset-1 overflow-hidden rounded-full bg-foreground/[0.07] shadow-[inset_-6px_-4px_10px_hsl(var(--foreground)/0.06)]">
-          <div
-            className="moon-light absolute inset-y-0 left-0 bg-indigo-300/75"
-            style={{ width: `${Math.max(12, (completed / Math.max(1, totalPoints)) * 100)}%` }}
-          />
-          <div className="absolute inset-0 rounded-full border border-indigo-300/20" />
-        </div>
+      <div className="absolute bottom-[9%] left-1/2 h-3 w-[48%] -translate-x-1/2 rounded-full border border-foreground/15 bg-foreground/[0.07]" />
+      <div className="absolute bottom-[14%] left-1/2 h-2 w-[35%] -translate-x-1/2 rotate-[18deg] rounded-full bg-foreground/[0.12]" />
+      <div className="absolute bottom-[14%] left-1/2 h-2 w-[35%] -translate-x-1/2 -rotate-[18deg] rounded-full bg-foreground/[0.09]" />
+      <div className="campfire-glow absolute bottom-[32%] left-1/2 h-16 w-16 -translate-x-1/2 rounded-full bg-amber-400/[0.08]" />
+      <div className="absolute bottom-[18%] left-1/2 h-12 w-10 -translate-x-1/2" style={{ transform: `translateX(-50%) scale(${0.85 + completed / Math.max(1, totalPoints) * 0.2})` }}>
+        <div className="campfire-flame absolute bottom-0 left-1/2 h-11 w-7 -translate-x-1/2 rotate-45 rounded-[75%_15%_75%_15%] bg-amber-400/85 shadow-[0_0_12px_rgba(251,191,36,.35)]" />
+        <div className="absolute bottom-0 left-1/2 h-7 w-5 -translate-x-1/2 rounded-[70%_30%_65%_35%] bg-orange-300/80" />
+        <div className="absolute bottom-0 left-1/2 h-4 w-2.5 -translate-x-1/2 rounded-full bg-foreground/80" />
       </div>
-      <div className="absolute bottom-[20%] left-[25%] h-1 w-1 rounded-full bg-indigo-400/45" />
-      <div className="absolute bottom-[43%] right-[24%] h-1.5 w-1.5 rounded-full bg-foreground/20" />
-      <div className="absolute bottom-[53%] left-[38%] h-1 w-1 rounded-full bg-foreground/20" />
-      <div className="absolute bottom-[9%] left-1/2 h-2 w-[54%] -translate-x-1/2 rounded-full border border-foreground/15 bg-foreground/[0.05]" />
+      <div className="campfire-ember absolute bottom-[38%] left-[39%] h-1 w-1 rounded-full bg-amber-300/70" />
+      <div className="campfire-ember absolute bottom-[44%] right-[38%] h-1 w-1 rounded-full bg-orange-300/60 [animation-delay:900ms]" />
+      <div className="campfire-ember absolute bottom-[51%] left-[48%] h-1 w-1 rounded-full bg-amber-300/60 [animation-delay:1.4s]" />
     </div>
   );
 }
@@ -72,7 +70,7 @@ export function ClimbTimer({
     <div className="relative aspect-square w-[13.5rem] max-w-full sm:w-[14.5rem]">
       <div className="absolute inset-0 overflow-hidden rounded-full border border-border/70 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.025),inset_0_-10px_24px_hsl(var(--foreground)/0.025)]">
         <div className="absolute inset-x-0 bottom-0 h-[31%] bg-foreground/[0.025]" />
-        <MoonPhases completedPoints={completedPoints} totalPoints={totalPoints} />
+        <FocusCampfire completedPoints={completedPoints} totalPoints={totalPoints} />
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-[9%] z-10 flex justify-center">
         <div className="flex flex-col items-center text-center">
