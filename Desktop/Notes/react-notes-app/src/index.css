@@ -38,3 +38,27 @@ body::before { width: min(46rem,85vw); height: min(24rem,42vw); top: -8rem; righ
 body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform: rotate(-7deg); background: repeating-linear-gradient(0deg,transparent 0 17px,color-mix(in srgb,#8b5cf6 10%,transparent) 18px 19px); opacity: .55; }
 #root { width: 100%; margin: 0 auto; min-height: 100svh; overflow-x: clip; }
 @layer base { * { @apply border-border outline-ring/50; } html { @apply font-sans; } h1,h2,h3,h4 { line-height: 1.25; letter-spacing: -.02em; } }
+
+@keyframes lighthouse-beam-sweep {
+  0%, 100% { opacity: .42; transform: skewY(-18deg) scaleX(.86); transform-origin: left center; }
+  50% { opacity: .8; transform: skewY(-18deg) scaleX(1); transform-origin: left center; }
+}
+@keyframes lighthouse-lantern-pulse {
+  0%, 100% { opacity: .65; box-shadow: 0 0 6px rgba(99,102,241,.28); }
+  50% { opacity: 1; box-shadow: 0 0 11px rgba(129,140,248,.68); }
+}
+@keyframes lighthouse-horizon-drift {
+  0%, 100% { transform: translateX(-2%); opacity: .5; }
+  50% { transform: translateX(2%); opacity: .8; }
+}
+@keyframes lighthouse-tower-breathe {
+  0%, 100% { filter: brightness(.98); }
+  50% { filter: brightness(1.03); }
+}
+.lighthouse-beam { animation: lighthouse-beam-sweep 5s ease-in-out infinite; }
+.lighthouse-lantern { animation: lighthouse-lantern-pulse 2.8s ease-in-out infinite; }
+.lighthouse-horizon { animation: lighthouse-horizon-drift 8s ease-in-out infinite; }
+.lighthouse-tower { animation: lighthouse-tower-breathe 6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .lighthouse-beam, .lighthouse-lantern, .lighthouse-horizon, .lighthouse-tower { animation: none; }
+}
