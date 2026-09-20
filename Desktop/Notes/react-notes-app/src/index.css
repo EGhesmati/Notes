@@ -39,22 +39,6 @@ body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform:
 #root { width: 100%; margin: 0 auto; min-height: 100svh; overflow-x: clip; }
 @layer base { * { @apply border-border outline-ring/50; } html { @apply font-sans; } h1,h2,h3,h4 { line-height: 1.25; letter-spacing: -.02em; } }
 
-@keyframes lighthouse-beam-sweep {
-  0%, 100% { opacity: .35; transform: skewY(-12deg) scaleX(.86); transform-origin: left center; }
-  50% { opacity: .72; transform: skewY(-12deg) scaleX(1); transform-origin: left center; }
-}
-@keyframes lighthouse-lantern-pulse {
-  0%, 100% { opacity: .65; box-shadow: 0 0 6px rgba(99,102,241,.28); }
-  50% { opacity: 1; box-shadow: 0 0 11px rgba(129,140,248,.68); }
-}
-@keyframes lighthouse-horizon-drift {
-  0%, 100% { transform: translateX(-2%); opacity: .5; }
-  50% { transform: translateX(2%); opacity: .8; }
-}
-@keyframes lighthouse-tower-breathe {
-  0%, 100% { filter: brightness(.98); }
-  50% { filter: brightness(1.03); }
-}
 @keyframes campfire-flicker {
   0%, 100% { transform: translateX(-50%) rotate(42deg) scale(.94); opacity: .78; }
   50% { transform: translateX(-50%) rotate(48deg) scale(1.06); opacity: 1; }
@@ -70,7 +54,6 @@ body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform:
 .campfire-flame { animation: campfire-flicker 1.35s ease-in-out infinite; transform-origin: bottom center; }
 .campfire-glow { animation: campfire-glow 2.2s ease-in-out infinite; }
 .campfire-ember { animation: campfire-ember 2.4s ease-in-out infinite; }
-.lighthouse-horizon { animation: lighthouse-horizon-drift 8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .campfire-flame, .campfire-glow, .campfire-ember, .lighthouse-horizon { animation: none; }
+  .campfire-flame, .campfire-glow, .campfire-ember { animation: none; }
 }
