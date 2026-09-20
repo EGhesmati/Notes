@@ -44,42 +44,61 @@ body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform:
   50% { transform: translateX(1.5%); }
 }
 .water-fill {
-  background: linear-gradient(to bottom, rgb(186 211 232 / .12), rgb(129 140 248 / .16));
-  transition: height 900ms cubic-bezier(.22, 1, .36, 1);
+  background:
+    radial-gradient(130% 105% at 50% 100%, rgb(129 140 248 / .15), transparent 60%),
+    repeating-linear-gradient(to bottom, transparent 0 38px, rgb(163 199 230 / .04) 38px 52px),
+    linear-gradient(to bottom, rgb(163 199 230 / .10), rgb(148 192 226 / .14));
+  transition: height 1000ms cubic-bezier(.22, 1, .36, 1);
+}
+.water-layers {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 .water-fish {
   position: absolute;
-  z-index: 0;
+  z-index: 1;
   display: block;
   width: 16px;
   height: 8px;
-  opacity: .38;
+  transform: scale(var(--fish-scale, .7)) scaleX(var(--fish-flip, 1));
   transform-origin: center;
 }
 .water-fish-body {
   position: absolute;
   left: 2px;
   top: 2px;
-  width: 10px;
+  width: 11px;
   height: 5px;
   border-radius: 70% 45% 45% 70%;
-  background: rgb(71 85 105 / .42);
+  background: linear-gradient(180deg, rgb(119 134 158 / .5), rgb(71 85 105 / .28));
 }
 .water-fish-tail {
   position: absolute;
   left: 0;
-  top: 2px;
+  top: 1.5px;
   width: 0;
   height: 0;
   border-top: 3px solid transparent;
   border-bottom: 3px solid transparent;
-  border-right: 5px solid rgb(71 85 105 / .34);
+  border-right: 5px solid rgb(100 116 139 / .34);
 }
-.water-fish-active { animation: water-fish-swim 8s ease-in-out infinite alternate; }
-.water-fish-paused { animation: water-fish-swim 24s ease-out 1 forwards; }
-@keyframes water-fish-swim {
-  0% { margin-left: -2%; }
-  100% { margin-left: 4%; }
+.water-fish-active {
+  --swim-duration: 20s;
+  --swim-delay: 0s;
+  animation: water-fish-drift var(--swim-duration) ease-in-out var(--swim-delay) infinite;
+}
+.water-fish-paused {
+  --swim-duration: 56s;
+  --swim-delay: 0s;
+  animation: water-fish-drift var(--swim-duration) ease-in-out var(--swim-delay) infinite;
+}
+@keyframes water-fish-drift {
+  0%, 12% { transform: translateX(0) scale(var(--fish-scale, .7)) scaleX(var(--fish-flip, 1)); }
+  26%, 40% { transform: translateX(5px) scale(var(--fish-scale, .7)) scaleX(var(--fish-flip, 1)); }
+  52% { transform: translateX(3px) scale(var(--fish-scale, .7)) scaleX(var(--fish-flip, 1)); }
+  70%, 84% { transform: translateX(-4px) scale(var(--fish-scale, .7)) scaleX(var(--fish-flip, 1)); }
+  100% { transform: translateX(0) scale(var(--fish-scale, .7)) scaleX(var(--fish-flip, 1)); }
 }
 .sea-wave { overflow: visible; fill: none; stroke-linecap: round; stroke-width: 1.6; opacity: .7; }
 .sea-surface-fill { fill: rgb(186 211 232 / .13); stroke: none; }
@@ -87,17 +106,29 @@ body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform:
 .sea-wave-primary { stroke: rgb(129 140 248 / .5); }
 .sea-wave-secondary { stroke: rgb(71 85 105 / .32); stroke-width: 1.2; }
 .sea-wave-tertiary { stroke: rgb(129 140 248 / .24); stroke-width: 1; }
-.sea-surface-active .sea-wave-primary { animation: sea-wave-drift 5s ease-in-out infinite; }
-.sea-surface-active .sea-wave-secondary { animation: sea-wave-drift 6.5s ease-in-out -1s infinite reverse; }
-.sea-surface-active .sea-wave-tertiary { animation: sea-wave-drift 8s ease-in-out -1.6s infinite; }
+.sea-surface-active .sea-wave-primary { animation: sea-wave-drift 6.5s ease-in-out infinite; }
+.sea-surface-active .sea-wave-secondary { animation: sea-wave-drift 8.5s ease-in-out -1.4s infinite reverse; }
+.sea-surface-active .sea-wave-tertiary { animation: sea-wave-drift 10.5s ease-in-out -2.2s infinite; }
 .sea-surface-paused .sea-wave { animation: sea-wave-drift 14s ease-out 1 forwards; }
-.sea-surface-complete .sea-wave { animation: sea-wave-drift 1.15s ease-out 1; }
+.sea-surface-complete .sea-wave-primary { animation: sea-wave-surge .6s ease-out 1; }
+.sea-surface-complete .sea-wave-secondary { animation: sea-wave-surge .78s ease-out 1; }
+.sea-surface-complete .sea-wave-tertiary { animation: sea-wave-surge .95s ease-out 1; }
+@keyframes sea-wave-surge {
+  0% { transform: translateX(0) scaleY(1); }
+  28% { transform: translateX(-1.5%) scaleY(1.65); }
+  62% { transform: translateX(1.2%) scaleY(1.12); }
+  100% { transform: translateX(0) scaleY(1); }
+}
 .water-ripple { animation: water-ripple 950ms ease-out both; }
 @keyframes water-ripple {
   0% { transform: translate(-50%, -50%) scale(.35); opacity: .7; }
   100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sea-wave-primary, .sea-wave-secondary, .sea-wave-tertiary, .water-ripple { animation: none; }
+  .sea-wave-primary, .sea-wave-secondary, .sea-wave-tertiary, .water-ripple {
+    animation: none;
+    transform: none;
+  }
+  .water-fish-active, .water-fish-paused { animation: none; }
   .water-fill { transition: none; }
 }
