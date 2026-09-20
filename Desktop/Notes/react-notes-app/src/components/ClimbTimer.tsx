@@ -1,7 +1,9 @@
-import { useMemo, useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
-import * as THREE from "three";
+import { useEffect, useMemo } from "react";
+import { useRive, useStateMachineInput } from "@rive-app/react-canvas";
 import type { TimerPhase } from "./PomodoroTimer";
+
+const RIVE_SOURCE = "/Notes/lighthouse.riv";
+const STATE_MACHINE = "Lighthouse";
 
 function formatTime(totalSeconds: number): string {
   const safe = Math.max(0, Math.floor(totalSeconds));
@@ -20,106 +22,130 @@ const PHASE_STATUS: Record<TimerPhase, string> = {
   "long-break": "Long break",
 };
 
-type SceneProps = {
+function StaticLighthouse({
+  completedPoints,
+  totalPoints,
+  complete,
+}: {
+  completedPoints: number;
+  totalPoints: number;
+  complete: boolean;
+}) {
+  const sections = useMemo(
+    () => Array.from({ length: Math.max(1, totalPoints) }, (_, index) => index),
+    [totalPoints],
+  );
+  const completed = Math.min(totalPoints, Math.max(0, Math.floor(completedPoints)));
+
+  return (
+    <div className="absolute bottom-[10%] left-1/2 top-[48%] w-[42%] -translate-x-1/2" aria-hidden>
+      <div className="absolute bottom-0 left-1/2 flex h-full w-[42%] min-w-16 -translate-x-1/2 flex-col items-center justify-end">
+        <div className="relative mb-1 h-7 w-[145%] rounded-t-md border border-foreground/25 bg-card shadow-[inset_0_-2px_0_hsl(var(--foreground)/0.04)]">
+          <div className={`mx-auto mt-1.5 h-3.5 w-10 rounded-sm border ${
+            complete ? "border-amber-400/80 bg-amber-300/80" : "border-indigo-500/40 bg-indigo-500/15"
+          }`} />
+          <div className="absolute inset-x-1.5 bottom-0 h-px bg-foreground/15" />
+        </div>
+        <div className="relative flex w-full flex-1 flex-col justify-end [clip-path:polygon(14%_0,86%_0,100%_100%,0_100%)] border-x border-foreground/20 bg-card/90 shadow-[inset_-5px_0_8px_hsl(var(--foreground)/0.035)]">
+          {sections.map((index) => (
+            <div
+              key={index}
+              className={`min-h-1 flex-1 border-t border-foreground/10 ${
+                index < completed ? "bg-foreground/15" : "bg-transparent"
+              }`}
+            />
+          ))}
+          <div className="pointer-events-none absolute inset-y-1 left-1/2 w-px -translate-x-1/2 bg-foreground/[0.08]" />
+          <div className="pointer-events-none absolute inset-y-2 left-[34%] w-px bg-indigo-500/[0.12]" />
+          <div className="pointer-events-none absolute inset-y-2 right-[34%] w-px bg-foreground/[0.07]" />
+        </div>
+        <div className="relative h-3 w-[150%] rounded-sm border border-foreground/20 bg-foreground/[0.09]">
+          <div className="absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-foreground/15" />
+        </div>
+      </div>
+      <div className="absolute bottom-[calc(100%-2rem)] left-1/2 h-5 w-[175%] -translate-x-1/2 border-y border-foreground/25 bg-card/95">
+        <div className="absolute inset-x-[12%] top-1/2 h-px -translate-y-1/2 bg-indigo-500/30" />
+        <div className="absolute inset-x-[18%] top-1 h-px bg-foreground/10" />
+      </div>
+      <div className="absolute bottom-[calc(100%-0.5rem)] left-1/2 h-8 w-12 -translate-x-1/2 rounded-t-md border border-foreground/25 bg-card shadow-[inset_0_-3px_0_hsl(var(--foreground)/0.04)]">
+        <div className="absolute inset-x-2 bottom-1 h-4 rounded-sm border border-foreground/20 bg-foreground/[0.06]" />
+      </div>
+      <div className="absolute bottom-[calc(100%+1.45rem)] left-1/2 h-4 w-16 -translate-x-1/2 border-x border-t border-foreground/25 bg-foreground/[0.08]">
+        <div className="absolute inset-x-1 top-1 h-px bg-foreground/20" />
+      </div>
+      <div className="absolute bottom-[calc(100%+2.4rem)] left-1/2 h-0 w-0 -translate-x-1/2 border-x-[1.35rem] border-b-[0.8rem] border-x-transparent border-b-foreground/20" />
+      <div className="absolute bottom-[calc(100%+3.15rem)] left-1/2 h-5 w-24 -translate-x-1/2 -skew-y-6 bg-indigo-500/[0.045]" />
+      <div className={`absolute bottom-[calc(100%+3rem)] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full ${
+        complete ? "bg-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.75)]" : "bg-indigo-500/65"
+      }`} />
+    </div>
+  );
+}
+
+function RiveScene({
+  running,
+  paused,
+  progress,
+  completedPoints,
+  totalPoints,
+  complete,
+}: {
   running: boolean;
   paused: boolean;
   progress: number;
   completedPoints: number;
   totalPoints: number;
   complete: boolean;
-};
+}) {
+  const { rive, RiveComponent } = useRive({
+    src: RIVE_SOURCE,
+    stateMachines: STATE_MACHINE,
+    autoplay: true,
+  }, { shouldResizeCanvasToContainer: true });
+  const isRunningInput = useStateMachineInput(rive, STATE_MACHINE, "isRunning");
+  const isPausedInput = useStateMachineInput(rive, STATE_MACHINE, "isPaused");
+  const progressInput = useStateMachineInput(rive, STATE_MACHINE, "progress");
+  const completedInput = useStateMachineInput(rive, STATE_MACHINE, "completedPoints");
+  const totalInput = useStateMachineInput(rive, STATE_MACHINE, "totalPoints");
+  const completeInput = useStateMachineInput(rive, STATE_MACHINE, "isComplete");
 
-function LighthouseScene({ running, paused, progress, completedPoints, totalPoints, complete }: SceneProps) {
-  const lampRef = useRef<THREE.Group>(null);
-  const beamRef = useRef<THREE.Mesh>(null);
-  const oceanRef = useRef<THREE.Mesh>(null);
-  const safeTotal = Math.max(1, Math.round(totalPoints));
-  const completed = Math.min(safeTotal, Math.max(0, Math.floor(completedPoints)));
-  const sections = useMemo(() => Array.from({ length: safeTotal }, (_, index) => index), [safeTotal]);
-  const sectionHeight = 0.58 / safeTotal;
-  const active = running && !paused;
-
-  useFrame((_, delta) => {
-    const speed = active ? 0.45 : 0.08;
-    if (lampRef.current) lampRef.current.rotation.y += delta * speed;
-    if (beamRef.current) beamRef.current.rotation.y += delta * speed * 0.8;
-    if (oceanRef.current) oceanRef.current.position.x = Math.sin(performance.now() * 0.00035) * (active ? 0.012 : 0.004);
-  });
+  useEffect(() => {
+    // Rive state-machine inputs are mutable runtime handles by design.
+    /* eslint-disable react-hooks/immutability */
+    if (isRunningInput) isRunningInput.value = running;
+    if (isPausedInput) isPausedInput.value = paused;
+    if (progressInput) progressInput.value = progress;
+    if (completedInput) completedInput.value = completedPoints;
+    if (totalInput) totalInput.value = totalPoints;
+    if (completeInput) completeInput.value = complete;
+    /* eslint-enable react-hooks/immutability */
+  }, [
+    complete,
+    completeInput,
+    completedInput,
+    completedPoints,
+    isPausedInput,
+    isRunningInput,
+    paused,
+    progress,
+    progressInput,
+    running,
+    totalInput,
+    totalPoints,
+  ]);
 
   return (
-    <group position={[0, -0.12, 0]}>
-      <ambientLight intensity={1.8} />
-      <directionalLight position={[-3, 4, 4]} intensity={2.4} color="#ffffff" />
-      <directionalLight position={[3, 1, 2]} intensity={0.7} color="#c7c9ff" />
-
-      <mesh ref={oceanRef} position={[0, -0.76, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[3.2, 1.2]} />
-        <meshStandardMaterial color="#eef0f5" roughness={1} />
-      </mesh>
-      <mesh position={[0, -0.59, -0.04]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[3.1, 0.02]} />
-        <meshBasicMaterial color="#cfd3df" transparent opacity={0.55} />
-      </mesh>
-
-      <group position={[0, -0.18, 0]}>
-        <mesh position={[0, -0.5, 0]}>
-          <boxGeometry args={[0.78, 0.12, 0.38]} />
-          <meshStandardMaterial color="#b7bbc7" roughness={0.85} />
-        </mesh>
-        {sections.map((index) => {
-          const y = -0.44 + index * sectionHeight;
-          const reached = index < completed;
-          const current = index === completed && running;
-          return (
-            <mesh key={index} position={[0, y, 0]} scale={[reached ? 1 : 0.98, 0.94, reached ? 1 : 0.98]}>
-              <boxGeometry args={[0.42 + index * 0.004, sectionHeight * 0.9, 0.3]} />
-              <meshStandardMaterial color={reached ? "#d6d8df" : current ? "#e5e6f7" : "#f3f4f7"} emissive={current ? "#5c63c4" : "#000000"} emissiveIntensity={current ? progress * 0.08 : 0} roughness={0.8} />
-            </mesh>
-          );
-        })}
-        <mesh position={[0, 0.19, 0]}>
-          <cylinderGeometry args={[0.28, 0.35, 0.08, 4]} />
-          <meshStandardMaterial color="#b2b6c2" roughness={0.8} />
-        </mesh>
-        <mesh position={[0, 0.28, 0]}>
-          <cylinderGeometry args={[0.2, 0.2, 0.15, 12]} />
-          <meshStandardMaterial color="#dfe1e7" roughness={0.55} metalness={0.05} />
-        </mesh>
-        <mesh position={[0, 0.38, 0]}>
-          <coneGeometry args={[0.26, 0.12, 4]} />
-          <meshStandardMaterial color="#9ea3b1" roughness={0.75} />
-        </mesh>
-        <mesh position={[0, 0.48, 0]}>
-          <sphereGeometry args={[0.055, 12, 8]} />
-          <meshStandardMaterial color={complete ? "#f6c453" : "#777de0"} emissive={complete ? "#e6a827" : "#373b9d"} emissiveIntensity={complete ? 1.2 : 0.25} />
-        </mesh>
-
-        <group ref={lampRef} position={[0, 0.48, 0]}>
-          <mesh rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.012, 0.012, 1.25, 8]} />
-            <meshBasicMaterial color="#7378c8" transparent opacity={active ? 0.2 : 0.08} />
-          </mesh>
-        </group>
-        <mesh ref={beamRef} position={[0.48, 0.48, -0.02]} rotation={[0, 0, -Math.PI / 2]}>
-          <coneGeometry args={[0.11, 0.9, 16, 1, true]} />
-          <meshBasicMaterial color="#8388dc" transparent opacity={active ? 0.07 : 0.025} depthWrite={false} />
-        </mesh>
-      </group>
-    </group>
-  );
-}
-
-function ThreeScene(props: SceneProps) {
-  return (
-    <div className="absolute inset-0 overflow-hidden rounded-full">
-      <Canvas
-        orthographic
-        dpr={[1, 1.5]}
-        camera={{ position: [0, 0, 5], zoom: 185, near: 0.1, far: 20 }}
-        gl={{ alpha: true, antialias: true }}
-      >
-        <LighthouseScene {...props} />
-      </Canvas>
+    <div className="absolute inset-0 overflow-hidden rounded-full bg-background">
+      {rive ? <RiveComponent className="h-full w-full" /> : null}
+      {!rive ? (
+        <div className="absolute inset-0">
+          <div className="absolute inset-x-0 top-[45%] h-px bg-foreground/10" />
+          <div className="absolute inset-x-0 bottom-0 h-[22%] bg-foreground/[0.035]" />
+          <div className="absolute bottom-[21%] left-0 right-0 h-px bg-foreground/10" />
+          <div className="absolute left-[28%] top-[34%] h-10 w-[44%] -skew-x-12 bg-indigo-500/[0.045]" />
+          <StaticLighthouse completedPoints={completedPoints} totalPoints={totalPoints} complete={complete} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -151,7 +177,7 @@ export function ClimbTimer({
   return (
     <div className="relative aspect-square w-[13.5rem] max-w-full sm:w-[14.5rem]">
       <div className="absolute inset-0 rounded-full border border-border/70 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.025),inset_0_-10px_24px_hsl(var(--foreground)/0.025)]" />
-      <ThreeScene
+      <RiveScene
         running={running}
         paused={paused}
         progress={isFocus ? pomodoroProgress : 0}
@@ -168,7 +194,7 @@ export function ClimbTimer({
             {formatTime(secondsLeft)}
           </span>
           <span className="mt-1.5 rounded-full border border-indigo-500/15 bg-indigo-500/[0.07] px-2.5 py-0.5 text-[10px] font-medium text-foreground/65">
-            {running && isFocus ? <span className="mr-1 inline-block h-1 w-1 rounded-full bg-indigo-500" /> : null}
+            {running && isFocus ? <span className="h-1 w-1 rounded-full bg-indigo-500" /> : null}
             {status}
           </span>
         </div>
