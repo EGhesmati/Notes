@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
-import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus, getAscent, incrementAscent, rollbackAscent } from "@/hooks/use-pomodoro-stats";
+import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus, getAscent, incrementAscent } from "@/hooks/use-pomodoro-stats";
 import { NoteSelect } from "./NoteSelect";
 import { JourneySummary } from "./AscentMountain";
 import { ClimbTimer } from "./ClimbTimer";
@@ -45,6 +45,7 @@ interface PersistedState {
   pomoCount: number;
   running: boolean;
   startedAt: number | null;
+  totalPoints?: number;
 }
 
 function loadState(userId: number): PersistedState | null {
@@ -61,6 +62,7 @@ function loadState(userId: number): PersistedState | null {
       pomoCount: parsed.pomoCount ?? 0,
       running: parsed.running ?? false,
       startedAt: parsed.startedAt ?? null,
+      totalPoints: Math.max(4, Math.min(64, parsed.totalPoints ?? 16)),
     };
   } catch {
     return null;
@@ -297,7 +299,7 @@ function StepperButton({
   );
 }
 
-function CheckpointSetting({
+function ProgressPointsSetting({
   value,
   onChange,
 }: {
@@ -307,15 +309,26 @@ function CheckpointSetting({
   return (
     <div className="flex items-center justify-between gap-4 py-3">
       <div className="min-w-0">
-        <div className="text-sm font-semibold text-foreground/90">Rungs per checkpoint</div>
+        <div className="text-sm font-semibold text-foreground/90">Climb length</div>
         <div className="mt-0.5 text-xs text-foreground/50">
-          Checkpoint after {value} completed {value === 1 ? "session" : "sessions"}
+          {value} points · one per completed Pomodoro
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <StepperButton label="−" disabled={value <= 1} onClick={() => onChange(value - 1)} />
-        <span className="w-7 text-center text-sm font-semibold tabular-nums text-foreground">{value}</span>
-        <StepperButton label="+" disabled={value >= 16} onClick={() => onChange(value + 1)} />
+        <StepperButton label="−" disabled={value <= 4} onClick={() => onChange(value - 4)} />
+        <input
+          aria-label="Progress points"
+          type="number"
+          min={4}
+          max={64}
+          value={value}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            if (Number.isFinite(next)) onChange(Math.max(4, Math.min(64, Math.round(next))));
+          }}
+          className="h-8 w-12 rounded-md border border-border bg-card text-center text-sm font-semibold tabular-nums text-foreground outline-none focus:border-foreground/40"
+        />
+        <StepperButton label="+" disabled={value >= 64} onClick={() => onChange(value + 4)} />
       </div>
     </div>
   );
@@ -367,6 +380,7 @@ export function PomodoroTimer() {
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const endAtRef = useRef<number | null>(null);
+  const completionHandledRef = useRef(false);
   const restored = useRef(false);
 
   const soundRef = useRef(true);
@@ -392,12 +406,12 @@ export function PomodoroTimer() {
     }
   });
 
-  const [checkpointStep, setCheckpointStep] = useState<number>(() => {
+  const [totalPoints, setTotalPoints] = useState<number>(() => {
     try {
-      const saved = localStorage.getItem(`pomodoro_checkpoint_step_${userId}`);
-      return saved === null ? 4 : Math.max(1, Math.min(16, Number(saved) || 4));
+      const saved = localStorage.getItem(`pomodoro_total_points_${userId}`);
+      return saved === null ? 16 : Math.max(4, Math.min(64, Number(saved) || 16));
     } catch {
-      return 4;
+      return 16;
     }
   });
 
@@ -412,6 +426,7 @@ export function PomodoroTimer() {
   const [isCustomLongBreak, setIsCustomLongBreak] = useState(false);
   const [phase, setPhase] = useState<TimerPhase>("focus");
   const [secondsLeft, setSecondsLeft] = useState(focusMin * 60);
+  const [pomodoroProgress, setPomodoroProgress] = useState(0);
   const [running, setRunning] = useState(false);
   const [pomoCount, setPomoCount] = useState(0);
 
@@ -427,7 +442,7 @@ export function PomodoroTimer() {
 
   const [ascent, setAscent] = useState<number>(() => getAscent(userId));
   const ascentRef = useRef(ascent);
-  const checkpointStepRef = useRef(checkpointStep);
+  const totalPointsRef = useRef(totalPoints);
 
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
@@ -452,11 +467,11 @@ export function PomodoroTimer() {
     soundRef.current = sound;
     autoStartRef.current = autoStart;
     ascentRef.current = ascent;
-    checkpointStepRef.current = checkpointStep;
+    totalPointsRef.current = totalPoints;
     try {
       localStorage.setItem(`pomodoro_sound_${userId}`, sound ? "1" : "0");
       localStorage.setItem(`pomodoro_autostart_${userId}`, autoStart ? "1" : "0");
-      localStorage.setItem(`pomodoro_checkpoint_step_${userId}`, String(checkpointStep));
+      localStorage.setItem(`pomodoro_total_points_${userId}`, String(totalPoints));
     } catch {
       // ignore
     }
@@ -473,7 +488,7 @@ export function PomodoroTimer() {
     sound,
     autoStart,
     ascent,
-    checkpointStep,
+    totalPoints,
   ]);
 
   const setSound = (v: boolean) => {
@@ -502,17 +517,25 @@ export function PomodoroTimer() {
       if (intervalRef.current) clearInterval(intervalRef.current);
       const startedAt = Date.now();
       endAtRef.current = startedAt + remaining * 1000;
+      completionHandledRef.current = false;
+      const phaseDuration = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
+      setPomodoroProgress(next === "focus" ? Math.min(1, Math.max(0, 1 - remaining / phaseDuration)) : 0);
       runningRef.current = true;
       setRunning(true);
       intervalRef.current = setInterval(() => {
         if (!endAtRef.current) return;
-        const left = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
+        const now = Date.now();
+        const left = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
+        setPomodoroProgress(next === "focus"
+          ? Math.min(1, Math.max(0, 1 - (endAtRef.current - now) / (phaseDuration * 1000)))
+          : 0);
         secondsLeftRef.current = left;
         setSecondsLeft(left);
         if (left === 0) {
           if (intervalRef.current) clearInterval(intervalRef.current);
           intervalRef.current = null;
           endAtRef.current = null;
+          setPomodoroProgress(next === "focus" ? 1 : 0);
           if (soundRef.current) {
             playChime();
             notify(PHASE_LABEL[next], "Time's up!");
@@ -537,13 +560,22 @@ export function PomodoroTimer() {
   const handleComplete = useCallback(
     (completedPhase: TimerPhase) => {
       if (completedPhase === "focus") {
+        if (completionHandledRef.current) return;
+        completionHandledRef.current = true;
         // Freeze the completed scene at the checkpoint while the user
         // optionally associates the session with a note.
         const completedCount = pomoCountRef.current + 1;
+        const currentPoints = getAscent(userIdRef.current);
+        const nextPoints = currentPoints < totalPointsRef.current
+          ? incrementAscent(userIdRef.current)
+          : currentPoints;
+        ascentRef.current = Math.min(totalPointsRef.current, nextPoints);
+        setAscent(ascentRef.current);
         pomoCountRef.current = completedCount;
         setPomoCount(completedCount);
         runningRef.current = false;
         setRunning(false);
+        setPomodoroProgress(1);
         saveState(userIdRef.current, {
           focusMin: focusMinRef.current,
           breakMin: breakMinRef.current,
@@ -551,6 +583,7 @@ export function PomodoroTimer() {
           phase: "focus",
           secondsLeft: 0,
           pomoCount: completedCount,
+          totalPoints: totalPointsRef.current,
           running: false,
           startedAt: null,
         });
@@ -561,13 +594,14 @@ export function PomodoroTimer() {
       setSelectedNoteId(null);
       const focusDur = focusMinRef.current * 60;
       if (autoStartRef.current) {
-        if (pomoCountRef.current % 4 === 0 && ascentRef.current >= 4) {
+        if (pomoCountRef.current % 4 === 0 && ascentRef.current >= totalPointsRef.current) {
           ascentRef.current = 0;
           setAscent(0);
         }
         beginCountdown({ next: "focus", remaining: focusDur });
       } else {
         setSecondsLeft(focusDur);
+        setPomodoroProgress(0);
         runningRef.current = false;
         setRunning(false);
         endAtRef.current = null;
@@ -589,9 +623,6 @@ export function PomodoroTimer() {
       const next: TimerPhase = count % 4 === 0 ? "long-break" : "short-break";
       const nextDur = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
       recordCompletion(userIdRef.current, "focus", focusMinRef.current * 60, noteId);
-      const newAscent = incrementAscent(userIdRef.current);
-      ascentRef.current = newAscent;
-      setAscent(newAscent);
       setNotePickerOpen(false);
       setSelectedNoteId(null);
       setPomoCount(count);
@@ -608,6 +639,7 @@ export function PomodoroTimer() {
       } else {
         setPhase(next);
         setSecondsLeft(nextDur);
+        setPomodoroProgress(0);
         runningRef.current = false;
         setRunning(false);
         endAtRef.current = null;
@@ -637,7 +669,7 @@ export function PomodoroTimer() {
       });
       return;
     }
-    if (phaseRef.current === "focus" && pomoCountRef.current % 4 === 0 && ascentRef.current >= 4) {
+    if (phaseRef.current === "focus" && pomoCountRef.current % 4 === 0 && ascentRef.current >= totalPointsRef.current) {
       ascentRef.current = 0;
       setAscent(0);
     }
@@ -653,17 +685,12 @@ export function PomodoroTimer() {
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = null;
     endAtRef.current = null;
-    if (phaseRef.current === "focus" && runningRef.current) {
-      // Abandoned a running focus session → roll the boulder back.
-      const back = rollbackAscent(userIdRef.current, checkpointStepRef.current);
-      ascentRef.current = back;
-      setAscent(back);
-    }
     runningRef.current = false;
     setRunning(false);
     const dur = durFor(phaseRef.current, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
     secondsLeftRef.current = dur;
     setSecondsLeft(dur);
+    setPomodoroProgress(0);
     clearState(userIdRef.current);
   }, []);
 
@@ -690,16 +717,13 @@ export function PomodoroTimer() {
     endAtRef.current = null;
     setSelectedNoteId(null);
     if (p === "focus") {
-      // Abandoned focus session → the boulder falls back to the last checkpoint.
-      const back = rollbackAscent(userIdRef.current, checkpointStepRef.current);
-      ascentRef.current = back;
-      setAscent(back);
-      const next: TimerPhase = (count + 1) % 4 === 0 ? "long-break" : "short-break";
+      const next: TimerPhase = "short-break";
       const nextDur = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
       setPhase(next);
-      setPomoCount(count + 1);
+      setPomoCount(count);
       secondsLeftRef.current = nextDur;
       setSecondsLeft(nextDur);
+      setPomodoroProgress(0);
       runningRef.current = false;
       setRunning(false);
     } else {
@@ -707,6 +731,7 @@ export function PomodoroTimer() {
       setPhase("focus");
       secondsLeftRef.current = nextDur;
       setSecondsLeft(nextDur);
+      setPomodoroProgress(0);
       runningRef.current = false;
       setRunning(false);
     }
@@ -871,6 +896,7 @@ export function PomodoroTimer() {
     setFocusMin(saved.focusMin);
     setBreakMin(saved.breakMin);
     setLongBreakMin(saved.longBreakMin);
+    setTotalPoints(saved.totalPoints ?? 16);
     setCustomFocusInput(String(saved.focusMin));
     setCustomBreakInput(String(saved.breakMin));
     setCustomLongBreakInput(String(saved.longBreakMin));
@@ -1025,7 +1051,9 @@ export function PomodoroTimer() {
                 duration={duration}
                 phase={phase}
                 running={running}
-                ascent={ascent}
+                pomodoroProgress={pomodoroProgress}
+                completedPoints={ascent}
+                totalPoints={totalPoints}
               />
             </div>
 
@@ -1079,7 +1107,7 @@ export function PomodoroTimer() {
 
             {/* 3. Progression */}
             <div className="border-t border-border/50 px-8 py-5">
-              <JourneySummary height={ascent} checkpointStep={checkpointStep} />
+              <JourneySummary height={ascent} totalPoints={totalPoints} />
 
               <div className="mt-5 flex items-center justify-center gap-1">
                 <SecondaryButton onClick={reset} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset" />
@@ -1144,7 +1172,7 @@ export function PomodoroTimer() {
                     checked={sound}
                     onChange={setSound}
                   />
-                  <CheckpointSetting value={checkpointStep} onChange={setCheckpointStep} />
+                  <ProgressPointsSetting value={totalPoints} onChange={setTotalPoints} />
                 </div>
 
                 {!("Notification" in window) || Notification.permission === "denied" ? (

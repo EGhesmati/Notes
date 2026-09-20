@@ -1,27 +1,18 @@
-export const ASCENT_MAX = 16;
-
-const LEVELS: { min: number; title: string }[] = [
-  { min: 16, title: "Summit" },
-  { min: 12, title: "High Ridge" },
-  { min: 8, title: "Snow Line" },
-  { min: 4, title: "Cliff Path" },
-  { min: 1, title: "Rising Trail" },
-  { min: 0, title: "Base Camp" },
+const LEVELS = [
+  { fraction: 1, title: "Summit" },
+  { fraction: 0.75, title: "High Ridge" },
+  { fraction: 0.5, title: "Snow Line" },
+  { fraction: 0.25, title: "Cliff Path" },
+  { fraction: 0, title: "Base Camp" },
 ];
 
-export function ascentLevel(height: number): { title: string } {
-  for (const l of LEVELS) {
-    if (height >= l.min) return { title: l.title };
-  }
-  return LEVELS[LEVELS.length - 1];
+export function ascentLevel(height: number, totalPoints: number): { title: string } {
+  const fraction = totalPoints > 0 ? height / totalPoints : 0;
+  return LEVELS.find((level) => fraction >= level.fraction) ?? LEVELS[LEVELS.length - 1];
 }
 
-/** Rungs until the next checkpoint, mirroring the rollback logic. */
-export function stepsToNextCheckpoint(height: number, step: number): number {
-  const s = Math.max(1, Math.min(ASCENT_MAX, Math.round(step)));
-  const c = Math.min(ASCENT_MAX, Math.max(0, height));
-  const mod = c % s;
-  return mod === 0 && c > 0 ? s : s - mod;
+export function stepsToNextCheckpoint(height: number, totalPoints: number): number {
+  return Math.max(0, Math.ceil(Math.max(0, totalPoints - height)));
 }
 
 function MountainIcon({ className }: { className?: string }) {
@@ -33,34 +24,25 @@ function MountainIcon({ className }: { className?: string }) {
   );
 }
 
-/**
- * Quiet text-only progression readout — the climb itself lives inside the
- * timer; this is just the level/steps vocabulary.
- */
-export function JourneySummary({ height, checkpointStep }: { height: number; checkpointStep: number }) {
-  const c = Math.min(ASCENT_MAX, Math.max(0, height));
-  const s = Math.max(1, Math.min(ASCENT_MAX, Math.round(checkpointStep)));
-  const toNext = stepsToNextCheckpoint(c, s);
+export function JourneySummary({ height, totalPoints }: { height: number; totalPoints: number }) {
+  const c = Math.min(totalPoints, Math.max(0, Math.floor(height)));
+  const toNext = stepsToNextCheckpoint(c, totalPoints);
 
   return (
     <div className="w-full select-none">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MountainIcon className="h-3.5 w-3.5 text-indigo-500/80" />
-          <span className="text-xs font-medium text-foreground">{ascentLevel(c).title}</span>
+          <span className="text-xs font-medium text-foreground">{ascentLevel(c, totalPoints).title}</span>
         </div>
-        <span className="text-[11px] tabular-nums text-muted-foreground">
-          {c} / {ASCENT_MAX} steps
-        </span>
+        <span className="text-[11px] tabular-nums text-muted-foreground">{c} / {totalPoints} points</span>
       </div>
       <div className="mt-1.5 flex items-center justify-between text-[10px] text-foreground/50">
-        <span>
-          Next checkpoint · {toNext === 1 ? "1 pomodoro" : `${toNext} pomodoros`}
-        </span>
-        {c >= ASCENT_MAX ? (
-          <span className="font-medium text-amber-600 dark:text-amber-400">Peak reached</span>
+        <span>{toNext === 0 ? "Summit reached" : `Next point · ${toNext} ${toNext === 1 ? "pomodoro" : "pomodoros"}`}</span>
+        {c >= totalPoints ? (
+          <span className="font-medium text-amber-600 dark:text-amber-400">Climb complete</span>
         ) : (
-          <span>every {s} completed</span>
+          <span>one point per Pomodoro</span>
         )}
       </div>
     </div>
