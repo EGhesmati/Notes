@@ -39,6 +39,13 @@ export function ClimbTimer({
   const complete = isFocus && secondsLeft <= 0 && !running;
   const visualPoints = completedPoints + (isFocus ? Math.min(1, Math.max(0, pomodoroProgress)) : 0);
   const waterLevel = Math.min(1, Math.max(0, visualPoints / Math.max(1, totalPoints)));
+  const fishCount = waterLevel >= 0.9 ? 4 : waterLevel >= 0.65 ? 3 : waterLevel >= 0.4 ? 2 : waterLevel >= 0.2 ? 1 : 0;
+  const fish = [
+    { left: "24%", bottom: "26%", size: "0.8", delay: "0s" },
+    { left: "68%", bottom: "48%", size: "0.65", delay: "-2.4s" },
+    { left: "46%", bottom: "70%", size: "0.55", delay: "-1.2s" },
+    { left: "78%", bottom: "20%", size: "0.72", delay: "-3.1s" },
+  ];
   const status = isFocus && secondsLeft <= 0 && !running
     ? "Focus complete"
     : running ? PHASE_STATUS[phase] : paused ? "Paused" : "Ready";
@@ -46,8 +53,19 @@ export function ClimbTimer({
   return (
     <div className="relative aspect-square w-[13.5rem] max-w-full sm:w-[14.5rem]">
       <div className="absolute inset-0 overflow-hidden rounded-full border border-border/70 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.025),inset_0_-10px_24px_hsl(var(--foreground)/0.025)]">
-        <div className="water-fill absolute inset-x-0 bottom-0" style={{ height: `${waterLevel * 100}%` }}>
-          <div className={`sea-surface absolute inset-x-[-12%] top-0 h-8 ${
+        <div className="water-fill absolute inset-x-0 bottom-0 overflow-hidden" style={{ height: `${waterLevel * 100}%` }}>
+          {fish.slice(0, fishCount).map((item, index) => (
+            <span
+              key={index}
+              className={`water-fish ${running ? "water-fish-active" : paused ? "water-fish-paused" : ""}`}
+              style={{ left: item.left, bottom: item.bottom, transform: `scale(${item.size})`, animationDelay: item.delay }}
+              aria-hidden
+            >
+              <span className="water-fish-body" />
+              <span className="water-fish-tail" />
+            </span>
+          ))}
+          <div className={`sea-surface absolute inset-x-[-12%] top-0 z-[1] h-8 ${
           running ? "sea-surface-active" : complete ? "sea-surface-complete" : paused ? "sea-surface-paused" : ""
           }`} aria-hidden>
           <svg className="sea-wave sea-wave-primary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">
