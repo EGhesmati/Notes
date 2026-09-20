@@ -40,10 +40,13 @@ body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform:
 @layer base { * { @apply border-border outline-ring/50; } html { @apply font-sans; } h1,h2,h3,h4 { line-height: 1.25; letter-spacing: -.02em; } }
 
 @keyframes sea-wave-drift {
-  0%, 100% { transform: translateX(-3%) scaleX(.96); opacity: .45; }
-  50% { transform: translateX(3%) scaleX(1.04); opacity: .75; }
+  0%, 100% { transform: translateX(-5%); }
+  50% { transform: translateX(5%); }
 }
-.sea-wave { opacity: .45; }
+.sea-wave { overflow: visible; fill: none; stroke-linecap: round; stroke-width: 1.6; opacity: .7; }
+.sea-wave-primary { stroke: rgb(129 140 248 / .5); }
+.sea-wave-secondary { stroke: rgb(71 85 105 / .32); stroke-width: 1.2; }
+.sea-wave-tertiary { stroke: rgb(129 140 248 / .24); stroke-width: 1; }
 .sea-surface-active .sea-wave-primary { animation: sea-wave-drift 2.8s ease-in-out infinite; }
 .sea-surface-active .sea-wave-secondary { animation: sea-wave-drift 3.6s ease-in-out -1s infinite reverse; }
 .sea-surface-active .sea-wave-tertiary { animation: sea-wave-drift 4.4s ease-in-out -1.6s infinite; }

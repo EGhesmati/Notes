@@ -46,9 +46,15 @@ export function ClimbTimer({
         <div className={`sea-surface absolute inset-x-[-12%] bottom-[17%] h-[13%] ${
           running ? "sea-surface-active" : complete ? "sea-surface-complete" : paused ? "sea-surface-paused" : ""
         }`} aria-hidden>
-          <div className="sea-wave sea-wave-primary absolute inset-x-0 top-1/2 h-px bg-indigo-400/20" />
-          <div className="sea-wave sea-wave-secondary absolute inset-x-[8%] top-[62%] h-px bg-foreground/10" />
-          <div className="sea-wave sea-wave-tertiary absolute inset-x-[18%] top-[76%] h-px bg-indigo-400/10" />
+          <svg className="sea-wave sea-wave-primary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">
+            <path d="M-10 17 C 12 5, 30 5, 52 17 S 92 29, 114 17 S 154 5, 176 17 S 216 29, 250 14" />
+          </svg>
+          <svg className="sea-wave sea-wave-secondary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">
+            <path d="M-10 21 C 15 11, 34 11, 58 21 S 101 31, 124 20 S 166 10, 190 20 S 220 30, 250 18" />
+          </svg>
+          <svg className="sea-wave sea-wave-tertiary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">
+            <path d="M-10 25 C 18 18, 35 18, 62 25 S 106 31, 132 24 S 174 17, 202 24 S 226 29, 250 22" />
+          </svg>
         </div>
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-[9%] z-10 flex justify-center">
