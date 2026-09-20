@@ -17,6 +17,39 @@ const PHASE_STATUS: Record<TimerPhase, string> = {
   "long-break": "Long break",
 };
 
+const FISH_PATH =
+  "M26.2 8 C26.2 5.2 21.6 3.3 17.2 3.3 C13 3.3 9.4 4.1 7.2 5.2 L7.2 4.2 C6 3.6 4.6 2.6 3 1.8 L0.8 3.4 C2 5 3.2 6.6 3.7 8 C3.2 9.4 2 11 0.8 12.6 L3 14.2 C4.6 13.4 6 12.4 7.2 11.8 L7.2 10.8 C9.4 11.9 13 12.7 17.2 12.7 C21.6 12.7 26.2 10.8 26.2 8 Z";
+const FISH_FIN_PATH =
+  "M13.2 3.4 C13.5 1.6 12.1 1 11.3 2.3 C10.9 2.9 10.7 3.5 10.8 4 Z";
+
+interface WavePart {
+  cycles: number;
+  amp: number;
+  phase: number;
+}
+
+function buildWave(mean: number, parts: WavePart[], floor = 72) {
+  const pts: string[] = [];
+  for (let x = 0; x <= 240; x += 3) {
+    let y = mean;
+    for (const p of parts) y += p.amp * Math.sin((2 * Math.PI * p.cycles * x) / 240 + p.phase);
+    pts.push(`${x} ${y.toFixed(2)}`);
+  }
+  const line = `M ${pts.join(" L ")}`;
+  return { line, fill: `${line} L 240 ${floor} L 0 ${floor} Z` };
+}
+
+const WAVE_PRIMARY = buildWave(25, [
+  { cycles: 3, amp: 4.5, phase: 0.5 },
+  { cycles: 4, amp: 2.2, phase: 1.7 },
+  { cycles: 6, amp: 1.1, phase: 2.9 },
+]);
+const WAVE_SUBSURFACE = buildWave(34, [
+  { cycles: 2, amp: 3, phase: 2.1 },
+  { cycles: 5, amp: 1.6, phase: 0.4 },
+  { cycles: 8, amp: 1, phase: 4.1 },
+]);
+
 export function ClimbTimer({
   secondsLeft,
   duration,
@@ -41,10 +74,10 @@ export function ClimbTimer({
   const waterLevel = Math.min(1, Math.max(0, visualPoints / Math.max(1, totalPoints)));
   const fishCount = waterLevel >= 0.9 ? 4 : waterLevel >= 0.65 ? 3 : waterLevel >= 0.4 ? 2 : waterLevel >= 0.2 ? 1 : 0;
   const fish = [
-    { left: "36%", bottom: "46%", size: 0.68, flip: -1, opacity: 0.36, duration: "21s", delay: "-2s" },
-    { left: "66%", bottom: "20%", size: 0.6, flip: 1, opacity: 0.28, duration: "26s", delay: "-7s" },
-    { left: "22%", bottom: "72%", size: 0.8, flip: -1, opacity: 0.45, duration: "16s", delay: "-4s" },
-    { left: "52%", bottom: "58%", size: 0.74, flip: 1, opacity: 0.4, duration: "19s", delay: "-1s" },
+    { left: "30%", bottom: "58%", size: 0.78, flip: -1, opacity: 0.42, blur: 0.3, duration: "23s", delay: "-3s" },
+    { left: "68%", bottom: "24%", size: 0.62, flip: 1, opacity: 0.27, blur: 0.55, duration: "30s", delay: "-9s" },
+    { left: "14%", bottom: "42%", size: 0.7, flip: -1, opacity: 0.35, blur: 0.4, duration: "26s", delay: "-6s" },
+    { left: "72%", bottom: "60%", size: 0.84, flip: 1, opacity: 0.46, blur: 0.2, duration: "20s", delay: "-1s" },
   ];
   const status = isFocus && secondsLeft <= 0 && !running
     ? "Focus complete"
@@ -53,46 +86,67 @@ export function ClimbTimer({
   return (
     <div className="relative aspect-square w-[13.5rem] max-w-full sm:w-[14.5rem]">
       <div className="absolute inset-0 overflow-hidden rounded-full border border-border/70 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.025),inset_0_-10px_24px_hsl(var(--foreground)/0.025)]">
-        <div className="water-fill absolute inset-x-0 bottom-0 overflow-hidden" style={{ height: `${waterLevel * 100}%` }}>
+        <div className="water-vessel" style={{ height: `${waterLevel * 100}%` }}>
+          <div className="water-body" aria-hidden />
           <div className="water-layers" aria-hidden />
+          <div className="water-sheen" aria-hidden />
+          <div className="water-sheen water-sheen-b" aria-hidden />
           {fish.slice(0, fishCount).map((item, index) => (
             <span
               key={index}
-              className={`water-fish ${running ? "water-fish-active" : paused ? "water-fish-paused" : ""}`}
+              className="water-fish"
               style={
                 {
                   left: item.left,
                   bottom: item.bottom,
-                  opacity: item.opacity,
                   "--fish-scale": item.size,
                   "--fish-flip": item.flip,
+                  "--fish-opacity": item.opacity,
+                  "--fish-blur": `${item.blur}px`,
                   "--swim-duration": item.duration,
                   "--swim-delay": item.delay,
                 } as React.CSSProperties
               }
               aria-hidden
             >
-              <span className="water-fish-body" />
-              <span className="water-fish-tail" />
+              <span className={`water-fish-swim ${running ? "water-fish-swim-active" : paused ? "water-fish-swim-paused" : ""}`}>
+                <svg viewBox="0 0 28 16">
+                  <path d={FISH_PATH} />
+                  <path d={FISH_FIN_PATH} />
+                </svg>
+              </span>
             </span>
           ))}
-          <div className={`sea-surface absolute inset-x-[-12%] top-0 z-[2] h-8 ${
-          running ? "sea-surface-active" : complete ? "sea-surface-complete" : paused ? "sea-surface-paused" : ""
+          <div className={`sea-surface ${
+          running ? "is-active" : complete ? "is-complete" : paused ? "is-paused" : ""
           }`} aria-hidden>
-          <svg className="sea-wave sea-wave-primary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">
-            <path className="sea-surface-fill" d="M-10 17 C 12 5, 30 5, 52 17 S 92 29, 114 17 S 154 5, 176 17 S 216 29, 250 14 V32 H-10 Z" />
-            <path d="M-10 17 C 12 5, 30 5, 52 17 S 92 29, 114 17 S 154 5, 176 17 S 216 29, 250 14" />
-          </svg>
-          <svg className="sea-wave sea-wave-secondary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">
-            <path className="sea-surface-fill secondary" d="M-10 21 C 15 11, 34 11, 58 21 S 101 31, 124 20 S 166 10, 190 20 S 220 30, 250 18 V32 H-10 Z" />
-            <path d="M-10 21 C 15 11, 34 11, 58 21 S 101 31, 124 20 S 166 10, 190 20 S 220 30, 250 18" />
-          </svg>
-          <svg className="sea-wave sea-wave-tertiary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">
-            <path d="M-10 25 C 18 18, 35 18, 62 25 S 106 31, 132 24 S 174 17, 202 24 S 226 29, 250 22" />
-          </svg>
-            <span key={completedPoints} className="water-ripple absolute left-1/2 top-1/2 h-3 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-indigo-400/15" />
+            <div className="sea-surface-heave">
+              <svg className="sea-wave sea-wave-primary" viewBox="0 0 240 80" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="sea-surf-a" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stopColor="#bcd6ea" stopOpacity="0.3" />
+                    <stop offset="0.6" stopColor="#bcd6ea" stopOpacity="0.06" />
+                    <stop offset="1" stopColor="#bcd6ea" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path fill="url(#sea-surf-a)" d={WAVE_PRIMARY.fill} />
+                <path className="sea-rim" d={WAVE_PRIMARY.line} />
+              </svg>
+              <svg className="sea-wave sea-wave-secondary" viewBox="0 0 240 80" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="sea-surf-b" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stopColor="#9db9d6" stopOpacity="0.14" />
+                    <stop offset="0.55" stopColor="#9db9d6" stopOpacity="0.04" />
+                    <stop offset="1" stopColor="#9db9d6" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path fill="url(#sea-surf-b)" d={WAVE_SUBSURFACE.fill} />
+              </svg>
+            </div>
+            {complete ? <span key={completedPoints} className="surface-roll" aria-hidden /> : null}
           </div>
         </div>
+        <div className="glass-halo" aria-hidden />
         <div className="pointer-events-none absolute inset-1 rounded-full border border-white/30" />
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-[9%] z-10 flex justify-center">
