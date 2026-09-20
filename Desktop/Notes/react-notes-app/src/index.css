@@ -38,3 +38,13 @@ body::before { width: min(46rem,85vw); height: min(24rem,42vw); top: -8rem; righ
 body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform: rotate(-7deg); background: repeating-linear-gradient(0deg,transparent 0 17px,color-mix(in srgb,#8b5cf6 10%,transparent) 18px 19px); opacity: .55; }
 #root { width: 100%; margin: 0 auto; min-height: 100svh; overflow-x: clip; }
 @layer base { * { @apply border-border outline-ring/50; } html { @apply font-sans; } h1,h2,h3,h4 { line-height: 1.25; letter-spacing: -.02em; } }
+
+@keyframes sea-wave-drift {
+  0%, 100% { transform: translateX(-3%) scaleX(.96); opacity: .45; }
+  50% { transform: translateX(3%) scaleX(1.04); opacity: .75; }
+}
+.sea-wave-primary { animation: sea-wave-drift 7s ease-in-out infinite; }
+.sea-wave-secondary { animation: sea-wave-drift 9s ease-in-out -2s infinite reverse; }
+@media (prefers-reduced-motion: reduce) {
+  .sea-wave-primary, .sea-wave-secondary { animation: none; }
+}

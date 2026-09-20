@@ -42,6 +42,10 @@ export function ClimbTimer({
     <div className="relative aspect-square w-[13.5rem] max-w-full sm:w-[14.5rem]">
       <div className="absolute inset-0 overflow-hidden rounded-full border border-border/70 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.025),inset_0_-10px_24px_hsl(var(--foreground)/0.025)]">
         <div className="absolute inset-x-0 bottom-0 h-[24%] bg-foreground/[0.018]" />
+        <div className="sea-surface absolute inset-x-[-12%] bottom-[17%] h-[13%]" aria-hidden>
+          <div className="sea-wave sea-wave-primary absolute inset-x-0 top-1/2 h-px bg-indigo-400/20" />
+          <div className="sea-wave sea-wave-secondary absolute inset-x-[8%] top-[62%] h-px bg-foreground/10" />
+        </div>
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-[9%] z-10 flex justify-center">
         <div className="flex flex-col items-center text-center">
