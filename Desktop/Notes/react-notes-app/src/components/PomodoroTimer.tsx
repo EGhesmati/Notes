@@ -54,7 +54,7 @@ function loadState(userId: number): PersistedState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     const savedPoints = localStorage.getItem(`pomodoro_total_points_${userId}`);
-    const configuredPoints = savedPoints === null ? 4 : Number(savedPoints);
+    const configuredPoints = savedPoints === null ? 16 : Number(savedPoints);
     return {
       focusMin: parsed.focusMin ?? 25,
       breakMin: parsed.breakMin ?? 5,
@@ -64,7 +64,7 @@ function loadState(userId: number): PersistedState | null {
       pomoCount: parsed.pomoCount ?? 0,
       running: parsed.running ?? false,
       startedAt: parsed.startedAt ?? null,
-      totalPoints: Math.max(1, Math.min(64, parsed.totalPoints ?? (Number.isFinite(configuredPoints) ? configuredPoints : 4))),
+      totalPoints: Math.max(1, Math.min(64, parsed.totalPoints ?? (Number.isFinite(configuredPoints) ? configuredPoints : 16))),
     };
   } catch {
     return null;
@@ -444,9 +444,9 @@ export function PomodoroTimer() {
   const [totalPoints, setTotalPoints] = useState<number>(() => {
     try {
       const saved = localStorage.getItem(`pomodoro_total_points_${userId}`);
-      return saved === null ? 4 : Math.max(1, Math.min(64, Number(saved) || 4));
+      return saved === null ? 16 : Math.max(1, Math.min(64, Number(saved) || 16));
     } catch {
-      return 4;
+      return 16;
     }
   });
 
@@ -948,7 +948,7 @@ export function PomodoroTimer() {
     setFocusMin(saved.focusMin);
     setBreakMin(saved.breakMin);
     setLongBreakMin(saved.longBreakMin);
-    setTotalPoints(saved.totalPoints ?? 4);
+    setTotalPoints(saved.totalPoints ?? 16);
     setCustomFocusInput(String(saved.focusMin));
     setCustomBreakInput(String(saved.breakMin));
     setCustomLongBreakInput(String(saved.longBreakMin));
