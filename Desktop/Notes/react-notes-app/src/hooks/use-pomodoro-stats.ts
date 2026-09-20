@@ -73,7 +73,31 @@ export function setDailyGoal(userId: number, minutes: number): void {
 // N is user-configurable with a default of 4).
 // The climb resets at the start of each calendar day.
 
-export const ASCENT_MAX = 16;
+export const DEFAULT_ASCENT_MAX = 16;
+export const ASCENT_MAX = DEFAULT_ASCENT_MAX;
+
+export function ascentLimitKey(userId: number): string {
+  return `pomodoro_total_points_${userId}`;
+}
+
+export function getAscentLimit(userId: number): number {
+  try {
+    const raw = localStorage.getItem(ascentLimitKey(userId));
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n >= 4 ? Math.min(64, Math.round(n)) : DEFAULT_ASCENT_MAX;
+  } catch {
+    return DEFAULT_ASCENT_MAX;
+  }
+}
+
+export function setAscentLimit(userId: number, points: number): void {
+  const safe = Number.isFinite(points) && points >= 4 ? Math.min(64, Math.round(points)) : DEFAULT_ASCENT_MAX;
+  try {
+    localStorage.setItem(ascentLimitKey(userId), String(safe));
+  } catch {
+    // ignore
+  }
+}
 
 export function ascentKey(userId: number): string {
   return `pomodoro_ascent_${userId}`;
@@ -123,7 +147,8 @@ export function incrementAscent(userId: number): number {
  */
 export function rollbackAscent(userId: number, step: number = 4): number {
   const current = getAscent(userId);
-  const clamped = Math.max(1, Math.min(ASCENT_MAX, Math.round(step)));
+  const limit = getAscentLimit(userId);
+  const clamped = Math.max(1, Math.min(limit, Math.round(step)));
   const checkpoint = Math.floor(current / clamped) * clamped;
   writeAscent(userId, checkpoint);
   return checkpoint;
