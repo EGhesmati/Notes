@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useId, useMemo, useRef } from "react";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform } from "framer-motion";
 import gsap from "gsap";
 import type { TimerPhase } from "./PomodoroTimer";
@@ -6,8 +6,9 @@ import type { TimerPhase } from "./PomodoroTimer";
 const SIZE = 320;
 const CENTER = SIZE / 2;
 const RADIUS = 148;
-const BASE_Y = 270;
-const TOWER_TOP = 92;
+const LIGHTHOUSE_X = 244;
+const BASE_Y = 276;
+const TOWER_TOP = 128;
 
 function formatTime(totalSeconds: number): string {
   const safe = Math.max(0, Math.floor(totalSeconds));
@@ -44,8 +45,8 @@ export function ClimbTimer({
   totalPoints: number;
 }) {
   const prefersReduced = useReducedMotion();
+  const clipId = useId().replace(/:/g, "");
   const constructionRef = useRef<SVGGElement>(null);
-  const towerRef = useRef<SVGGElement>(null);
   const beamRef = useRef<SVGGElement>(null);
   const atmosphereRef = useRef<SVGGElement>(null);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
@@ -66,9 +67,9 @@ export function ClimbTimer({
     () => Array.from({ length: safeTotal }, (_, index) => index),
     [safeTotal],
   );
-  const sectionHeight = (BASE_Y - TOWER_TOP - 20) / safeTotal;
+  const sectionHeight = (BASE_Y - TOWER_TOP - 22) / safeTotal;
   const currentSection = Math.min(safeTotal - 1, safeCompleted);
-  const yFor = (index: number) => BASE_Y - 15 - (index + 1) * sectionHeight;
+  const yFor = (index: number) => BASE_Y - 14 - (index + 1) * sectionHeight;
 
   useEffect(() => {
     ringProgress.set(currentProgress);
@@ -76,124 +77,119 @@ export function ClimbTimer({
 
   useEffect(() => {
     const construction = constructionRef.current;
-    const tower = towerRef.current;
     const beam = beamRef.current;
     const atmosphere = atmosphereRef.current;
-    if (!construction || !tower || !beam || !atmosphere) return;
+    if (!construction || !beam || !atmosphere) return;
 
-    timelineRef.current?.kill();
     const previous = visualPointsRef.current;
     const delta = safeCompleted - previous;
     visualPointsRef.current = safeCompleted;
+    timelineRef.current?.revert();
+    timelineRef.current?.kill();
 
-    if (delta < 0) {
-      gsap.set(tower, { scaleY: 1 });
-      gsap.set(beam, { opacity: complete ? 0.5 : 0.14, scale: 1, rotation: 0 });
-    }
+    gsap.context(() => {
+      gsap.set(construction, {
+        opacity: isFocus && !complete ? 0.25 + currentProgress * 0.55 : 0,
+        y: isFocus && !complete ? (1 - currentProgress) * -4 : 0,
+      });
+      gsap.set(beam, { opacity: complete ? 0.38 : 0.1, rotation: 0, transformOrigin: `${LIGHTHOUSE_X}px 112px` });
 
-    gsap.set(construction, {
-      opacity: isFocus && !complete ? 0.25 + currentProgress * 0.55 : 0,
-      y: isFocus && !complete ? (1 - currentProgress) * 3 : 0,
-      scaleY: isFocus && !complete ? 0.76 + currentProgress * 0.24 : 1,
-      transformOrigin: "50% 100%",
+      const timeline = gsap.timeline({ paused: !running && delta <= 0 });
+      if (delta > 0 && !prefersReduced) {
+        timeline
+          .fromTo(construction, { y: -10, opacity: 0 }, { y: 0, opacity: 1, duration: 0.75, ease: "power2.out" })
+          .to(beam, { opacity: complete ? 0.5 : 0.28, duration: 0.6, ease: "power2.out" }, 0.1);
+      }
+      timelineRef.current = timeline;
+
+      if (complete && running && !prefersReduced) {
+        gsap.to(beam, { rotation: 360, duration: 16, repeat: -1, ease: "none", transformOrigin: `${LIGHTHOUSE_X}px 112px` });
+      }
+      if (running && !prefersReduced) {
+        gsap.to(atmosphere, { x: 2, duration: 5, yoyo: true, repeat: -1, ease: "sine.inOut" });
+      }
     });
 
-    timelineRef.current = gsap.timeline({ paused: !running && delta <= 0 });
-    if (delta > 0) {
-      timelineRef.current
-        .fromTo(tower, { scaleY: 0.985 }, { scaleY: 1, duration: prefersReduced ? 0 : 0.85, ease: "power2.out", transformOrigin: "50% 100%" })
-        .fromTo(beam, { opacity: 0.15, scale: 0.88 }, { opacity: complete ? 0.56 : 0.3, scale: 1, duration: prefersReduced ? 0 : 0.7, ease: "power2.out" }, 0.12);
-    }
-    if (complete) {
-      gsap.to(beam, { rotation: 360, duration: prefersReduced ? 0 : 16, repeat: -1, ease: "none", transformOrigin: "0 0" });
-    } else {
-      gsap.killTweensOf(beam);
-    }
     return () => {
+      timelineRef.current?.revert();
       timelineRef.current?.kill();
-      gsap.killTweensOf([beam, atmosphere]);
+      gsap.killTweensOf([beam, atmosphere, construction]);
     };
   }, [complete, currentProgress, isFocus, prefersReduced, running, safeCompleted]);
-
-  useEffect(() => {
-    const atmosphere = atmosphereRef.current;
-    if (!atmosphere || prefersReduced) return;
-    const drift = gsap.to(atmosphere, { x: 3, duration: 5, yoyo: true, repeat: -1, ease: "sine.inOut", paused: !running });
-    return () => { drift.kill(); };
-  }, [prefersReduced, running]);
 
   return (
     <div className="relative flex items-center justify-center">
       <div className="relative h-64 w-64 sm:h-72 sm:w-72">
-        <svg viewBox="0 0 320 320" className="h-full w-full -rotate-90">
+        <svg viewBox="0 0 320 320" preserveAspectRatio="xMidYMid meet" className="h-full w-full -rotate-90" aria-hidden>
           <circle cx={CENTER} cy={CENTER} r={RADIUS} fill="none" strokeWidth="1" className="stroke-border/50" />
           <motion.circle
             cx={CENTER} cy={CENTER} r={RADIUS} fill="none" strokeWidth="1.7" strokeLinecap="round"
-            className={`${isFocus ? "stroke-indigo-600" : "stroke-foreground/25"}`}
-            style={{ strokeDasharray: 2 * Math.PI * RADIUS, strokeDashoffset: dashOffset, filter: isFocus ? "drop-shadow(0 0 4px rgb(99 102 241 / 0.26))" : undefined }}
+            className={isFocus ? "stroke-indigo-600" : "stroke-foreground/25"}
+            style={{ strokeDasharray: 2 * Math.PI * RADIUS, strokeDashoffset: dashOffset }}
           />
         </svg>
 
-        <svg viewBox="0 0 320 320" className="absolute inset-0 h-full w-full">
+        <svg viewBox="0 0 320 320" preserveAspectRatio="xMidYMid meet" className="absolute inset-0 h-full w-full" aria-hidden>
           <defs>
-            <clipPath id="lighthouse-world"><circle cx={CENTER} cy={CENTER} r={RADIUS - 2} /></clipPath>
+            <clipPath id={clipId}><circle cx={CENTER} cy={CENTER} r={RADIUS - 2} /></clipPath>
           </defs>
-          <g clipPath="url(#lighthouse-world)">
-            <rect x="0" y="0" width="320" height="320" className="fill-background" />
-            <g ref={atmosphereRef}>
-              <path d="M 0 204 C 46 188 72 204 108 190 C 154 172 184 198 224 180 C 260 164 292 184 320 170 L 320 320 L 0 320 Z" className="fill-foreground/[0.025]" />
-              <path d="M 0 238 C 46 220 82 242 120 224 C 160 205 202 240 240 216 C 270 198 296 220 320 208 L 320 320 L 0 320 Z" className="fill-foreground/[0.045]" />
-              <path d="M 0 270 C 55 258 94 270 138 260 C 188 248 225 270 270 254 C 292 246 306 254 320 248 L 320 320 L 0 320 Z" className="fill-foreground/[0.07]" />
-              <path d="M 0 282 Q 42 274 84 282 T 168 282 T 252 282 T 336 282" fill="none" strokeWidth="1" className="stroke-foreground/10" />
-              <path d="M 0 294 Q 42 286 84 294 T 168 294 T 252 294 T 336 294" fill="none" strokeWidth="0.8" className="stroke-foreground/10" />
+
+          <g clipPath={`url(#${clipId})`}>
+            <g id="background">
+              <rect width={SIZE} height={SIZE} className="fill-background" />
+              <path d="M0 160 C55 144 92 158 132 150 C180 140 214 154 260 144 C285 139 305 141 320 138 L320 220 L0 220Z" className="fill-foreground/[0.025]" />
             </g>
 
-            <g ref={beamRef} opacity={complete ? 0.5 : 0.14}>
-              <path d="M 160 106 L 76 62 L 76 82 Z" className="fill-indigo-500/[0.08]" />
-              <path d="M 160 106 L 244 62 L 244 82 Z" className="fill-indigo-500/[0.06]" />
+            <g id="environment">
+              <g ref={atmosphereRef}>
+                <path d="M0 224 C45 213 82 226 122 215 C170 202 207 224 252 210 C282 201 304 211 320 207 L320 320 L0 320Z" className="fill-foreground/[0.045]" />
+              </g>
+              <path d="M0 263 C52 253 88 266 132 256 C177 246 218 265 262 252 C286 245 305 251 320 247 L320 320 L0 320Z" className="fill-foreground/[0.075]" />
+              <path d="M0 282 Q42 274 84 282 T168 282 T252 282 T336 282" fill="none" strokeWidth="1" className="stroke-foreground/10" />
+              <path d="M0 295 Q42 287 84 295 T168 295 T252 295 T336 295" fill="none" strokeWidth="0.8" className="stroke-foreground/10" />
             </g>
 
-            <g ref={towerRef}>
-              <rect x="136" y={BASE_Y - 13} width="48" height="13" rx="2" className="fill-foreground/[0.08]" />
+            <g id="beam" ref={beamRef}>
+              <path d={`M${LIGHTHOUSE_X - 3} 112 L178 87 L178 102Z`} className="fill-indigo-500/[0.07]" />
+              <path d={`M${LIGHTHOUSE_X + 3} 112 L302 87 L302 102Z`} className="fill-indigo-500/[0.05]" />
+            </g>
+
+            <g id="lighthouse">
+              <rect x={LIGHTHOUSE_X - 22} y={BASE_Y - 13} width="44" height="13" rx="2" className="fill-foreground/[0.1]" />
               {sections.map((index) => {
                 const y = yFor(index);
                 const reached = index < safeCompleted;
                 const current = index === currentSection && !reached && isFocus;
+                const left = LIGHTHOUSE_X - 17 - index * 0.08;
+                const right = LIGHTHOUSE_X + 17 + index * 0.08;
                 return (
-                  <g key={index} opacity={reached ? 1 : current ? 0.42 + currentProgress * 0.48 : 0.12}>
-                    <path d={`M ${136 - index * 0.22} ${y} L ${184 + index * 0.22} ${y} L ${180 + index * 0.18} ${y - sectionHeight + 1} L ${140 - index * 0.18} ${y - sectionHeight + 1} Z`} className={reached ? "fill-foreground/[0.18]" : "fill-transparent"} />
-                    <path d={`M 142 ${y - sectionHeight + 3} L 178 ${y - sectionHeight + 3}`} strokeWidth="1" className={reached ? "stroke-foreground/30" : "stroke-foreground/10"} />
-                    {index % 4 === 3 && <path d={`M 133 ${y - sectionHeight} L 187 ${y - sectionHeight}`} strokeWidth="1.5" className="stroke-indigo-500/30" />}
+                  <g key={index} opacity={reached ? 1 : current ? 0.45 + currentProgress * 0.4 : 0.16}>
+                    <path d={`M${left} ${y} L${right} ${y} L${right - 3} ${y - sectionHeight + 1} L${left + 3} ${y - sectionHeight + 1}Z`} className={reached ? "fill-foreground/[0.18]" : "fill-transparent"} />
+                    <path d={`M${left + 5} ${y - sectionHeight + 3} L${right - 5} ${y - sectionHeight + 3}`} strokeWidth="1" className={reached ? "stroke-foreground/30" : "stroke-foreground/10"} />
+                    {index % 4 === 3 && <path d={`M${left - 4} ${y - sectionHeight} L${right + 4} ${y - sectionHeight}`} strokeWidth="1.5" className="stroke-indigo-500/30" />}
                   </g>
                 );
               })}
-              <path d="M 132 107 L 188 107 L 184 96 L 136 96 Z" className="fill-foreground/[0.18]" />
-              <rect x="139" y="96" width="42" height="8" rx="1.5" className="fill-indigo-500/15" />
-              <path d="M 145 96 L 145 88 L 175 88 L 175 96" fill="none" strokeWidth="1.5" className="stroke-foreground/55" />
-              <path d="M 148 88 L 148 80 L 172 80 L 172 88 Z" className="fill-foreground/[0.2]" />
-              <circle cx="160" cy="84" r="4" className={`${complete ? "fill-indigo-500/70" : "fill-indigo-500/20"}`} />
+              <path d={`M${LIGHTHOUSE_X - 26} 129 L${LIGHTHOUSE_X + 26} 129 L${LIGHTHOUSE_X + 21} 118 L${LIGHTHOUSE_X - 21} 118Z`} className="fill-foreground/[0.18]" />
+              <rect x={LIGHTHOUSE_X - 19} y="118" width="38" height="8" rx="1.5" className="fill-indigo-500/15" />
+              <path d={`M${LIGHTHOUSE_X - 14} 118 L${LIGHTHOUSE_X - 14} 110 L${LIGHTHOUSE_X + 14} 110 L${LIGHTHOUSE_X + 14} 118`} fill="none" strokeWidth="1.5" className="stroke-foreground/55" />
+              <path d={`M${LIGHTHOUSE_X - 11} 110 L${LIGHTHOUSE_X - 11} 102 L${LIGHTHOUSE_X + 11} 102 L${LIGHTHOUSE_X + 11} 110Z`} className="fill-foreground/[0.2]" />
+              <circle cx={LIGHTHOUSE_X} cy="106" r="4" className={complete ? "fill-indigo-500/70" : "fill-indigo-500/20"} />
             </g>
 
-            <g ref={constructionRef} transform={`translate(0,0)`}>
-              <path d={`M 142 ${yFor(currentSection) - sectionHeight} L 178 ${yFor(currentSection) - sectionHeight}`} strokeWidth="2" className="stroke-indigo-500/60" />
-              <path d={`M 143 ${yFor(currentSection) - sectionHeight + 5} L 177 ${yFor(currentSection) - sectionHeight + 5}`} strokeWidth="1" className="stroke-indigo-500/35" />
-              <circle cx="132" cy={yFor(currentSection) - sectionHeight / 2} r="2" className="fill-indigo-500/55" />
-              <circle cx="188" cy={yFor(currentSection) - sectionHeight / 2} r="2" className="fill-indigo-500/55" />
-            </g>
-
-            <g transform="translate(160,78)">
-              <path d="M 0 -9 L 0 0" strokeWidth="1" className="stroke-foreground/55" />
-              <path d="M 0 -9 L 7 -6 L 0 -3 Z" className={`${complete ? "fill-indigo-500/70" : "fill-indigo-500/35"}`} />
+            <g id="construction" ref={constructionRef}>
+              <path d={`M${LIGHTHOUSE_X - 15} ${yFor(currentSection) - sectionHeight} L${LIGHTHOUSE_X + 15} ${yFor(currentSection) - sectionHeight}`} strokeWidth="2" className="stroke-indigo-500/60" />
+              <path d={`M${LIGHTHOUSE_X - 14} ${yFor(currentSection) - sectionHeight + 5} L${LIGHTHOUSE_X + 14} ${yFor(currentSection) - sectionHeight + 5}`} strokeWidth="1" className="stroke-indigo-500/35" />
             </g>
           </g>
         </svg>
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="pointer-events-none absolute inset-[17%] flex items-center justify-center rounded-full bg-background/95">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={phase} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.28 }} className="z-10 flex flex-col items-center">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.32em] text-foreground/45">{PHASE_SESSION_LABEL[phase]}</span>
-              <span className="mt-3 font-sans text-7xl font-extralight tracking-tight tabular-nums text-foreground sm:text-8xl">{formatTime(secondsLeft)}</span>
-              <motion.span key={statusText} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-foreground/50">
+              <span className="text-[9px] font-semibold uppercase tracking-[0.28em] text-foreground/45">{PHASE_SESSION_LABEL[phase]}</span>
+              <span className="mt-2 font-sans text-5xl font-extralight tracking-tight tabular-nums text-foreground sm:text-6xl">{formatTime(secondsLeft)}</span>
+              <motion.span key={statusText} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="mt-2 flex items-center gap-1.5 text-[10px] font-medium text-foreground/50">
                 {running && isFocus && <span className="h-1 w-1 rounded-full bg-indigo-500" />}
                 {statusText}
               </motion.span>
