@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
-import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus, getAscent, incrementAscent } from "@/hooks/use-pomodoro-stats";
+import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus, getAscent, incrementAscent, resetAscent, setAscent as setAscentPoints } from "@/hooks/use-pomodoro-stats";
 import { NoteSelect } from "./NoteSelect";
 import { JourneySummary } from "./AscentMountain";
 import { ClimbTimer } from "./ClimbTimer";
@@ -53,6 +53,8 @@ function loadState(userId: number): PersistedState | null {
     const raw = localStorage.getItem(stateKey(userId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
+    const savedPoints = localStorage.getItem(`pomodoro_total_points_${userId}`);
+    const configuredPoints = savedPoints === null ? 16 : Number(savedPoints);
     return {
       focusMin: parsed.focusMin ?? 25,
       breakMin: parsed.breakMin ?? 5,
@@ -62,7 +64,7 @@ function loadState(userId: number): PersistedState | null {
       pomoCount: parsed.pomoCount ?? 0,
       running: parsed.running ?? false,
       startedAt: parsed.startedAt ?? null,
-      totalPoints: Math.max(4, Math.min(64, parsed.totalPoints ?? 16)),
+      totalPoints: Math.max(4, Math.min(64, parsed.totalPoints ?? (Number.isFinite(configuredPoints) ? configuredPoints : 16))),
     };
   } catch {
     return null;
@@ -694,6 +696,22 @@ export function PomodoroTimer() {
     clearState(userIdRef.current);
   }, []);
 
+  const resetPoints = useCallback(() => {
+    resetAscent(userIdRef.current);
+    ascentRef.current = 0;
+    setAscent(0);
+  }, []);
+
+  const handleTotalPointsChange = useCallback((value: number) => {
+    const next = Math.max(4, Math.min(64, Math.round(value)));
+    setTotalPoints(next);
+    if (ascentRef.current > next) {
+      const clamped = setAscentPoints(userIdRef.current, next);
+      ascentRef.current = clamped;
+      setAscent(clamped);
+    }
+  }, []);
+
   const resetCycle = useCallback(() => {
     pomoCountRef.current = 0;
     setPomoCount(0);
@@ -1110,7 +1128,9 @@ export function PomodoroTimer() {
               <JourneySummary height={ascent} totalPoints={totalPoints} />
 
               <div className="mt-5 flex items-center justify-center gap-1">
-                <SecondaryButton onClick={reset} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset" />
+                <SecondaryButton onClick={reset} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset timer" />
+                <span className="mx-1 h-1 w-1 rounded-full bg-border" />
+                <SecondaryButton onClick={resetPoints} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset points" />
                 <span className="mx-1 h-1 w-1 rounded-full bg-border" />
                 <SecondaryButton onClick={skipPhase} icon={<SkipForward className="h-3.5 w-3.5" />} label="Skip" />
               </div>
@@ -1172,7 +1192,7 @@ export function PomodoroTimer() {
                     checked={sound}
                     onChange={setSound}
                   />
-                  <ProgressPointsSetting value={totalPoints} onChange={setTotalPoints} />
+                  <ProgressPointsSetting value={totalPoints} onChange={handleTotalPointsChange} />
                 </div>
 
                 {!("Notification" in window) || Notification.permission === "denied" ? (

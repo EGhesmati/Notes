@@ -141,6 +141,17 @@ export function incrementAscent(userId: number): number {
   return next;
 }
 
+/** Reset the accumulated lighthouse points without changing timer state. */
+export function resetAscent(userId: number): void {
+  writeAscent(userId, 0);
+}
+
+export function setAscent(userId: number, points: number): number {
+  const next = Math.max(0, Math.floor(points));
+  writeAscent(userId, next);
+  return next;
+}
+
 /**
  * Abandoned a focus session: the boulder falls back to the last checkpoint
  * (every `step` steps, default 4). At height 1 it falls all the way down.
