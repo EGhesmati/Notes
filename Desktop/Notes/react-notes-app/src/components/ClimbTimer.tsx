@@ -35,6 +35,7 @@ export function ClimbTimer({
   const isFocus = phase === "focus";
   const paused = !running && secondsLeft !== duration;
   const complete = isFocus && secondsLeft <= 0 && !running;
+  const waterLevel = Math.min(1, Math.max(0, completedPoints / Math.max(1, totalPoints)));
   const status = isFocus && secondsLeft <= 0 && !running
     ? "Focus complete"
     : running ? PHASE_STATUS[phase] : paused ? "Paused" : "Ready";
@@ -42,10 +43,10 @@ export function ClimbTimer({
   return (
     <div className="relative aspect-square w-[13.5rem] max-w-full sm:w-[14.5rem]">
       <div className="absolute inset-0 overflow-hidden rounded-full border border-border/70 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.025),inset_0_-10px_24px_hsl(var(--foreground)/0.025)]">
-        <div className="absolute inset-x-0 bottom-0 h-[24%] bg-foreground/[0.018]" />
-        <div className={`sea-surface absolute inset-x-[-12%] bottom-[17%] h-[13%] ${
+        <div className="water-fill absolute inset-x-0 bottom-0" style={{ height: `${waterLevel * 100}%` }}>
+          <div className={`sea-surface absolute inset-x-[-12%] top-0 h-8 ${
           running ? "sea-surface-active" : complete ? "sea-surface-complete" : paused ? "sea-surface-paused" : ""
-        }`} aria-hidden>
+          }`} aria-hidden>
           <svg className="sea-wave sea-wave-primary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">
             <path d="M-10 17 C 12 5, 30 5, 52 17 S 92 29, 114 17 S 154 5, 176 17 S 216 29, 250 14" />
           </svg>
@@ -55,7 +56,10 @@ export function ClimbTimer({
           <svg className="sea-wave sea-wave-tertiary absolute inset-0 h-full w-full" viewBox="0 0 240 32" preserveAspectRatio="none">
             <path d="M-10 25 C 18 18, 35 18, 62 25 S 106 31, 132 24 S 174 17, 202 24 S 226 29, 250 22" />
           </svg>
+            <span key={completedPoints} className="water-ripple absolute left-1/2 top-1/2 h-3 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-indigo-400/20" />
+          </div>
         </div>
+        <div className="pointer-events-none absolute inset-1 rounded-full border border-white/30" />
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-[9%] z-10 flex justify-center">
         <div className="flex flex-col items-center text-center">

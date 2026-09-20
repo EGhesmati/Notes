@@ -43,6 +43,10 @@ body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform:
   0%, 100% { transform: translateX(-5%); }
   50% { transform: translateX(5%); }
 }
+.water-fill {
+  background: rgb(186 211 232 / .16);
+  transition: height 900ms cubic-bezier(.22, 1, .36, 1);
+}
 .sea-wave { overflow: visible; fill: none; stroke-linecap: round; stroke-width: 1.6; opacity: .7; }
 .sea-wave-primary { stroke: rgb(129 140 248 / .5); }
 .sea-wave-secondary { stroke: rgb(71 85 105 / .32); stroke-width: 1.2; }
@@ -52,6 +56,12 @@ body::after { width: 32rem; height: 8rem; left: -10rem; bottom: 4rem; transform:
 .sea-surface-active .sea-wave-tertiary { animation: sea-wave-drift 4.4s ease-in-out -1.6s infinite; }
 .sea-surface-paused .sea-wave { animation: sea-wave-drift 14s ease-out 1 forwards; }
 .sea-surface-complete .sea-wave { animation: sea-wave-drift 1.15s ease-out 1; }
+.water-ripple { animation: water-ripple 950ms ease-out both; }
+@keyframes water-ripple {
+  0% { transform: translate(-50%, -50%) scale(.35); opacity: .7; }
+  100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .sea-wave-primary, .sea-wave-secondary, .sea-wave-tertiary { animation: none; }
+  .sea-wave-primary, .sea-wave-secondary, .sea-wave-tertiary, .water-ripple { animation: none; }
+  .water-fill { transition: none; }
 }
