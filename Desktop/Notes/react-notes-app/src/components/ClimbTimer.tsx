@@ -46,14 +46,14 @@ export function ClimbTimer({
   return (
     <div className="relative aspect-square w-[13.5rem] max-w-full sm:w-[14.5rem]">
       <div className="absolute inset-0 overflow-hidden rounded-full border border-border/70 bg-background shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.025),inset_0_-10px_24px_hsl(var(--foreground)/0.025)]">
+        <PixiWater
+          waterLevel={waterLevel}
+          running={running}
+          paused={paused}
+          completedPoints={Math.floor(visualPoints)}
+        />
         <div className="pointer-events-none absolute inset-1 rounded-full border border-white/30" />
       </div>
-      <PixiWater
-        waterLevel={waterLevel}
-        running={running}
-        paused={paused}
-        completedPoints={Math.floor(visualPoints)}
-      />
       <div className="pointer-events-none absolute inset-x-0 top-[9%] z-10 flex justify-center">
         <div className="flex flex-col items-center text-center">
           <span className="text-[10px] font-semibold uppercase tracking-[0.34em] text-foreground/70">{PHASE_LABEL[phase]}</span>

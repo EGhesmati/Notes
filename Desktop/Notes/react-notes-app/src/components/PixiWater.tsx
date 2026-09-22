@@ -88,20 +88,6 @@ interface FishSim {
   speedPx: number;
 }
 
-const DROP_COUNT = 10;
-const DROP_RADIUS = 2.2;
-
-interface Drop {
-  gfx: Graphics;
-  active: boolean;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
-}
-
 interface Snap {
   waterLevel: number;
   running: boolean;
@@ -120,12 +106,8 @@ interface WaterSim {
   fishLayer: Container;
   fishes: FishSim[];
   fishTex: Texture;
-  dropLayer: Container;
-  drops: Drop[];
-  dropTimer: number;
   w: number;
   h: number;
-  ch: number;
   R: number;
   cx: number;
   cy: number;
@@ -281,58 +263,6 @@ function updateFish(s: WaterSim, dt: number): void {
   }
 }
 
-function spawnDrop(s: WaterSim): void {
-  const drop = s.drops.find((d) => !d.active);
-  if (!drop) return;
-  drop.active = true;
-  drop.x = s.cx + (Math.random() - 0.5) * 0.3 * s.R;
-  drop.y = s.cy + s.R - 4;
-  drop.vx = (Math.random() - 0.5) * 26;
-  drop.vy = 36 + Math.random() * 46;
-  drop.life = 0;
-  drop.maxLife = 1.5 + Math.random() * 0.9;
-  drop.gfx.visible = true;
-}
-
-function updateDrops(s: WaterSim, dt: number): void {
-  if (s.reduced) {
-    for (const d of s.drops) {
-      d.active = false;
-      d.gfx.visible = false;
-    }
-    return;
-  }
-
-  const full = s.snap.waterLevel >= 0.999;
-  if (full) {
-    s.dropTimer -= dt;
-    if (s.dropTimer <= 0) {
-      spawnDrop(s);
-      if (Math.random() < 0.3) spawnDrop(s);
-      s.dropTimer = 0.5 + Math.random() * 0.9;
-    }
-  }
-
-  for (const d of s.drops) {
-    if (!d.active) continue;
-    d.life += dt;
-    d.vy += 230 * dt;
-    d.x += d.vx * dt;
-    d.y += d.vy * dt;
-
-    const q = Math.min(1, d.life / d.maxLife);
-    const envelope = q < 0.15 ? q / 0.15 : q > 0.7 ? Math.max(0, (1 - q) / 0.3) : 1;
-    d.gfx.x = d.x;
-    d.gfx.y = d.y;
-    d.gfx.alpha = 0.42 * envelope;
-
-    if (q >= 1 || d.y - s.ch > 8) {
-      d.active = false;
-      d.gfx.visible = false;
-    }
-  }
-}
-
 function fireRipple(s: WaterSim): void {
   s.rippleE = 1;
   s.rippleT = 0;
@@ -402,7 +332,6 @@ function tick(s: WaterSim, dt: number): void {
   s.water.visible = s.cur > 0.002;
   updateWater(s);
   updateFish(s, dt);
-  updateDrops(s, dt);
   s.uniforms.uniforms.uTime = s.time;
   s.uniforms.update();
 }
@@ -416,12 +345,11 @@ function destroySim(s: WaterSim): void {
 }
 
 async function createWaterSim(host: HTMLDivElement, snap: Snap): Promise<WaterSim> {
-  const width = Math.max(1, host.clientWidth || 1);
-  const canvasH = Math.max(width, host.clientHeight || width);
+  const size = Math.max(1, host.clientWidth || 1);
   const app = new Application();
   await app.init({
-    width,
-    height: canvasH,
+    width: size,
+    height: size,
     backgroundAlpha: 0,
     antialias: true,
     resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -436,17 +364,16 @@ async function createWaterSim(host: HTMLDivElement, snap: Snap): Promise<WaterSi
   canvas.style.left = "0";
   canvas.style.width = "100%";
   canvas.style.height = "100%";
-  canvas.style.pointerEvents = "none";
   host.appendChild(canvas);
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const fishTex = makeFishTexture();
-  const w = width;
-  const h = width;
-  const R = width / 2;
-  const cx = width / 2;
-  const cy = width / 2;
+  const w = size;
+  const h = size;
+  const R = size / 2;
+  const cx = size / 2;
+  const cy = size / 2;
 
   const uniforms = new UniformGroup({
     uColorA: { value: new Float32Array([0.78, 0.84, 0.97, 0.36]), type: "vec4<f32>" },
@@ -457,7 +384,6 @@ async function createWaterSim(host: HTMLDivElement, snap: Snap): Promise<WaterSi
   const circleMask = new Graphics();
   const root = new Container();
   const fishLayer = new Container();
-  const dropLayer = new Container();
 
   const s: WaterSim = {
     app,
@@ -470,12 +396,8 @@ async function createWaterSim(host: HTMLDivElement, snap: Snap): Promise<WaterSi
     fishLayer,
     fishes: [],
     fishTex,
-    dropLayer,
-    drops: [],
-    dropTimer: 0.5,
     w,
     h,
-    ch: canvasH,
     R,
     cx,
     cy,
@@ -489,18 +411,6 @@ async function createWaterSim(host: HTMLDivElement, snap: Snap): Promise<WaterSi
     reduced,
     snap,
   };
-
-  const drops: Drop[] = [];
-  for (let i = 0; i < DROP_COUNT; i++) {
-    const gfx = new Graphics();
-    gfx.circle(0, 0, DROP_RADIUS).fill(0xa9c1e2);
-    gfx.alpha = 0;
-    gfx.visible = false;
-    gfx.scale.set(0.7 + Math.random() * 0.5);
-    dropLayer.addChild(gfx);
-    drops.push({ gfx, active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 1 });
-  }
-  s.drops = drops;
 
   buildGeometry(s);
   applyCircleMask(s);
@@ -537,7 +447,6 @@ async function createWaterSim(host: HTMLDivElement, snap: Snap): Promise<WaterSi
   updateFish(s, 0);
 
   app.stage.addChild(root);
-  app.stage.addChild(dropLayer);
   app.ticker.add((ticker) => {
     const dt = Math.min(ticker.deltaMS / 1000, 0.05);
     tick(s, dt);
@@ -545,19 +454,13 @@ async function createWaterSim(host: HTMLDivElement, snap: Snap): Promise<WaterSi
 
   const observer = new ResizeObserver(() => {
     const width = Math.max(1, host.clientWidth || 1);
-    const height = Math.max(width, host.clientHeight || width);
-    if (width === s.w && height === s.ch) return;
-    app.renderer.resize(width, height);
+    if (width === s.w) return;
+    app.renderer.resize(width, width);
     s.w = width;
     s.h = width;
-    s.ch = height;
     s.R = width / 2;
     s.cx = width / 2;
     s.cy = width / 2;
-    for (const d of s.drops) {
-      d.active = false;
-      d.gfx.visible = false;
-    }
     applyCircleMask(s);
     placeFish(s);
   });
@@ -615,5 +518,5 @@ export function PixiWater({
     };
   }, []);
 
-  return <div ref={hostRef} className="pointer-events-none absolute inset-x-0 top-0 h-[calc(100%+4rem)]" aria-hidden />;
+  return <div ref={hostRef} className="pointer-events-none absolute inset-0" aria-hidden />;
 }
