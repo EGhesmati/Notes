@@ -64,7 +64,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
   const [noteTags, setNoteTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [completionFilter, setCompletionFilter] = useState<"all" | "active" | "completed">("all");
 
   const {
     notes,
@@ -125,9 +124,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
     }
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
   }, [notes]);
-
-  const completedCount = useMemo(() => notes.filter((n) => n.completed).length, [notes]);
-  const activeCount = notes.length - completedCount;
 
   const addNote = useCallback(() => {
     const trimmed = text.trim();
@@ -200,13 +196,6 @@ function AppShell({ signOut }: { signOut: () => void }) {
   const filtered = useMemo(() => {
     let list = notes;
 
-    // completion filter
-    if (completionFilter === "active") {
-      list = list.filter((n) => !n.completed);
-    } else if (completionFilter === "completed") {
-      list = list.filter((n) => n.completed);
-    }
-
     // tag filter
     if (selectedTag) {
       list = list.filter((n) => n.tags && n.tags.includes(selectedTag));
@@ -223,16 +212,11 @@ function AppShell({ signOut }: { signOut: () => void }) {
     }
 
     return [...list].sort((a, b) => {
-      // uncompleted before completed if view is "all"
-      if (completionFilter === "all") {
-        if (!a.completed && b.completed) return -1;
-        if (a.completed && !b.completed) return 1;
-      }
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
       return 0; // stable: preserve custom drag order within groups
     });
-  }, [notes, debouncedSearch, completionFilter, selectedTag]);
+  }, [notes, debouncedSearch, selectedTag]);
 
   if (!hydrated) return <AppLoadingScreen />;
 
@@ -438,31 +422,10 @@ function AppShell({ signOut }: { signOut: () => void }) {
         )}
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-full border border-border/60 bg-card/80 p-0.5 backdrop-blur-xl">
-              {(
-                [
-                  { key: "all", label: "All", count: notes.length },
-                  { key: "active", label: "Active", count: activeCount },
-                  { key: "completed", label: "Done", count: completedCount },
-                ] as const
-              ).map(({ key, label, count }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setCompletionFilter(key)}
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-all ${
-                    completionFilter === key
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-                  }`}
-                >
-                  {label}
-                  <span className="ml-1 opacity-70 text-[10px]">({count})</span>
-                </button>
-              ))}
-            </div>
-
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              {notes.length} note{notes.length !== 1 && "s"}
+            </Badge>
             {debouncedSearch && (
               <Badge variant="outline" className="text-xs">
                 {filtered.length} match{filtered.length !== 1 && "es"}

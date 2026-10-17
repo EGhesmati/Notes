@@ -503,7 +503,7 @@ const NoteCard = memo(function NoteCard({
                       ? "border-emerald-500 bg-emerald-500 text-white shadow-xs"
                       : "border-border/80 bg-background/50 text-transparent hover:border-emerald-500/80 hover:bg-emerald-500/10"
                   }`}
-                  title={item.completed ? "Mark as active" : "Mark as completed"}
+                  title={item.completed ? "Uncheck note" : "Check off note"}
                 >
                   <Check className={`h-2.5 w-2.5 stroke-[3] ${item.completed ? "opacity-100" : "opacity-0"}`} />
                 </button>
@@ -512,19 +512,13 @@ const NoteCard = memo(function NoteCard({
                   #{item.id}
                 </span>
 
-                {item.completed && (
-                  <span className="inline-block rounded-full bg-emerald-500/15 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                    Done
-                  </span>
-                )}
-
-                {badge && !item.completed && (
+                {badge && (
                   <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${badge.className}`}>
                     {badge.label}
                   </span>
                 )}
               </div>
-              {due?.badge && !item.completed && (
+              {due?.badge && (
                 <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${due.badge.color}`}>
                   {due.badge.label}
                 </span>
