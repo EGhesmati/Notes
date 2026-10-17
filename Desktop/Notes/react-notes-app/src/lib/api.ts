@@ -24,6 +24,8 @@ export async function createNote(note: {
   priority?: string;
   dueDate?: string;
   pinned?: boolean;
+  completed?: boolean;
+  tags?: string[];
 }) {
   const res = await fetch(`${API_URL}/api/notes`, {
     method: "POST",
@@ -41,6 +43,9 @@ export async function updateNote(
     priority?: string | null;
     dueDate?: string | null;
     pinned?: boolean;
+    completed?: boolean;
+    tags?: string[];
+    color?: string;
   },
 ) {
   const res = await fetch(`${API_URL}/api/notes/${id}`, {

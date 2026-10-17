@@ -30,6 +30,7 @@ import { changePassword, changeUsername } from "@/lib/api";
 import { AppLoadingScreen } from "@/components/AppLoadingScreen";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import PomodoroStats from "@/components/PomodoroStats";
+import { AmbientSoundPlayer } from "@/components/AmbientSoundPlayer";
 import { TimeChips } from "@/components/TimeChips";
 import { useAuth } from "@/lib/auth-context";
 import { LoginPage } from "@/pages/LoginPage";
@@ -60,7 +61,23 @@ function AppShell({ signOut }: { signOut: () => void }) {
   const [priority, setPriority] = useState<Priority | undefined>();
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
-  const { notes, trash, setNotes: addNoteApi, editNote: editNoteApi, deleteNote: deleteNoteApi, restoreNote, deleteNotePermanent, reorder: reorderNotesApi } = useUserNotes();
+  const [noteTags, setNoteTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [completionFilter, setCompletionFilter] = useState<"all" | "active" | "completed">("all");
+
+  const {
+    notes,
+    trash,
+    setNotes: addNoteApi,
+    editNote: editNoteApi,
+    deleteNote: deleteNoteApi,
+    restoreNote,
+    deleteNotePermanent,
+    reorder: reorderNotesApi,
+    toggleComplete,
+  } = useUserNotes();
+
   // complete pomodoro dataset (local + server) → total focus time per note
   const { stats: pomoStats } = usePomodoroStats(userId);
   const timeOnNote = useMemo(() => timePerNoteMap(pomoStats), [pomoStats]);
@@ -96,29 +113,63 @@ function AppShell({ signOut }: { signOut: () => void }) {
 
   const debouncedSearch = useDebounce(search, 200);
 
+  // Collect distinct tags across all notes with count
+  const allTags = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const n of notes) {
+      if (n.tags) {
+        for (const t of n.tags) {
+          map.set(t, (map.get(t) || 0) + 1);
+        }
+      }
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [notes]);
+
+  const completedCount = useMemo(() => notes.filter((n) => n.completed).length, [notes]);
+  const activeCount = notes.length - completedCount;
+
   const addNote = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed) return;
     const color =
       NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)].name;
+
+    // extract any #hashtags directly in text
+    const extracted = (trimmed.match(/#[a-zA-Z0-9_\u0600-\u06FF-]+/g) || []).map((t) =>
+      t.slice(1).trim(),
+    );
+    const finalTags = Array.from(new Set([...noteTags, ...extracted]));
+
     addNoteApi({
       text: trimmed,
       color,
       priority,
       dueDate: toISO(dueDate, dueTime),
+      tags: finalTags,
     });
     setText("");
     setPriority(undefined);
     setDueDate("");
     setDueTime("");
-  }, [text, priority, dueDate, dueTime, addNoteApi]);
+    setNoteTags([]);
+    setTagInput("");
+  }, [text, priority, dueDate, dueTime, noteTags, addNoteApi]);
 
   const editNote = useCallback(
-    (id: number, newText: string, newPriority?: Priority, newDueDate?: string, newDueTime?: string) => {
+    (
+      id: number,
+      newText: string,
+      newPriority?: Priority,
+      newDueDate?: string,
+      newDueTime?: string,
+      newTags?: string[],
+    ) => {
       editNoteApi(id, {
         text: newText,
-        priority: newPriority || null,
-        dueDate: toISO(newDueDate, newDueTime) || null,
+        priority: newPriority !== undefined ? newPriority || null : undefined,
+        dueDate: newDueDate !== undefined ? toISO(newDueDate, newDueTime) || null : undefined,
+        tags: newTags,
       });
     },
     [editNoteApi],
@@ -147,17 +198,41 @@ function AppShell({ signOut }: { signOut: () => void }) {
   );
 
   const filtered = useMemo(() => {
-    const matches = debouncedSearch
-      ? notes.filter((n) =>
-          n.text.toLowerCase().includes(debouncedSearch.toLowerCase()),
-        )
-      : notes;
-    return [...matches].sort((a, b) => {
+    let list = notes;
+
+    // completion filter
+    if (completionFilter === "active") {
+      list = list.filter((n) => !n.completed);
+    } else if (completionFilter === "completed") {
+      list = list.filter((n) => n.completed);
+    }
+
+    // tag filter
+    if (selectedTag) {
+      list = list.filter((n) => n.tags && n.tags.includes(selectedTag));
+    }
+
+    // search filter
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      list = list.filter(
+        (n) =>
+          n.text.toLowerCase().includes(q) ||
+          (n.tags && n.tags.some((t) => t.toLowerCase().includes(q))),
+      );
+    }
+
+    return [...list].sort((a, b) => {
+      // uncompleted before completed if view is "all"
+      if (completionFilter === "all") {
+        if (!a.completed && b.completed) return -1;
+        if (a.completed && !b.completed) return 1;
+      }
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
       return 0; // stable: preserve custom drag order within groups
     });
-  }, [notes, debouncedSearch]);
+  }, [notes, debouncedSearch, completionFilter, selectedTag]);
 
   if (!hydrated) return <AppLoadingScreen />;
 
@@ -186,6 +261,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
                 </span>
               )}
             </Button>
+            <AmbientSoundPlayer />
             <PomodoroTimer />
             <PomodoroStats />
             {user?.isAdmin && (
@@ -238,7 +314,7 @@ function AppShell({ signOut }: { signOut: () => void }) {
 
         <div className="mb-2 flex gap-2 sm:gap-3">
           <Input
-            placeholder="Write a note..."
+            placeholder="Write a note... (use #tag to categorize)"
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addNote()}
@@ -276,26 +352,117 @@ function AppShell({ signOut }: { signOut: () => void }) {
             className="h-7 w-32 rounded-md border border-border bg-card/80 px-2 text-[11px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
           {dueDate && <TimeChips value={dueTime} onChange={setDueTime} />}
+
+          <span className="text-[10px] text-muted-foreground/60">|</span>
+          <span className="text-[11px] font-medium text-muted-foreground">Tags</span>
+          <div className="flex flex-wrap items-center gap-1">
+            {noteTags.map((t) => (
+              <span
+                key={t}
+                className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
+              >
+                #{t}
+                <button
+                  type="button"
+                  onClick={() => setNoteTags((prev) => prev.filter((x) => x !== t))}
+                  className="text-primary/60 hover:text-destructive"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </span>
+            ))}
+            <input
+              type="text"
+              placeholder="+tag"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const clean = tagInput.trim().replace(/^#/, "");
+                  if (clean && !noteTags.includes(clean)) {
+                    setNoteTags((prev) => [...prev, clean]);
+                  }
+                  setTagInput("");
+                }
+              }}
+              className="h-6 w-16 rounded border border-border bg-card/80 px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
         </div>
-        <p className="mb-5 ml-1 mt-1 text-xs text-muted-foreground">
+        <p className="mb-4 ml-1 mt-1 text-xs text-muted-foreground">
           {text.length} character{text.length !== 1 && "s"}
         </p>
 
-        <div className="relative mb-5">
+        <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
           <Input
-            placeholder="Search notes..."
+            placeholder="Search notes or #tags..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-11 border-border bg-card/80 pl-10 backdrop-blur-xl focus-visible:ring-ring"
           />
         </div>
 
+        {/* Tag filter pills */}
+        {allTags.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1">
+            <span className="text-[11px] font-medium text-muted-foreground mr-1">Tags:</span>
+            <button
+              type="button"
+              onClick={() => setSelectedTag(null)}
+              className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all ${
+                selectedTag === null
+                  ? "bg-foreground text-background"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              All
+            </button>
+            {allTags.map(([tag, count]) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setSelectedTag((prev) => (prev === tag ? null : tag))}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all ${
+                  selectedTag === tag
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                }`}
+              >
+                <span>#{tag}</span>
+                <span className="opacity-60 text-[10px]">({count})</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-xs">
-              {notes.length} note{notes.length !== 1 && "s"}
-            </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-full border border-border/60 bg-card/80 p-0.5 backdrop-blur-xl">
+              {(
+                [
+                  { key: "all", label: "All", count: notes.length },
+                  { key: "active", label: "Active", count: activeCount },
+                  { key: "completed", label: "Done", count: completedCount },
+                ] as const
+              ).map(({ key, label, count }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setCompletionFilter(key)}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-all ${
+                    completionFilter === key
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                  <span className="ml-1 opacity-70 text-[10px]">({count})</span>
+                </button>
+              ))}
+            </div>
+
             {debouncedSearch && (
               <Badge variant="outline" className="text-xs">
                 {filtered.length} match{filtered.length !== 1 && "es"}
@@ -335,7 +502,17 @@ function AppShell({ signOut }: { signOut: () => void }) {
           </p>
         ) : (
           <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
-            <NotesGrid notes={filtered} onDelete={deleteNote} onEdit={editNote} onTogglePin={togglePin} onReorder={handleReorder} timeOnNote={timeOnNote} view={view} />
+            <NotesGrid
+              notes={filtered}
+              onDelete={deleteNote}
+              onEdit={editNote}
+              onTogglePin={togglePin}
+              onToggleComplete={toggleComplete}
+              onSelectTag={(t) => setSelectedTag((prev) => (prev === t ? null : t))}
+              onReorder={handleReorder}
+              timeOnNote={timeOnNote}
+              view={view}
+            />
           </Suspense>
         )}
       </main>

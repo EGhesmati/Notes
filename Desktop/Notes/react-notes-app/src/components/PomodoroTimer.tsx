@@ -24,6 +24,7 @@ import { useAuth } from "@/lib/auth-context";
 import { recordCompletion, usePomodoroStats, getDailyGoal, todaysFocus, getAscent, incrementAscent, resetAscent, setAscent as setAscentPoints } from "@/hooks/use-pomodoro-stats";
 import { NoteSelect } from "./NoteSelect";
 import { ClimbTimer } from "./ClimbTimer";
+import { ambientSound } from "@/lib/ambient-sound";
 
 export type TimerPhase = "focus" | "short-break" | "long-break";
 
@@ -524,6 +525,10 @@ export function PomodoroTimer() {
     ascent,
     totalPoints,
   ]);
+
+  useEffect(() => {
+    ambientSound.setTimerRunning(running && phase === "focus");
+  }, [running, phase]);
 
   const setSound = (v: boolean) => {
     soundRef.current = v;

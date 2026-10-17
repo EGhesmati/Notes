@@ -44,6 +44,11 @@ await pool.query(`
   -- soft-delete support: trashed notes have a non-null deleted_at timestamp
   ALTER TABLE notes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
+  -- completion and tags support
+  ALTER TABLE notes ADD COLUMN IF NOT EXISTS completed BOOLEAN NOT NULL DEFAULT FALSE;
+  ALTER TABLE notes ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+  ALTER TABLE notes ADD COLUMN IF NOT EXISTS tags TEXT NOT NULL DEFAULT '[]';
+
   -- password hashing support: new/changed passwords are stored here as scrypt hashes;
   -- legacy rows keep a plaintext passcode until they next verify (upgraded on login/change)
   ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
@@ -214,16 +219,29 @@ app.post("/api/auth/change-username", authMiddleware, async (req, res) => {
 
 // ---- Notes ----
 
+function formatNoteRow(n: any) {
+  let tags: string[];
+  try {
+    tags = typeof n.tags === "string" ? JSON.parse(n.tags || "[]") : (n.tags || []);
+  } catch {
+    tags = [];
+  }
+  return {
+    ...n,
+    dueDate: n.due_date || undefined,
+    pinned: !!n.pinned,
+    completed: !!n.completed,
+    completedAt: n.completed_at || undefined,
+    tags: Array.isArray(tags) ? tags : [],
+  };
+}
+
 app.get("/api/notes", authMiddleware, async (req, res) => {
   const { rows } = await pool.query(
     "SELECT * FROM notes WHERE user_id = $1 AND deleted_at IS NULL ORDER BY pinned DESC, sort_order ASC, created_at DESC",
     [(req as any).userId],
   );
-  res.json(rows.map((n: any) => ({
-    ...n,
-    dueDate: n.due_date || undefined,
-    pinned: !!n.pinned,
-  })));
+  res.json(rows.map(formatNoteRow));
 });
 
 // List trashed (soft-deleted) notes, most recently deleted first.
@@ -232,11 +250,7 @@ app.get("/api/notes/trash", authMiddleware, async (req, res) => {
     "SELECT * FROM notes WHERE user_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC",
     [(req as any).userId],
   );
-  res.json(rows.map((n: any) => ({
-    ...n,
-    dueDate: n.due_date || undefined,
-    pinned: !!n.pinned,
-  })));
+  res.json(rows.map(formatNoteRow));
 });
 
 // Restore a soft-deleted note back to the active list.
@@ -249,20 +263,48 @@ app.post("/api/notes/:id/restore", authMiddleware, async (req, res) => {
 });
 
 app.post("/api/notes", authMiddleware, async (req, res) => {
-  const { text, color, priority, dueDate, pinned } = req.body;
+  const { text, color, priority, dueDate, pinned, completed, tags } = req.body;
+  const tagsJson = JSON.stringify(Array.isArray(tags) ? tags : []);
+  const isCompleted = !!completed;
+  const completedAt = isCompleted ? new Date().toISOString() : null;
   const { rows } = await pool.query(
-    "INSERT INTO notes (user_id, text, color, priority, due_date, pinned) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-    [(req as any).userId, text, color, priority || null, dueDate || null, pinned ? 1 : 0],
+    "INSERT INTO notes (user_id, text, color, priority, due_date, pinned, completed, completed_at, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
+    [(req as any).userId, text, color, priority || null, dueDate || null, pinned ? 1 : 0, isCompleted, completedAt, tagsJson],
   );
-  const note = rows[0];
-  res.json({ ...note, dueDate: note.due_date || undefined, pinned: !!note.pinned });
+  res.json(formatNoteRow(rows[0]));
 });
 
 app.put("/api/notes/:id", authMiddleware, async (req, res) => {
-  const { text, color, priority, dueDate, pinned } = req.body;
+  const { text, color, priority, dueDate, pinned, completed, tags } = req.body;
+  const tagsJson = tags !== undefined ? JSON.stringify(Array.isArray(tags) ? tags : []) : null;
+
   await pool.query(
-    "UPDATE notes SET text = COALESCE($1, text), priority = $2, due_date = $3, pinned = COALESCE($4, pinned), updated_at = NOW() WHERE id = $5 AND user_id = $6",
-    [text, priority || null, dueDate || null, pinned != null ? (pinned ? 1 : 0) : null, req.params.id, (req as any).userId],
+    `UPDATE notes SET
+      text = COALESCE($1, text),
+      color = COALESCE($2, color),
+      priority = CASE WHEN $3::text IS NOT NULL THEN $3 ELSE priority END,
+      due_date = CASE WHEN $4::text IS NOT NULL THEN $4 ELSE due_date END,
+      pinned = COALESCE($5, pinned),
+      completed = COALESCE($6, completed),
+      completed_at = CASE
+        WHEN $6 IS TRUE THEN NOW()
+        WHEN $6 IS FALSE THEN NULL
+        ELSE completed_at
+      END,
+      tags = COALESCE($7, tags),
+      updated_at = NOW()
+    WHERE id = $8 AND user_id = $9`,
+    [
+      text,
+      color,
+      priority !== undefined ? priority : null,
+      dueDate !== undefined ? dueDate : null,
+      pinned != null ? (pinned ? 1 : 0) : null,
+      completed != null ? completed : null,
+      tagsJson,
+      req.params.id,
+      (req as any).userId,
+    ],
   );
   res.json({ ok: true });
 });

@@ -13,6 +13,9 @@ interface RawNote {
   // server returns pinned as a boolean (true/false); coerce with !! when reading
   pinned: boolean | number | null;
   deleted_at?: string | null;
+  completed?: boolean | number | null;
+  completed_at?: string | null;
+  tags?: string[] | string | null;
 }
 
 function lsKey(userId: number) {
@@ -51,6 +54,19 @@ function saveTrash(userId: number | null, notes: NoteItem[]) {
   localStorage.setItem(trashKey(userId), JSON.stringify(notes));
 }
 
+function parseTags(rawTags: string[] | string | null | undefined): string[] {
+  if (Array.isArray(rawTags)) return rawTags;
+  if (typeof rawTags === "string") {
+    try {
+      const parsed = JSON.parse(rawTags);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 function mapRaw(n: RawNote): NoteItem {
   return {
     id: n.id,
@@ -61,6 +77,9 @@ function mapRaw(n: RawNote): NoteItem {
     dueDate: n.due_date || undefined,
     pinned: !!n.pinned,
     deletedAt: n.deleted_at || undefined,
+    completed: !!n.completed,
+    completedAt: n.completed_at || undefined,
+    tags: parseTags(n.tags),
   };
 }
 
@@ -121,7 +140,7 @@ export function useUserNotes() {
     return () => window.removeEventListener("focus", onFocus);
   }, [fetchAndApply]);
 
-  const addNote = useCallback(async (note: { text: string; color: string; priority?: string; dueDate?: string; pinned?: boolean }) => {
+  const addNote = useCallback(async (note: { text: string; color: string; priority?: string; dueDate?: string; pinned?: boolean; completed?: boolean; tags?: string[] }) => {
     try {
       const n = await apiCreate(note);
       const item: NoteItem = {
@@ -132,6 +151,9 @@ export function useUserNotes() {
         priority: (n.priority as NoteItem["priority"]) || undefined,
         dueDate: n.due_date || undefined,
         pinned: n.pinned === 1,
+        completed: !!n.completed,
+        completedAt: n.completed_at || undefined,
+        tags: parseTags(n.tags || note.tags),
       };
       setNotes((prev) => {
         const next = [...prev, item];
@@ -148,6 +170,9 @@ export function useUserNotes() {
         priority: note.priority as NoteItem["priority"],
         dueDate: note.dueDate,
         pinned: note.pinned,
+        completed: !!note.completed,
+        completedAt: note.completed ? new Date().toISOString() : undefined,
+        tags: note.tags || [],
       };
       setNotes((prev) => {
         const next = [...prev, item];
@@ -157,7 +182,18 @@ export function useUserNotes() {
     }
   }, [userId]);
 
-  const editNote = useCallback(async (id: number, updates: { text?: string; priority?: string | null; dueDate?: string | null; pinned?: boolean }) => {
+  const editNote = useCallback(async (
+    id: number,
+    updates: {
+      text?: string;
+      priority?: string | null;
+      dueDate?: string | null;
+      pinned?: boolean;
+      completed?: boolean;
+      tags?: string[];
+      color?: string;
+    },
+  ) => {
     try {
       await apiUpdate(id, updates);
     } catch {
@@ -165,11 +201,50 @@ export function useUserNotes() {
     }
     setNotes((prev) => {
       const next = prev.map((n) =>
-        n.id === id ? { ...n, ...updates, priority: (updates.priority as NoteItem["priority"]) || undefined, dueDate: updates.dueDate ?? undefined } : n,
+        n.id === id
+          ? {
+              ...n,
+              ...updates,
+              priority: (updates.priority as NoteItem["priority"]) !== undefined
+                ? (updates.priority as NoteItem["priority"]) || undefined
+                : n.priority,
+              dueDate: updates.dueDate !== undefined ? updates.dueDate ?? undefined : n.dueDate,
+              completed: updates.completed !== undefined ? updates.completed : n.completed,
+              completedAt: updates.completed !== undefined
+                ? (updates.completed ? n.completedAt || new Date().toISOString() : undefined)
+                : n.completedAt,
+              tags: updates.tags !== undefined ? updates.tags : n.tags,
+            }
+          : n,
       );
       saveLocal(userId, next);
       return next;
     });
+  }, [userId]);
+
+  const toggleComplete = useCallback(async (id: number) => {
+    let nextVal = false;
+    setNotes((prev) => {
+      const target = prev.find((n) => n.id === id);
+      if (!target) return prev;
+      nextVal = !target.completed;
+      const next = prev.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              completed: nextVal,
+              completedAt: nextVal ? new Date().toISOString() : undefined,
+            }
+          : n,
+      );
+      saveLocal(userId, next);
+      return next;
+    });
+    try {
+      await apiUpdate(id, { completed: nextVal });
+    } catch {
+      // ignore
+    }
   }, [userId]);
 
   // Soft-delete: remove from the active list and add to the local trash.
@@ -253,5 +328,5 @@ export function useUserNotes() {
     [userId],
   );
 
-  return { notes, trash, setNotes: addNote, editNote, deleteNote, restoreNote, deleteNotePermanent, reorder, loading } as const;
+  return { notes, trash, setNotes: addNote, editNote, deleteNote, restoreNote, deleteNotePermanent, reorder, toggleComplete, loading } as const;
 }

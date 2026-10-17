@@ -9,6 +9,9 @@ export interface NoteItem {
   dueDate?: string;
   pinned?: boolean;
   deletedAt?: string;
+  completed?: boolean;
+  completedAt?: string;
+  tags?: string[];
 }
 
 export type NotesState = readonly NoteItem[];

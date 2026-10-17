@@ -2,7 +2,7 @@ import { memo, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Pencil, Check, X, Calendar, Pin, Timer, GripVertical } from "lucide-react";
+import { Trash2, Pencil, Check, X, Calendar, Pin, Timer, GripVertical, Plus } from "lucide-react";
 import { PRIORITY_BADGE, noteColor } from "@/types";
 import type { NotesState, Priority } from "@/types";
 import { formatDuration } from "@/hooks/use-pomodoro-stats";
@@ -18,8 +18,11 @@ interface NotesGridProps {
     priority?: Priority,
     dueDate?: string,
     dueTime?: string,
+    tags?: string[],
   ) => void;
   readonly onTogglePin: (id: number) => void;
+  readonly onToggleComplete: (id: number) => void;
+  readonly onSelectTag?: (tag: string) => void;
   readonly onReorder: (orderedIds: number[]) => void;
   /** total focus seconds worked per note id */
   readonly timeOnNote: Map<number, number>;
@@ -83,6 +86,8 @@ const NotesGrid = memo(function NotesGrid({
   onDelete,
   onEdit,
   onTogglePin,
+  onToggleComplete,
+  onSelectTag,
   onReorder,
   timeOnNote,
   view,
@@ -152,6 +157,8 @@ const NotesGrid = memo(function NotesGrid({
         onDelete={onDelete}
         onEdit={onEdit}
         onTogglePin={onTogglePin}
+        onToggleComplete={onToggleComplete}
+        onSelectTag={onSelectTag}
         timeOnNote={timeOnNote}
         dragEnabled={dragEnabled}
         isDragging={dragId === item.id}
@@ -163,7 +170,7 @@ const NotesGrid = memo(function NotesGrid({
         onDragEndItem={clearDrag}
       />
     ),
-    [onDelete, onEdit, onTogglePin, timeOnNote, dragEnabled, dragId, overId, handleDragStart, handleDragOver, handleDrop, clearDrag],
+    [onDelete, onEdit, onTogglePin, onToggleComplete, onSelectTag, timeOnNote, dragEnabled, dragId, overId, handleDragStart, handleDragOver, handleDrop, clearDrag],
   );
 
   if (notes.length === 0) {
@@ -188,7 +195,34 @@ const NotesGrid = memo(function NotesGrid({
         {KANBAN_COLUMNS.map((col) => {
           const colNotes = notes.filter((n) => (col.key === null ? !n.priority : n.priority === col.key));
           return (
-            <div key={col.label} className="flex min-w-[16rem] max-w-[16rem] flex-1 flex-col rounded-2xl border border-border/60 bg-muted/40 p-3">
+            <div
+              key={col.label}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const sourceIdRaw = e.dataTransfer.getData("text/plain") || String(dragId);
+                const sourceId = Number(sourceIdRaw);
+                if (Number.isFinite(sourceId)) {
+                  const targetNote = notes.find((n) => n.id === sourceId);
+                  if (targetNote && targetNote.priority !== (col.key || undefined)) {
+                    const parsedDates = fromISO(targetNote.dueDate);
+                    onEdit(
+                      targetNote.id,
+                      targetNote.text,
+                      (col.key as Priority) || undefined,
+                      parsedDates.date,
+                      parsedDates.time,
+                      targetNote.tags,
+                    );
+                  }
+                }
+                clearDrag();
+              }}
+              className="flex min-w-[17rem] max-w-[17rem] flex-1 flex-col rounded-2xl border border-border/60 bg-muted/40 p-3 transition-colors hover:border-primary/30"
+            >
               <div className={`mb-3 flex items-center justify-between rounded-lg px-2.5 py-2 ${col.header}`}>
                 <div className="flex items-center gap-2">
                   <span className={`h-2 w-2 rounded-full ${col.dot}`} />
@@ -198,9 +232,9 @@ const NotesGrid = memo(function NotesGrid({
                   {colNotes.length}
                 </span>
               </div>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 flex-1">
                 {colNotes.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-border/70 px-3 py-6 text-center text-[11px] text-muted-foreground/60">
+                  <div className="flex-1 min-h-24 flex items-center justify-center rounded-xl border border-dashed border-border/70 px-3 py-6 text-center text-[11px] text-muted-foreground/60">
                     Drop notes here
                   </div>
                 ) : (
@@ -226,6 +260,8 @@ const NoteCard = memo(function NoteCard({
   onDelete,
   onEdit,
   onTogglePin,
+  onToggleComplete,
+  onSelectTag,
   timeOnNote,
   variant,
   dragEnabled,
@@ -246,8 +282,11 @@ const NoteCard = memo(function NoteCard({
     priority?: Priority,
     dueDate?: string,
     dueTime?: string,
+    tags?: string[],
   ) => void;
   readonly onTogglePin: (id: number) => void;
+  readonly onToggleComplete: (id: number) => void;
+  readonly onSelectTag?: (tag: string) => void;
   readonly timeOnNote: Map<number, number>;
   readonly dragEnabled: boolean;
   readonly isDragging: boolean;
@@ -264,6 +303,8 @@ const NoteCard = memo(function NoteCard({
   const [editPriority, setEditPriority] = useState<Priority | undefined>(item.priority);
   const [editDueDate, setEditDueDate] = useState(defaultDates.date);
   const [editDueTime, setEditDueTime] = useState(defaultDates.time);
+  const [editTags, setEditTags] = useState<string[]>(item.tags || []);
+  const [newTagInput, setNewTagInput] = useState("");
 
   const startEdit = useCallback(() => {
     setEditText(item.text);
@@ -271,17 +312,31 @@ const NoteCard = memo(function NoteCard({
     const d = fromISO(item.dueDate);
     setEditDueDate(d.date);
     setEditDueTime(d.time);
+    setEditTags(item.tags || []);
+    setNewTagInput("");
     setEditing(true);
-  }, [item.text, item.priority, item.dueDate]);
+  }, [item.text, item.priority, item.dueDate, item.tags]);
 
   const cancelEdit = useCallback(() => setEditing(false), []);
+
+  const handleAddTag = useCallback(() => {
+    const clean = newTagInput.trim().replace(/^#/, "");
+    if (clean && !editTags.includes(clean)) {
+      setEditTags((prev) => [...prev, clean]);
+    }
+    setNewTagInput("");
+  }, [newTagInput, editTags]);
+
+  const handleRemoveTag = useCallback((t: string) => {
+    setEditTags((prev) => prev.filter((tag) => tag !== t));
+  }, []);
 
   const saveEdit = useCallback(() => {
     const trimmed = editText.trim();
     if (!trimmed) return;
-    onEdit(item.id, trimmed, editPriority, editDueDate, editDueTime);
+    onEdit(item.id, trimmed, editPriority, editDueDate, editDueTime, editTags);
     setEditing(false);
-  }, [editText, editPriority, editDueDate, editDueTime, item.id, onEdit]);
+  }, [editText, editPriority, editDueDate, editDueTime, editTags, item.id, onEdit]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -307,9 +362,11 @@ const NoteCard = memo(function NoteCard({
       onDrop={(e) => onDropItem(e, item.id)}
       onDragEnd={onDragEndItem}
       onDragLeave={() => {}}
-      className={`group relative flex flex-col overflow-hidden rounded-lg border bg-card/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5 ${
+      className={`group relative flex flex-col overflow-hidden rounded-xl border bg-card/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5 ${
         isDragging ? "opacity-40 scale-[0.98]" : ""
-      } ${isOver ? "ring-2 ring-primary/40" : ""} ${dragEnabled ? "cursor-grab active:cursor-grabbing" : ""}`}
+      } ${isOver ? "ring-2 ring-primary/40" : ""} ${dragEnabled ? "cursor-grab active:cursor-grabbing" : ""} ${
+        item.completed ? "bg-card/40 border-border/40" : ""
+      }`}
     >
       {item.pinned && (
         <span className="absolute right-3 top-2.5 z-10 text-foreground/30 transition-colors group-hover:text-primary">
@@ -335,7 +392,54 @@ const NoteCard = memo(function NoteCard({
             <p className="text-[10px] text-muted-foreground/60">
               Markdown supported: <span className="font-mono">**bold**</span>, <span className="font-mono">*italic*</span>, <span className="font-mono">`code`</span>, <span className="font-mono">## heading</span>, <span className="font-mono">- lists</span>
             </p>
-            <div className="flex flex-wrap items-center gap-1.5">
+
+            {/* Tags edit */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-medium text-muted-foreground">Tags</span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {editTags.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+                  >
+                    #{t}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(t)}
+                      className="hover:text-destructive text-primary/60"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    placeholder="Add tag..."
+                    value={newTagInput}
+                    onChange={(e) => setNewTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddTag();
+                      }
+                    }}
+                    className="h-6 w-20 rounded border border-border bg-background px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleAddTag}
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
               {PRIORITY_OPTIONS.map((p) => {
                 const sel = editPriority === p;
                 const b = PRIORITY_BADGE[p];
@@ -386,16 +490,41 @@ const NoteCard = memo(function NoteCard({
                 >
                   <GripVertical className="h-4 w-4" />
                 </button>
+
+                {/* Completion Checkbox */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleComplete(item.id);
+                  }}
+                  className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border transition-all ${
+                    item.completed
+                      ? "border-emerald-500 bg-emerald-500 text-white shadow-xs"
+                      : "border-border/80 bg-background/50 text-transparent hover:border-emerald-500/80 hover:bg-emerald-500/10"
+                  }`}
+                  title={item.completed ? "Mark as active" : "Mark as completed"}
+                >
+                  <Check className={`h-2.5 w-2.5 stroke-[3] ${item.completed ? "opacity-100" : "opacity-0"}`} />
+                </button>
+
                 <span className="select-none font-mono text-[10px] font-semibold uppercase text-foreground/35">
                   #{item.id}
                 </span>
-                {badge && (
+
+                {item.completed && (
+                  <span className="inline-block rounded-full bg-emerald-500/15 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    Done
+                  </span>
+                )}
+
+                {badge && !item.completed && (
                   <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${badge.className}`}>
                     {badge.label}
                   </span>
                 )}
               </div>
-              {due?.badge && (
+              {due?.badge && !item.completed && (
                 <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest ${due.badge.color}`}>
                   {due.badge.label}
                 </span>
@@ -404,9 +533,37 @@ const NoteCard = memo(function NoteCard({
 
             {/* Note body (markdown) */}
             <div className={`flex flex-1 flex-col ${compact ? "px-3 pt-1 pb-3" : "px-4 pt-1.5 pb-4"}`}>
-              <div className={`${compact ? "text-[13px]" : "text-sm"} leading-relaxed text-foreground`}>
+              <div
+                className={`${compact ? "text-[13px]" : "text-sm"} leading-relaxed transition-all ${
+                  item.completed
+                    ? "line-through text-muted-foreground/60 decoration-muted-foreground/40"
+                    : "text-foreground"
+                }`}
+              >
                 {renderMarkdown(item.text)}
               </div>
+
+              {/* Tags pill row */}
+              {item.tags && item.tags.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-1">
+                  {item.tags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectTag?.(tag);
+                      }}
+                      className="inline-flex items-center gap-0.5 rounded-full bg-foreground/5 hover:bg-primary/10 hover:text-primary px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors"
+                      title={`Filter by #${tag}`}
+                    >
+                      <span className="opacity-40">#</span>
+                      <span>{tag}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {(due?.dateLabel || focusedLabel) && (
                 <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
                   {due?.dateLabel && (
@@ -428,9 +585,9 @@ const NoteCard = memo(function NoteCard({
             {/* Footer meta row */}
             <div className={`flex items-center justify-between border-t border-border/60 ${compact ? "px-3 py-1.5" : "px-4 py-2"}`}>
               {!compact && (
-              <span className="text-[10px] text-muted-foreground/60">
-                {created.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-              </span>
+                <span className="text-[10px] text-muted-foreground/60">
+                  {created.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                </span>
               )}
               <div className={`ml-auto flex items-center gap-0.5 ${compact ? "" : "opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"}`}>
                 <Button variant="ghost" size="icon" onClick={() => onTogglePin(item.id)} className={`h-7 w-7 ${item.pinned ? "text-primary" : "text-muted-foreground"} hover:text-foreground`} title={item.pinned ? "Unpin" : "Pin"}>
