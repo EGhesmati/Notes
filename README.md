@@ -121,7 +121,7 @@ react-notes-app/
 │   ├── hooks/
 │   │   ├── use-user-notes.ts      # Notes CRUD (API + localStorage)
 │   │   ├── use-pomodoro-stats.ts  # Pomodoro stats engine
-│   │   ├── use-theme.ts           # Dark/light mode
+│   │   ├── use-theme.ts           # Light mode and Nord dark theme
 │   │   ├── use-debounce.ts        # Search debouncing
 │   │   └── use-local-storage.ts   # localStorage sync
 │   ├── components/
