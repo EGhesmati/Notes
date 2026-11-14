@@ -1319,7 +1319,7 @@ export function PomodoroTimer() {
                 transition={{ duration: 0.16 }}
               >
                 <motion.div
-                  className="w-[min(24rem,_calc(100vw-2rem))] max-h-[calc(100vh-4rem)] overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm sm:w-[26rem]"
+                  className="flex max-h-[calc(100dvh-2rem)] w-[min(24rem,_calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm sm:w-[26rem]"
                   initial={{ opacity: 0, y: 12, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.98 }}
@@ -1329,7 +1329,7 @@ export function PomodoroTimer() {
                     scale: { type: "spring", stiffness: 380, damping: 30 },
                   }}
                 >
-                  <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+                  <div className="flex shrink-0 items-center justify-between border-b border-border/50 px-4 py-3">
                     <h3 className="text-sm font-semibold text-foreground">
                       {pendingPartialDuration === null ? "Associate with Note" : "Save Focus Session"}
                     </h3>
@@ -1337,15 +1337,17 @@ export function PomodoroTimer() {
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                  <div className="space-y-3 p-4">
-                    {pendingPartialDuration !== null && (
-                      <p className="text-xs text-muted-foreground">
-                        Record {Math.floor(pendingPartialDuration / 60)}m {pendingPartialDuration % 60}s of focus time.
-                      </p>
-                    )}
-                    <NoteSelect notes={noteOptions} value={selectedNoteId} onChange={(id) => setSelectedNoteId(id)} />
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+                    <div className="space-y-3">
+                      {pendingPartialDuration !== null && (
+                        <p className="text-xs text-muted-foreground">
+                          Record {Math.floor(pendingPartialDuration / 60)}m {pendingPartialDuration % 60}s of focus time.
+                        </p>
+                      )}
+                      <NoteSelect notes={noteOptions} value={selectedNoteId} onChange={(id) => setSelectedNoteId(id)} />
+                    </div>
                   </div>
-                  <div className="flex gap-2 border-t border-border/50 px-4 py-3">
+                  <div className="flex shrink-0 gap-2 border-t border-border/50 px-4 py-3">
                     <Button
                       onClick={() => {
                         if (selectedNoteId !== null) {

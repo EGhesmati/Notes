@@ -61,7 +61,7 @@ export function NoteSelect({ notes, value, onChange }: NoteSelectProps) {
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-44 overflow-y-auto rounded-lg border border-border bg-card/95 p-1 shadow-xl backdrop-blur-xl">
+        <div className="mt-1 max-h-[min(11rem,35dvh)] overflow-y-auto overscroll-contain rounded-lg border border-border bg-card/95 p-1 shadow-xl backdrop-blur-xl">
           {notes.length === 0 ? (
             <p className="px-2 py-2 text-[11px] text-muted-foreground">No notes yet</p>
           ) : (
