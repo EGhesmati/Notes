@@ -264,6 +264,10 @@ export function todaysFocus(stats: PomoStat[]): { minutes: number; sessions: num
 // same queued items to Neon at the same time.
 let _syncingUserId: number | null = null;
 
+function statIdentity(stat: PomoStat): string {
+  return JSON.stringify([stat.ts, stat.duration, stat.phase, stat.noteId ?? null]);
+}
+
 /** Push locally-queued pomodoro stats to the backend (Neon) and drop the ones that succeed. */
 export async function syncStats(userId: number): Promise<void> {
   if (_syncingUserId === userId) return;
@@ -273,7 +277,7 @@ export async function syncStats(userId: number): Promise<void> {
     if (!token) return; // no auth, can't sync
     const queued = loadStats(userId);
     if (queued.length === 0) return;
-    const remaining: PomoStat[] = [];
+    const syncedCounts = new Map<string, number>();
     for (const item of queued) {
       try {
         const res = await fetch(`${API_URL}/api/pomodoros`, {
@@ -289,12 +293,28 @@ export async function syncStats(userId: number): Promise<void> {
             noteId: item.noteId ?? null,
           }),
         });
-        if (!res.ok) remaining.push(item);
+        if (res.ok) {
+          const identity = statIdentity(item);
+          syncedCounts.set(identity, (syncedCounts.get(identity) ?? 0) + 1);
+        }
       } catch {
-        remaining.push(item);
+        // Keep failed records in the local queue for the next sync attempt.
       }
     }
-    saveStats(userId, remaining);
+    if (syncedCounts.size > 0) {
+      // Merge against the latest queue so a completion added while requests
+      // were in flight is not discarded when successfully synced items clear.
+      const current = loadStats(userId);
+      const remainingCounts = new Map(syncedCounts);
+      const remaining = current.filter((item) => {
+        const identity = statIdentity(item);
+        const count = remainingCounts.get(identity) ?? 0;
+        if (count === 0) return true;
+        remainingCounts.set(identity, count - 1);
+        return false;
+      });
+      saveStats(userId, remaining);
+    }
   } finally {
     _syncingUserId = null;
   }
