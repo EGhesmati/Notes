@@ -30,6 +30,7 @@ A full-stack productivity platform with notes, Pomodoro timer, statistics, and u
 - **25 / 60 / 90 min** focus, **5 / 10 / 15 min** short break
 - **30 min** long break every 4th cycle
 - 🔗 **Link to notes** — track which note you're working on
+- **Save partial focus sessions** — record elapsed time and link it to a note without completing a full Pomodoro
 - 🔊 Sound effects + browser notifications
 - 💾 Persists on page reload
 

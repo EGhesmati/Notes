@@ -14,6 +14,7 @@ import {
   Pause,
   RotateCcw,
   SkipForward,
+  Save,
   Settings,
   CheckCircle2,
   Trophy,
@@ -482,6 +483,7 @@ export function PomodoroTimer() {
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
   const [noteOptions, setNoteOptions] = useState<{ id: number; text: string }[]>([]);
+  const [pendingPartialDuration, setPendingPartialDuration] = useState<number | null>(null);
 
   const [recapOpen, setRecapOpen] = useState(false);
   const { stats: pomoStats } = usePomodoroStats(userId);
@@ -626,6 +628,7 @@ export function PomodoroTimer() {
           running: false,
           startedAt: null,
         });
+        setPendingPartialDuration(null);
         setNotePickerOpen(true);
         return;
       }
@@ -663,6 +666,7 @@ export function PomodoroTimer() {
       const nextDur = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
       recordCompletion(userIdRef.current, "focus", focusMinRef.current * 60, noteId);
       setNotePickerOpen(false);
+      setPendingPartialDuration(null);
       setSelectedNoteId(null);
       setPomoCount(count);
 
@@ -687,6 +691,70 @@ export function PomodoroTimer() {
     },
     [beginCountdown, recap],
   );
+
+  const savePartialFocus = useCallback(
+    (noteId: number | null) => {
+      const duration = pendingPartialDuration;
+      if (duration === null || duration <= 0) return;
+
+      recordCompletion(userIdRef.current, "focus", duration, noteId);
+      const focusDur = focusMinRef.current * 60;
+      setNotePickerOpen(false);
+      setPendingPartialDuration(null);
+      setSelectedNoteId(null);
+      setPhase("focus");
+      phaseRef.current = "focus";
+      secondsLeftRef.current = focusDur;
+      setSecondsLeft(focusDur);
+      setPomodoroProgress(0);
+      runningRef.current = false;
+      setRunning(false);
+      endAtRef.current = null;
+      clearState(userIdRef.current);
+    },
+    [pendingPartialDuration],
+  );
+
+  const recordPartialFocus = useCallback(() => {
+    if (phaseRef.current !== "focus" || notePickerOpen) return;
+
+    const focusDur = focusMinRef.current * 60;
+    const remaining = runningRef.current && endAtRef.current !== null
+      ? Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000))
+      : secondsLeftRef.current;
+    const elapsed = focusDur - remaining;
+    if (elapsed <= 0) return;
+    if (elapsed >= focusDur) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      endAtRef.current = null;
+      handleCompleteRef.current("focus");
+      return;
+    }
+
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = null;
+    endAtRef.current = null;
+    runningRef.current = false;
+    setRunning(false);
+    secondsLeftRef.current = remaining;
+    setSecondsLeft(remaining);
+    setPomodoroProgress(elapsed / focusDur);
+    saveState(userIdRef.current, {
+      focusMin: focusMinRef.current,
+      breakMin: breakMinRef.current,
+      longBreakMin: longBreakMinRef.current,
+      phase: "focus",
+      secondsLeft: remaining,
+      pomoCount: pomoCountRef.current,
+      totalPoints: totalPointsRef.current,
+      running: false,
+      startedAt: null,
+    });
+    setPendingPartialDuration(elapsed);
+    setSelectedNoteId(null);
+    setNotePickerOpen(true);
+  }, [notePickerOpen]);
 
   const start = useCallback(() => {
     unlockAudio();
@@ -999,6 +1067,7 @@ export function PomodoroTimer() {
   const handleClearNotes = useCallback(() => {
     setSelectedNoteId(null);
     setNotePickerOpen(false);
+    setPendingPartialDuration(null);
   }, []);
 
   const duration = durFor(phase, focusMin, breakMin, longBreakMin);
@@ -1146,6 +1215,13 @@ export function PomodoroTimer() {
             {/* 3. Compact actions */}
             <div className="border-t border-border/50 px-6 py-1.5">
               <div className="flex items-center justify-center gap-1">
+                {phase === "focus" && pomodoroProgress > 0 && (
+                  <SecondaryButton
+                    onClick={recordPartialFocus}
+                    icon={<Save className="h-3.5 w-3.5" />}
+                    label="Save partial"
+                  />
+                )}
                 <SecondaryButton onClick={reset} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reset timer" />
                 <span className="mx-1 h-1 w-1 rounded-full bg-border" />
                 <SecondaryButton onClick={skipPhase} icon={<SkipForward className="h-3.5 w-3.5" />} label="Skip" />
@@ -1254,19 +1330,30 @@ export function PomodoroTimer() {
                   }}
                 >
                   <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
-                    <h3 className="text-sm font-semibold text-foreground">Associate with Note</h3>
+                    <h3 className="text-sm font-semibold text-foreground">
+                      {pendingPartialDuration === null ? "Associate with Note" : "Save Focus Session"}
+                    </h3>
                     <Button variant="ghost" size="icon" onClick={handleClearNotes} className="h-6 w-6 text-foreground/50 hover:text-foreground">
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                  <div className="max-h-[20rem] overflow-y-auto p-4">
+                  <div className="space-y-3 p-4">
+                    {pendingPartialDuration !== null && (
+                      <p className="text-xs text-muted-foreground">
+                        Record {Math.floor(pendingPartialDuration / 60)}m {pendingPartialDuration % 60}s of focus time.
+                      </p>
+                    )}
                     <NoteSelect notes={noteOptions} value={selectedNoteId} onChange={(id) => setSelectedNoteId(id)} />
                   </div>
                   <div className="flex gap-2 border-t border-border/50 px-4 py-3">
                     <Button
                       onClick={() => {
                         if (selectedNoteId !== null) {
-                          finishFocus(selectedNoteId);
+                          if (pendingPartialDuration === null) {
+                            finishFocus(selectedNoteId);
+                          } else {
+                            savePartialFocus(selectedNoteId);
+                          }
                         }
                       }}
                       disabled={selectedNoteId === null}
@@ -1275,8 +1362,12 @@ export function PomodoroTimer() {
                       <Check className="mr-2 h-4 w-4" />
                       Save with Note
                     </Button>
-                    <Button onClick={() => finishFocus(null)} variant="outline" className="flex-1">
-                      Skip Note
+                    <Button
+                      onClick={() => pendingPartialDuration === null ? finishFocus(null) : savePartialFocus(null)}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      {pendingPartialDuration === null ? "Skip Note" : "Record without Note"}
                     </Button>
                   </div>
                 </motion.div>
