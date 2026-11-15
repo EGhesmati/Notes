@@ -47,6 +47,7 @@ interface PersistedState {
   running: boolean;
   startedAt: number | null;
   totalPoints?: number;
+  recordedPartialSeconds?: number;
 }
 
 function loadState(userId: number): PersistedState | null {
@@ -66,6 +67,10 @@ function loadState(userId: number): PersistedState | null {
       running: parsed.running ?? false,
       startedAt: parsed.startedAt ?? null,
       totalPoints: Math.max(1, Math.min(64, parsed.totalPoints ?? (Number.isFinite(configuredPoints) ? configuredPoints : 16))),
+      recordedPartialSeconds:
+        typeof parsed.recordedPartialSeconds === "number" && Number.isFinite(parsed.recordedPartialSeconds)
+          ? Math.max(0, Math.floor(parsed.recordedPartialSeconds))
+          : 0,
     };
   } catch {
     return null;
@@ -475,6 +480,7 @@ export function PomodoroTimer() {
   const runningRef = useRef(running);
   const selectedNoteIdRef = useRef<number | null>(null);
   const userIdRef = useRef(userId);
+  const recordedPartialSecondsRef = useRef(0);
 
   const [ascent, setAscent] = useState<number>(() => getAscent(userId));
   const ascentRef = useRef(ascent);
@@ -593,6 +599,7 @@ export function PomodoroTimer() {
         pomoCount: pomoCountRef.current,
         running: true,
         startedAt,
+        recordedPartialSeconds: recordedPartialSecondsRef.current,
       });
     },
     [notify],
@@ -627,6 +634,7 @@ export function PomodoroTimer() {
           totalPoints: totalPointsRef.current,
           running: false,
           startedAt: null,
+          recordedPartialSeconds: recordedPartialSecondsRef.current,
         });
         setPendingPartialDuration(null);
         setNotePickerOpen(true);
@@ -664,14 +672,21 @@ export function PomodoroTimer() {
       const count = pomoCountRef.current;
       const next: TimerPhase = ascentRef.current >= totalPointsRef.current ? "long-break" : "short-break";
       const nextDur = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
-      recordCompletion(userIdRef.current, "focus", focusMinRef.current * 60, noteId);
+      const duration = Math.max(
+        0,
+        focusMinRef.current * 60 - recordedPartialSecondsRef.current,
+      );
+      if (duration > 0) {
+        recordCompletion(userIdRef.current, "focus", duration, noteId);
+      }
+      recordedPartialSecondsRef.current = 0;
       setNotePickerOpen(false);
       setPendingPartialDuration(null);
       setSelectedNoteId(null);
       setPomoCount(count);
 
       const goalMin = getDailyGoal(userIdRef.current);
-      const newTodayMin = recap.minutes + Math.round(focusMinRef.current);
+      const newTodayMin = recap.minutes + Math.round(duration / 60);
       if (goalMin > 0 && newTodayMin >= goalMin) {
         setRecapOpen(true);
       }
@@ -698,21 +713,15 @@ export function PomodoroTimer() {
       if (duration === null || duration <= 0) return;
 
       recordCompletion(userIdRef.current, "focus", duration, noteId);
-      const focusDur = focusMinRef.current * 60;
+      recordedPartialSecondsRef.current += duration;
       setNotePickerOpen(false);
       setPendingPartialDuration(null);
       setSelectedNoteId(null);
       setPhase("focus");
       phaseRef.current = "focus";
-      secondsLeftRef.current = focusDur;
-      setSecondsLeft(focusDur);
-      setPomodoroProgress(0);
-      runningRef.current = false;
-      setRunning(false);
-      endAtRef.current = null;
-      clearState(userIdRef.current);
+      beginCountdown({ next: "focus", remaining: secondsLeftRef.current });
     },
-    [pendingPartialDuration],
+    [beginCountdown, pendingPartialDuration],
   );
 
   const recordPartialFocus = useCallback(() => {
@@ -723,7 +732,7 @@ export function PomodoroTimer() {
       ? Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000))
       : secondsLeftRef.current;
     const elapsed = focusDur - remaining;
-    if (elapsed <= 0) return;
+    const partialElapsed = elapsed - recordedPartialSecondsRef.current;
     if (elapsed >= focusDur) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -731,6 +740,7 @@ export function PomodoroTimer() {
       handleCompleteRef.current("focus");
       return;
     }
+    if (partialElapsed <= 0) return;
 
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = null;
@@ -750,8 +760,9 @@ export function PomodoroTimer() {
       totalPoints: totalPointsRef.current,
       running: false,
       startedAt: null,
+      recordedPartialSeconds: recordedPartialSecondsRef.current,
     });
-    setPendingPartialDuration(elapsed);
+    setPendingPartialDuration(partialElapsed);
     setSelectedNoteId(null);
     setNotePickerOpen(true);
   }, [notePickerOpen]);
@@ -773,6 +784,7 @@ export function PomodoroTimer() {
         pomoCount: pomoCountRef.current,
         running: false,
         startedAt: null,
+        recordedPartialSeconds: recordedPartialSecondsRef.current,
       });
       return;
     }
@@ -794,6 +806,7 @@ export function PomodoroTimer() {
     endAtRef.current = null;
     runningRef.current = false;
     setRunning(false);
+    recordedPartialSecondsRef.current = 0;
     const dur = durFor(phaseRef.current, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
     secondsLeftRef.current = dur;
     setSecondsLeft(dur);
@@ -827,6 +840,7 @@ export function PomodoroTimer() {
     endAtRef.current = null;
     setSelectedNoteId(null);
     if (p === "focus") {
+      recordedPartialSecondsRef.current = 0;
       const next: TimerPhase = "short-break";
       const nextDur = durFor(next, focusMinRef.current, breakMinRef.current, longBreakMinRef.current);
       setPhase(next);
@@ -851,8 +865,10 @@ export function PomodoroTimer() {
   const changeFocus = useCallback((val: number) => {
     setFocusMin(val);
     if (!runningRef.current && phaseRef.current === "focus") {
+      recordedPartialSecondsRef.current = 0;
       secondsLeftRef.current = val * 60;
       setSecondsLeft(val * 60);
+      setPomodoroProgress(0);
     }
   }, []);
 
@@ -1016,6 +1032,7 @@ export function PomodoroTimer() {
     setPhase(saved.phase);
     setSecondsLeft(saved.secondsLeft);
     setPomoCount(saved.pomoCount);
+    recordedPartialSecondsRef.current = saved.recordedPartialSeconds ?? 0;
     if (saved.running && saved.startedAt) {
       const elapsed = Math.floor((Date.now() - saved.startedAt) / 1000);
       const remaining = Math.max(0, saved.secondsLeft - elapsed);
